@@ -5,7 +5,7 @@
 
 https://github.com/hodlen/PowerInfer/assets/34213478/b782ccc8-0a2a-42b6-a6aa-07b2224a66f7
 
-<sub>The demo running environment consists of a single 4090 GPU, the model is Falcon (ReLU)-40B, and the precision is FP16.</sub>
+<sub>The demo is running with a single 24G 4090 GPU, the model is Falcon (ReLU)-40B, and the precision is FP16.</sub>
 
 ---
 ## Abstract
@@ -108,7 +108,7 @@ In order to build PowerInfer you have two different options.
 
 ![github-eval-2080ti-q4](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/0fc1bfc4-aafc-4e82-a865-bec0143aff1a)
 
-PowerInfer achieves up to 11x and 8x speedup for fp16 and int4 model!
+PowerInfer achieves up to 11x and 8x speedup for FP16 and INT4 model!
 
 ## TODOs
 We will release the code and data in the following order, please stay tuned!
@@ -127,7 +127,7 @@ We will release the code and data in the following order, please stay tuned!
 If you find PowerInfer useful or relevant to your project and research, please kindly cite our paper:
 
 ```bibtex
-Stay Tune
+Stay tuned!
 ```
 
 ## Acknowledgement
