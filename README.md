@@ -119,6 +119,7 @@ We will release the code and data in the following order, please stay tuned!
 - [x] Release core code of PowerInfer, supporting Llama-2, Falcon-40B.
 - [ ] Release perplexity evaluation code
 - [ ] Support Metal for Mac
+- [ ] Release code for OPT models
 - [ ] Release predictor training code 
 - [ ] Support online split for FFN network
 - [ ] Support Multi-GPU 
