@@ -93,7 +93,7 @@ As for now, we have't released predictor training code, we suggest you can downl
 ```
 - If you have CPU with one GPU:
 ```bash
-./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt)
+./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt) --vram-budget $(GPU_VRAM_OFFLOADING)
 ```
 
 As for now, it requires a offline-generated "GPU index" file to split FFNs on GPU. If you want to try it, please use the following instruction to generate the GPU index file:
