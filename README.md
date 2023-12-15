@@ -104,9 +104,9 @@ In order to build PowerInfer you have two different options.
 
 ## Evaluation
 
-<img src="/Users/apple/Library/CloudStorage/OneDrive-个人/typora图片/image-20231214203009338.png" alt="image-20231214203009338" style="zoom:50%;" />
+![github-eval-4090](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d700fa6c-77ba-462f-a2fc-3fd21c898f33)
 
-<img src="/Users/apple/Library/CloudStorage/OneDrive-个人/typora图片/image-20231214203105378.png" alt="image-20231214203105378" style="zoom:50%;" />
+![github-eval-2080ti-q4](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/0fc1bfc4-aafc-4e82-a865-bec0143aff1a)
 
 PowerInfer achieves up to 11x and 8x speedup for fp16 and int4 model!
 
