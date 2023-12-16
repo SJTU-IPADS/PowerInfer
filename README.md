@@ -1,11 +1,13 @@
 # PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU
 ---
 
-*Demo* 🔥
+## Demo 🔥
 
 https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d26ae05b-d0cf-40b6-8788-bda3fe447e28
 
-<sub>PowerInfer v.s. llama.cpp on a single RTX 4090(24G) running Falcon(ReLU)-40B-FP16 with a 11x speedup!</sub>
+PowerInfer v.s. llama.cpp on a single RTX 4090(24G) running Falcon(ReLU)-40B-FP16 with a 11x speedup!
+
+<sub>Both PowerInfer and llama.cpp were running on the same hardware and fully utilized VRAM on RTX 4090.</sub>
 
 ---
 ## Abstract
