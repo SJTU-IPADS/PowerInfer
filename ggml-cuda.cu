@@ -4552,12 +4552,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
         return;
     }
     int id = lst[row];
-    // int id = row;
-    // if (idx[id] < 0.0f) {
-    //     return;
-    // }
     const int bid = blockIdx.y;
-    // if (bid == 0) global_lock = 0;
 
     extern __shared__ float shared_dst[]; // TODO:dynamic
 
@@ -4689,7 +4684,6 @@ static __global__ void dequantize_mul_mat_vec_sparse(const void * __restrict__ v
         return;
     }
     int id = lst[row];
-    // int id = row;
     if (idx[id] < 0.0f) {
         return;
     }

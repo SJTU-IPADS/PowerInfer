@@ -14413,11 +14413,6 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
         const int ir0 = atomic_fetch_add(params->aic, dr);
         for (int64_t ir1 = ir0; ir1 < ir0+dr; ir1++) {
             if (ir1 >= nr) break;
-            // if (gid[ir1] == 1)
-            //     continue;
-            // if (idx[ir1] < 0.0f)
-            //     continue;
-            // ggml_axpy_normal_f16(ne00, src0_row+nb01*ir1, vy, vy, wdata[ir1]);
             ggml_axpy_avx_f16(ne00, (ggml_fp16_t *)(src0_row+nb01*ir1), (ggml_fp16_t *)vy, vy, wdata[ir1]);
         }
         if (ir0 + dr >= nr)
