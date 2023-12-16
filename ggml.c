@@ -14059,6 +14059,8 @@ static void ggml_compute_forward_mul_mat_sparse(
     enum ggml_type    const vec_dot_type          = type_traits[type].vec_dot_type;
     ggml_from_float_t const from_float_to_vec_dot = type_traits[vec_dot_type].from_float;
 
+    const float threshold = sparse_pred_threshold;
+
     GGML_ASSERT(ne0 == ne01);
     GGML_ASSERT(ne1 == ne11);
     GGML_ASSERT(ne2 == ne12);
@@ -14262,7 +14264,7 @@ static void ggml_compute_forward_mul_mat_sparse(
                     float *dst_col = (float *)((char *)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
 
                     // if (ffdata[ir0] <= 0.0f) {
-                    if (gid[ir0] == 1 || ffdata[ir0] < -0.0f) {
+                    if (gid[ir0] == 1 || ffdata[ir0] < threshold) {
                         dst_col[ir0] = 0;
                         continue;
                     }
@@ -14477,6 +14479,8 @@ static void ggml_compute_forward_mul_mat_axpy(
     enum ggml_type    const vec_dot_type          = type_traits[type].vec_dot_type;
     ggml_from_float_t const from_float_to_vec_dot = type_traits[vec_dot_type].from_float;
 
+    const float threshold = sparse_pred_threshold;
+
     // GGML_ASSERT(ne0 == ne01);
     // GGML_ASSERT(ne1 == ne11);
     // GGML_ASSERT(ne2 == ne12);
@@ -14564,7 +14568,7 @@ static void ggml_compute_forward_mul_mat_axpy(
                 if (gid[ir1] == 1) {
                     continue;
                 }
-                if (idx[ir1] < -0.0f)
+                if (idx[ir1] < threshold)
                     continue;
                 // ggml_axpy_normal_f16(ne00, src0_row+nb01*ir1, vy, vy, wdata[ir1]);
                 ggml_axpy_avx_f16(ne00, (ggml_fp16_t *)(src0_row+nb01*ir1), (ggml_fp16_t *)vy, vy, src1_ptr[ir1]);
@@ -14626,6 +14630,8 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
     // ggml_vec_dot_t    const vec_dot               = type_traits[type].vec_dot;
     enum ggml_type    const vec_dot_type          = type_traits[type].vec_dot_type;
     ggml_from_float_t const from_float_to_vec_dot = type_traits[vec_dot_type].from_float;
+
+    const float threshold = sparse_pred_threshold;
 
     // GGML_ASSERT(ne0 == ne01);
     // GGML_ASSERT(ne1 == ne11);
@@ -14708,7 +14714,7 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
                 break;
             if (gid[ir1] == 1)
                 continue;
-            if (idx[ir1] < 0.0f)
+            if (idx[ir1] < threshold)
                 continue;
             int bid = ir1 / QK8_0;
             int qsid = ir1 % QK8_0;
