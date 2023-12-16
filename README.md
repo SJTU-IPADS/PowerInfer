@@ -3,9 +3,9 @@
 
 *Demo* 🔥
 
-https://github.com/hodlen/PowerInfer/assets/34213478/b782ccc8-0a2a-42b6-a6aa-07b2224a66f7
+https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d26ae05b-d0cf-40b6-8788-bda3fe447e28
 
-<sub>The demo is running with a single 24G 4090 GPU, the model is Falcon (ReLU)-40B, and the precision is FP16.</sub>
+<sub>PowerInfer v.s. llama.cpp on a single RTX 4090(24G) running Falcon(ReLU)-40B-FP16 with a 11x speedup!</sub>
 
 ---
 ## Abstract
