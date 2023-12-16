@@ -2808,7 +2808,7 @@ struct llama_augmentation_model_loader {
             return NULL;
         }
         // allocate and copy selected weights to gpu
-        #ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUBLAS
         int64_t row_len = src->ne[0];
         int64_t gpu_rows = gpu_bucket->ne[0];
         if (gpu_rows == 0)
@@ -2841,10 +2841,9 @@ struct llama_augmentation_model_loader {
         ggml_set_no_alloc(aux_ctx, false);
 
         return gpu_dst;
-        #else
-            printf("As you do not support CUDA. Split to GPU is not allowed.\n");
+#else
         return NULL;
-        #endif
+#endif
     }
 
     void slice_ffn_mat_to_gpu(llama_layer & layer) {
