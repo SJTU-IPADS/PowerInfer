@@ -25,10 +25,10 @@ only 18\% lower than that achieved by a top-tier server-grade A100 GPU.
 This significantly outperforms llama.cpp by up to 11.69x while retaining model accuracy.
 
 ## Feature
-PowerInfer is a fast and easy-to-use inference engine for deploying LLM locally. Interestingly, we observe that in ReLU LLM, every neuron is an expert! And a small subset of neurons consistently contributes to the output.
+PowerInfer is a high-speed and easy-to-use inference engine for deploying LLM locally. Interestingly, we observe that in ReLU LLM, every neuron is an expert! And a small subset of neurons consistently contributes to the output.
 PowerInfer is fast with:
 
-- Exploiting the high locality in LLM infernece
+- Exploiting the high locality in LLM inference
 - Neuron-aware hybrid CPU/GPU sparse operator
 - Neuron granularity offloading
 
@@ -79,7 +79,7 @@ cmake --build build --config Release
 ```
 
 ## Model Weights
-As for now, we have't released predictor training code, we suggest you can download the sparse-model from huggingface in the following link.
+As for now, we have not released the predictor training code, we suggest you download the sparse model from huggingface in the following link.
 | Base Model | GGUF Format Link | Original Model |
 |------------|------------------|----------------|
 | LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |
@@ -96,11 +96,11 @@ As for now, we have't released predictor training code, we suggest you can downl
 ./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt) --vram-budget $(GPU_VRAM_OFFLOADING)
 ```
 
-As for now, it requires a offline-generated "GPU index" file to split FFNs on GPU. If you want to try it, please use the following instruction to generate the GPU index file:
+As for now, it requires an offline-generated "GPU index" file to split FFNs on GPU. If you want to try it, please use the following instructions to generate the GPU index file:
 ```bash
 python scripts/export-gpu-split.py $(activation_count_path) $(output_idx_path) solver
 ```
-Then, you can use the following instruction to run PowerInfer with GPU index:
+Then, you can use the following instructions to run PowerInfer with GPU index:
 ```bash
 ./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt) --gpu-index $(split_path)
 ```
@@ -111,7 +111,7 @@ Then, you can use the following instruction to run PowerInfer with GPU index:
 
 ![github-eval-2080ti-q4](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/0fc1bfc4-aafc-4e82-a865-bec0143aff1a)
 
-PowerInfer achieves up to 11x and 8x speedup for FP16 and INT4 model!
+PowerInfer achieves up to 11.69x and 8.00x speedup for FP16 and INT4 models!
 
 ## TODOs
 We will release the code and data in the following order, please stay tuned!
