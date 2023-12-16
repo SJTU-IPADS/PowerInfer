@@ -55,7 +55,7 @@ The SparseLLM Team is currently converting the Mistral-7B model to a sparser ver
 ### Get the Code
 
 ```bash
-git clone https://github.com/hodlen/PowerInfer
+git clone https://github.com/SJTU-IPADS/PowerInfer
 cd PowerInfer
 ```
 ### Build
