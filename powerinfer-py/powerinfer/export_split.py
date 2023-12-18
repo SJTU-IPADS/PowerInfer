@@ -18,6 +18,10 @@ def write_file_header(fout: BinaryIO, n_tensors: int) -> None:
     POWERINFER_MAGIC = int.from_bytes(b"PWRI", "little")
     fout.write(struct.pack("<I", POWERINFER_MAGIC))
     fout.write(struct.pack("i", 1))  # file version
+
+    # TODO: write header: total neuron count, capacity, layer count, batch size, threshold
+    
+
     # TODO: If we found we need more common parameters, we can add them here.
     fout.write(struct.pack("i", n_tensors))
 

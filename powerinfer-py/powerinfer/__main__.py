@@ -19,6 +19,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # TODO: what if the model is quantized?
+
     solved = solve_gpu_split(
         activation_path=args.activation,
         neuron=args.neuron,

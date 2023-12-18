@@ -1367,7 +1367,7 @@ struct llama_vocab {
     }
 };
 
-struct llama_mlp_model_loader;
+struct llama_gpu_split_loader;
 struct llama_augmentation_model_loader;
 
 struct llama_model {
@@ -1405,7 +1405,7 @@ struct llama_model {
     std::unique_ptr<llama_mmap> mapping;
 
     // aux model loaders for dynamically loaded/transformed model weights
-    std::unique_ptr<struct llama_mlp_model_loader> mlp_model_loader;
+    std::unique_ptr<struct llama_gpu_split_loader> mlp_model_loader;
     std::unique_ptr<struct llama_augmentation_model_loader> aug_model_loader;
 
     // objects representing data potentially being locked in memory
@@ -2632,7 +2632,7 @@ static void llm_load_print_meta(llama_model_loader & ml, llama_model & model) {
 }
 
 
-struct llama_mlp_model_loader {
+struct llama_gpu_split_loader {
     int n_tensors = 0;
     size_t n_bytes = 0; // tensor data bytes
 
@@ -2644,7 +2644,7 @@ struct llama_mlp_model_loader {
     std::unique_ptr<llama_mmap> mapping;
     struct ggml_context * ctx_meta = nullptr;
 
-    llama_mlp_model_loader(const std::string & fname, bool use_mmap) : fname(fname), use_mmap(use_mmap), file(fname.c_str(), "rb") {
+    llama_gpu_split_loader(const std::string & fname, bool use_mmap) : fname(fname), use_mmap(use_mmap), file(fname.c_str(), "rb") {
         GGML_ASSERT(use_mmap);
 
         // verify magic and version
@@ -2675,7 +2675,7 @@ struct llama_mlp_model_loader {
     int apply_tensors_to_base_model(llama_model * model) {
         // TODO: assert fp is at the end of headers
         if (n_tensors != model -> layers.size() * 2) {
-           LLAMA_LOG_ERROR("%s: error: the number of mlp adapters does not match the layer of model\n", __func__);
+           LLAMA_LOG_ERROR("%s: error: the number of gpu splits does not match the layer of model\n", __func__);
             return 1;
         }
         LLAMA_LOG_INFO("%s: applying gpu_idx adapter from '%s' - please wait ...\n", __func__, fname.c_str());
@@ -2957,7 +2957,7 @@ struct buffered_tensor_allocator {
     // For GPU tensors, we need to allocate them in VRAM as much as possible,
     // and update the tensor data in-place. If the VRAM budget is exceeded,
     // we allocate the tensor in CPU memory.
-    void flush() {
+    size_t flush() {
 #if defined(GGML_USE_CUBLAS)
         // iterate over offloading priorities
         for (int enum_i = TENSOR_OFFLOAD_ATTN; enum_i <= TENSOR_OFFLOAD_KV_CACHE; enum_i ++) {
@@ -2974,8 +2974,35 @@ struct buffered_tensor_allocator {
         }
         ml.done_getting_tensors();
 #endif
+        return vram_allocated_bytes;
     }
 };
+
+static int llm_generate_gpu_split_via_python(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes) {
+    char command_buffer[512];
+    sprintf(
+        command_buffer,
+        "python3 -m powerinfer --activation %s --neuron %d --capacity %d --layer %d --output %s", 
+        "model_path/../activation",
+        model.hparams.n_embd, // what?
+        vram_allocatable_bytes,
+        model.hparams.n_layer,
+        "model_path/../gpu-split.gguf"
+    );
+    return system(command_buffer);
+}
+
+static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model) {
+    // TODO: when GPU split cache exists, get total VRAM requirement from header;
+    // If applicable, use the cache to load the GPU split.
+
+    // Otherwise, generate the GPU split via Python.
+    if (llm_generate_gpu_split_via_python(ml, model, 0) != 0) {
+        LLAMA_LOG_ERROR("%s: error: failed to generate gpu split\n", __func__);
+        return;
+    }
+
+}
 
 static void llm_load_sparse_model_tensors(
         llama_model_loader & ml,
@@ -3131,19 +3158,19 @@ static void llm_load_sparse_model_tensors(
         }
     }
 
-    alloc.flush();
+    size_t vram_allocated_bytes = alloc.flush();
 
     // print memory requirements
     {
         // this is the total memory required to run the inference
         size_t mem_required =
             ctx_size +
-            mmapped_size - alloc.vram_allocated_bytes; // weights in VRAM not in memory
+            mmapped_size - vram_allocated_bytes; // weights in VRAM not in memory
 
         LLAMA_LOG_INFO("%s: mem required  = %7.2f MB\n", __func__, mem_required / 1024.0 / 1024.0);
 
 #if defined(GGML_USE_CUBLAS) || defined(GGML_USE_CLBLAST)
-        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
+        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, vram_allocated_bytes / 1024.0 / 1024.0);
 #endif
     }
 
@@ -3155,6 +3182,11 @@ static void llm_load_sparse_model_tensors(
 
     ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
 
+    // Try to partially offload FFNs if there is enough VRAM
+    if (vram_capacity - vram_allocated_bytes >= 512ull * 1024 * 1024) {
+
+    }
+
     if (progress_callback) {
         progress_callback(1.0f, progress_callback_user_data);
     }
@@ -3165,7 +3197,7 @@ static void llm_load_sparse_model_tensors(
     // we take page faults deferred by mmap() into consideration
     model.t_load_us = ggml_time_us() - model.t_start_us;
 
-    model.n_gpu_layers = -1; // based on offloading results?
+    model.n_gpu_layers = -1; // TODO: based on offloading results, by category?
 }
 
 static void llm_load_tensors(
@@ -9671,12 +9703,12 @@ int llama_model_apply_lora_from_file(const struct llama_model * model, const cha
 }
 
 int llama_model_apply_gpu_idx_from_file(struct llama_model * model, const char * path_mlp, bool use_mmap) {
-    llama_mlp_model_loader * mlp_ml = new llama_mlp_model_loader(path_mlp, use_mmap);
+    llama_gpu_split_loader * mlp_ml = new llama_gpu_split_loader(path_mlp, use_mmap);
     if (mlp_ml -> apply_tensors_to_base_model(model) > 0) {
-        LLAMA_LOG_ERROR("%s: failed to apply mlp adapter\n", __func__);
+        LLAMA_LOG_ERROR("%s: failed to apply gpu split\n", __func__);
         return 1;
     }
-    model -> mlp_model_loader = std::unique_ptr<llama_mlp_model_loader>(mlp_ml);
+    model -> mlp_model_loader = std::unique_ptr<llama_gpu_split_loader>(mlp_ml);
     return 0;
 }
 
