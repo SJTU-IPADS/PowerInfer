@@ -99,22 +99,23 @@ PowerInfer models are stored in a special format called *PowerInfer GGUF* based 
 | LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |  [PowerInfer/ReluLLaMA-70B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-70B-Predictor)
 
 ## Inference
-- If you just have CPU:
+
+For CPU-only and CPU-GPU hybrid inference with all available VRAM, you can use the following instructions to run PowerInfer:
 ```bash
-  ./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt)
+  ./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt
 ```
-- If you have CPU with one GPU:
+If you want to limit the VRAM usage of GPU:
 ```bash
-./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt) --vram-budget $(GPU_VRAM_OFFLOADING)
+  ./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --vram-budget $vram_gb
 ```
 
 As for now, it requires an offline-generated "GPU index" file to split FFNs on GPU. If you want to try it, please use the following instructions to generate the GPU index file:
 ```bash
-python scripts/export-gpu-split.py $(activation_count_path) $(output_idx_path) solver
+python scripts/export-gpu-split.py $activation_count_path $output_idx_path solver
 ```
 Then, you can use the following instructions to run PowerInfer with GPU index:
 ```bash
-./build/bin/main -m /PATH/TO/MODEL -n $(output_token_count) -t $(thread_num) -p $(prompt) --gpu-index $(split_path)
+./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --gpu-index $split_path
 ```
 
 ## Evaluation
