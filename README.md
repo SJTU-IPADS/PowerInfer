@@ -63,6 +63,7 @@ Now PowerInfer supports the following architectures:
 ```bash
 git clone https://github.com/SJTU-IPADS/PowerInfer
 cd PowerInfer
+pip install -r requirements.txt # install Python helpers' dependencies
 ```
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
