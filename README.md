@@ -41,7 +41,7 @@ PowerInfer is flexible and easy to use with:
 
 - **Easy Integration**: Compatible with popular ReLU-sparse models, readily accessible via [Hugging Face](https://huggingface.co/PowerInfer/).
 - **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardwares, enabling low-latency LLM inference on a single GPU.
-- **Backward Compatibility**: PowerInfer is a different spices from llama.cpp, but you can make use of most of `examples/` the same way as llama.cpp. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
+- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp including server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
 
 You can use these models with PowerInfer today:
 
@@ -70,7 +70,7 @@ cd PowerInfer
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
-Using `make` on Linux or MacOS:
+Using `make` on Linux or macOS:
 ```bash
 make
 ```
@@ -88,13 +88,15 @@ cmake --build build --config Release
 ```
 
 ## Model Weights
-As for now, we have not released the predictor training code, we suggest you download the sparse model from huggingface in the following link.
-| Base Model | GGUF Format Link | Original Model |
-|------------|------------------|----------------|
-| LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |
-| LLaMA(ReLU)-2-13B    | [PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF)   | [SparseLLM/ReluLLaMA-13B](https://huggingface.co/SparseLLM/ReluLLaMA-13B)  |
-| Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    | [SparseLLM/ReluFalcon-40B](https://huggingface.co/SparseLLM/ReluFalcon-40B)      |
-| LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |
+
+PowerInfer models are stored in a special format called *PowerInfer GGUF* based on GGUF format, consisting of both LLM weights and predictor weights. You can download PowerInfer GGUF weights from Hugging Face or convert them from the original model weights and predictor weights.
+
+| Base Model | PowerInfer GGUF Format | Original Model | Predictor |
+|------------|------------------|----------------|---------------------|
+| LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |  [PowerInfer/ReluLLaMA-7B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-7B-Predictor)
+| LLaMA(ReLU)-2-13B    | [PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF)   | [SparseLLM/ReluLLaMA-13B](https://huggingface.co/SparseLLM/ReluLLaMA-13B)  |  [PowerInfer/ReluLLaMA-13B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-13B-Predictor)
+| Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    | [SparseLLM/ReluFalcon-40B](https://huggingface.co/SparseLLM/ReluFalcon-40B)      | [PowerInfer/ReluFalcon-40B-Predictor](https://huggingface.co/PowerInfer/ReluFalcon-40B-Predictor)
+| LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |  [PowerInfer/ReluLLaMA-70B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-70B-Predictor)
 
 ## Inference
 - If you just have CPU:
