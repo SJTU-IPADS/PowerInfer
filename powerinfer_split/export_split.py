@@ -9,7 +9,7 @@ import numpy as np
 
 def load_activation_weights(models_base: Path):
     # TODO: might need a specification file to indicate which models to load.
-    # But for now, let's assume it is a plain directory of models_{0, ... , n_layers - 1}.pt
+    # But for now, let's assume it is a plain directory of activation_{0, ... , n_layers - 1}.pt
     *_, files = next(os.walk(models_base))
     return [torch.load(models_base / f"activation_{i}.pt") for i in range(len(files))]
 
@@ -66,9 +66,9 @@ def export_split(activations_path: str, output_path: str, solved_list: list[int]
     with open(output_path, "wb") as fout:
         fout.truncate()
         write_file_header(fout, n_tensors=n_tensors)
-        for i, activation in enumerate(predictors):
+        for i, (activation, selected_count) in enumerate(zip(predictors, solved_list)):
             print(f"appending gpu idx layer-{i}")
-            append_gpu_idx(fout, activation, solved_list[i])
+            append_gpu_idx(fout, activation, selected_count)
 
     print(f"exported GPU index to {output_path}")
 

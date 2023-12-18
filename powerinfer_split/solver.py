@@ -10,8 +10,10 @@ import pickle
 def solve_gpu_split(
     activation_path: str,
     neuron: int,
+    capacity: int,
     layer: int,
     batch: int,
+    threshold: int,
 ):
     # Processing activation data
     values = []
@@ -32,7 +34,7 @@ def solve_gpu_split(
     c = matrix(c)
 
     # Setting capacity and neuron count per batch
-    CAP = args.capacity
+    CAP = capacity
     CAP = int(CAP / batch)
     neuron = int(neuron / batch)
     coeff = []
@@ -52,7 +54,7 @@ def solve_gpu_split(
         lst = [0] * (neuron * layer + layer)
         for j in range(neuron):
             lst[i * neuron + j] = -1
-        lst[neuron * layer + i] = int(args.threshold / batch)
+        lst[neuron * layer + i] = int(threshold / batch)
         coeff.append(lst)
         h.append(0)
 
