@@ -123,7 +123,6 @@ def main(predictors_path: str, output_path: str, solver_path: str):
         for i, activation in enumerate(predictors):
             print(f"appending gpu idx layer-{i}")
             append_gpu_idx(fout, activation, loaded_lst[i])
-            # append_gpu_idx(fout, activation, (32768*0.0))
 
     print(f"converted MLP adapters from {predictors_path} to {output_path}")
 
