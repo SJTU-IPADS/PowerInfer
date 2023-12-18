@@ -14,8 +14,9 @@ PowerInfer v.s. llama.cpp on a single RTX 4090(24G) running Falcon(ReLU)-40B-FP1
 ## Abstract
 
 We introduce PowerInfer, a high-speed Large Language Model (LLM) inference engine on a personal computer (PC) 
-equipped with a single consumer-grade GPU. The key underlying the design of PowerInfer is exploiting the high locality 
+equipped with a single consumer-grade GPU. The key underlying the design of PowerInfer is exploiting the high **locality** 
 inherent in LLM inference, characterized by a power-law distribution in neuron activation. 
+
 This distribution indicates that a small subset of neurons, termed hot neurons, are consistently activated 
 across inputs, while the majority, cold neurons, vary based on specific inputs.
 PowerInfer exploits such an insight to design a GPU-CPU hybrid inference engine:
@@ -23,33 +24,35 @@ hot-activated neurons are preloaded onto the GPU for fast access, while cold-act
 on the CPU, thus significantly reducing GPU memory demands and CPU-GPU data transfers.
 PowerInfer further integrates adaptive predictors and neuron-aware sparse operators,
 optimizing the efficiency of neuron activation and computational sparsity.
+
 Evaluation shows that PowerInfer attains an average token generation rate of 13.20 tokens/s, with a peak of 29.08 tokens/s, across various LLMs (including OPT-175B) on a single NVIDIA RTX 4090 GPU,
 only 18\% lower than that achieved by a top-tier server-grade A100 GPU.
 This significantly outperforms llama.cpp by up to 11.69x while retaining model accuracy.
 
 ## Features
-PowerInfer is a high-speed and easy-to-use inference engine for deploying LLM locally. Interestingly, we observe that in ReLU LLM, every neuron is an expert! And a small subset of neurons consistently contributes to the output.
+PowerInfer is a high-speed and easy-to-use inference engine for deploying LLMs locally. 
+
 PowerInfer is fast with:
 
-- Exploiting the high locality in LLM inference
-- Neuron-aware hybrid CPU/GPU sparse operator
-- Neuron granularity offloading
+- **Locality-centric design**: Utilizes sparse activation and 'hot'/'cold' neuron concept for efficient LLM inference, ensuring high speed with lower resource demands.
+- **Hybrid CPU/GPU Utilization**: Seamlessly integrates memory/computation capabilities of CPU and GPU for balanced workload and faster processing.
 
 PowerInfer is flexible and easy to use with:
 
-- Integration with popular [ReLU-sparse models](https://huggingface.co/SparseLLM)
-- Low-latency serving locally with one single consumer-grade GPU 
+- **Easy Integration**: Compatible with popular ReLU-sparse models, readily accessible via [Hugging Face](https://huggingface.co/PowerInfer/).
+- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardwares, enabling low-latency LLM inference on a single GPU.
+- **Backward Compatibility**: PowerInfer is a different spices from llama.cpp, but you can make use of most of `examples/` the same way as llama.cpp. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
 
-PowerInfer supports the following models:
+You can use these models with PowerInfer today:
 
-- Falcon-40B model
-- Llama family models
+- Falcon-40B
+- Llama2 family
 
-Now PowerInfer supports the following architectures on Linux/macOS:
+We have tested PowerInfer on the following platforms:
 
-- x86-64 CPU with AVX2 instructions
-- Nvidia GPU
-- ARM CPU (including M chips)
+- x86-64 CPU (with AVX2 instructions) on Linux
+- x86-64 CPU and NVIDIA GPU on Linux
+- Apple M Chips on macOS
   
 
 ## Getting Started
