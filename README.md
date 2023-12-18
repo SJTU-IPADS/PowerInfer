@@ -1,5 +1,7 @@
 # PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU
----
+
+## TL;DR
+PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** for your device.
 
 ## Demo 🔥
 
@@ -9,7 +11,6 @@ PowerInfer v.s. llama.cpp on a single RTX 4090(24G) running Falcon(ReLU)-40B-FP1
 
 <sub>Both PowerInfer and llama.cpp were running on the same hardware and fully utilized VRAM on RTX 4090.</sub>
 
----
 ## Abstract
 
 We introduce PowerInfer, a high-speed Large Language Model (LLM) inference engine on a personal computer (PC) 
@@ -26,7 +27,7 @@ Evaluation shows that PowerInfer attains an average token generation rate of 13.
 only 18\% lower than that achieved by a top-tier server-grade A100 GPU.
 This significantly outperforms llama.cpp by up to 11.69x while retaining model accuracy.
 
-## Feature
+## Features
 PowerInfer is a high-speed and easy-to-use inference engine for deploying LLM locally. Interestingly, we observe that in ReLU LLM, every neuron is an expert! And a small subset of neurons consistently contributes to the output.
 PowerInfer is fast with:
 
@@ -44,13 +45,12 @@ PowerInfer supports the following models:
 - Falcon-40B model
 - Llama family models
 
-Now PowerInfer supports the following architectures:
+Now PowerInfer supports the following architectures on Linux/macOS:
 
-- Intel CPU with AVX2 instructions
+- x86-64 CPU with AVX2 instructions
 - Nvidia GPU
+- ARM CPU (including M chips)
   
-
-
 
 ## Getting Started
 
