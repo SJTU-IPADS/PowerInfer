@@ -39,9 +39,9 @@ PowerInfer is fast with:
 
 PowerInfer is flexible and easy to use with:
 
-- **Easy Integration**: Compatible with popular ReLU-sparse models, readily accessible via [Hugging Face](https://huggingface.co/PowerInfer/).
-- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardwares, enabling low-latency LLM inference on a single GPU.
-- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp including server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
+- **Easy Integration**: Compatible with popular [ReLU-sparse models](https://huggingface.co/SparseLLM) as accurate as their dense counterparts.
+- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardwares, enabling low-latency LLM inference and serving on a single GPU.
+- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp such as server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
 
 You can use these models with PowerInfer today:
 
