@@ -52,7 +52,7 @@ We have tested PowerInfer on the following platforms:
 
 - x86-64 CPU (with AVX2 instructions) on Linux
 - x86-64 CPU and NVIDIA GPU on Linux
-- Apple M Chips on macOS
+- Apple M Chips on macOS (As we do not optimize for Mac, the performance improvement is not significant now.)
   
 
 ## Getting Started
