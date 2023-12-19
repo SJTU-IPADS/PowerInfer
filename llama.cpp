@@ -2878,7 +2878,7 @@ struct buffered_tensor_allocator {
         }
         ml.done_getting_tensors();
 #endif
-        return 0;
+        return vram_allocated_bytes;
     }
 };
 
@@ -2934,7 +2934,8 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
 
 static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes, bool no_cache, bool no_offload) {
 #if defined(GGML_USE_CUBLAS)
-    if (vram_budget_bytes >= 256ull * 1024 * 1024 && !no_offload) {
+    if (vram_budget_bytes >= 512ull * 1024 * 1024 && !no_offload) {
+        vram_budget_bytes -= 512ull * 1024 * 1024; // leave 512 MiB as a safety margin
         if (!llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
         LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
         }
@@ -3100,8 +3101,8 @@ static void llm_load_sparse_model_tensors(
         }
     }
 
-    size_t vram_allocated_bytes = 0;
-    // size_t vram_allocated_bytes = alloc.flush();
+    size_t vram_allocated_bytes = alloc.flush();
+    GGML_ASSERT(vram_allocated_bytes < vram_capacity);
 
     // print memory requirements
     {
