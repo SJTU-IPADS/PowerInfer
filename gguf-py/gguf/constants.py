@@ -75,7 +75,6 @@ class Keys:
         SPARSE_THRESHOLD = "powerinfer.sparse_threshold"
 
     class Split:
-        NEURON_COUNT  = "split.neuron_count"
         VRAM_CAPACITY = "split.vram_capacity"
 
 

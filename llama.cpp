@@ -2654,11 +2654,12 @@ struct llama_gpu_split_loader {
     llama_model_loader * idx_loader;
     size_t vram_required = 0;
 
-    llama_gpu_split_loader(const std::string & fname, bool use_mmap) : fname(fname), use_mmap(use_mmap), file(fname.c_str(), "rb") {
+    llama_gpu_split_loader(const std::string & fname, bool use_mmap) : fname(fname), use_mmap(use_mmap) {
         GGML_ASSERT(use_mmap);
 
         idx_loader = new llama_model_loader(fname, use_mmap);
         GGUF_GET_KEY(idx_loader->ctx_gguf, vram_required, gguf_get_val_u64, GGUF_TYPE_UINT64, true, LLM_KV_NAMES[LLM_KV_SPLIT_VRAM_CAPACITY]);
+        printf("loaded gpu_idx, vram_required: %ld\n", vram_required);
 
         n_tensors = idx_loader->n_tensors;
 
@@ -2672,9 +2673,6 @@ struct llama_gpu_split_loader {
             /*.no_alloc   =*/ true,
         };
         ctx_meta = ggml_init(params);
-
-        // memory-map the mlp weights file
-        mapping.reset(new llama_mmap(&file, /* prefetch */ 0, ggml_is_numa()));
     }
 
     bool check_vram_allocable(size_t vram_budget) {
@@ -2899,13 +2897,13 @@ static bool load_gpu_split_from_split_file(llama_model & model, std::string spli
         && loader.apply_tensors_to_base_model(&model) == 0;
 }
 
-static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes) {
+static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes, bool no_cache) {
     const char * model_path = ml.file.fname.c_str();
     const char * model_basedir = dirname(const_cast<char *>(model_path));
-    std::string cached_split_path = std::string(model_basedir) + "/gpu-split.gguf";
+    std::string cached_split_path = std::string(model_basedir) + "/gpu-index.genearted.gguf";
 
     // Load GPU split from previously generated cache
-    if (access(cached_split_path.c_str(), F_OK) == 0) {
+    if (access(cached_split_path.c_str(), F_OK) == 0 && !no_cache) {
         if (load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes)) {
             return true;
         }
@@ -2919,20 +2917,21 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
         return false;
     }
 
-    std::stringstream command_ss;
-    int ffn_width = model.layers[0].ffn_up->ne[1];
-    float bpw = 2;
-    float bpr = model.hparams.n_embd * bpw;
-    float vram_per_neuron = "model has gate" ? bpr * 3 : bpr * 2; // vram bytes per neuron
-    int neuron_cap = floor(vram_allocatable_bytes / vram_per_neuron);
+    // Calculate solver parameters
+    ggml_tensor * ffn_up = model.layers[0].ffn_up;
+    ggml_tensor * ffn_gate = model.layers[0].ffn_gate;
+    int slice_size = ffn_up->ne[1] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
+    // For model arch with FFN gate, the gate is also sliced, otherwise only the up and down matrices are sliced
+    int vram_bytes_per_slice = slice_size * (ffn_gate ? 3 : 2);
+    int neuron_cap = floor(vram_allocatable_bytes / vram_bytes_per_slice);
 
+    std::stringstream command_ss;
     command_ss << "python3 -m powerinfer"
                << " --activation " << activation_path
-               << " --neuron " << ffn_width
-               << " --capacity " << neuron_cap
-               << " --batch " << 64
-               << " --threshold" << 384
                << " --layer " << model.hparams.n_layer
+               << " --neuron " << ffn_gate->ne[1]
+               << " --capacity " << neuron_cap
+               << " --vram-capacity " << vram_allocatable_bytes
                << " --output " << cached_split_path;
     if (system(command_ss.str().c_str()) != 0 || access(cached_split_path.c_str(), F_OK) != 0) {
         LLAMA_LOG_ERROR("%s: error: failed to generate gpu split\n", __func__);
@@ -2947,10 +2946,10 @@ static void llm_generate_empty_gpu_split(llama_model_loader &ml, llama_model & m
     llama_model_apply_augmentation(&model);
 }
 
-static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes) {
+static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes, bool no_cache) {
 #if defined(GGML_USE_CUBLAS)
     if (vram_budget_bytes >= 256ull * 1024 * 1024) {
-        if (llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes)) {
+        if (llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
             return;
         }
         LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
@@ -2965,7 +2964,7 @@ static void llm_load_sparse_model_tensors(
         llama_model & model,
         int main_gpu,
         long int vram_budget_bytes,
-        const float * tensor_split,
+        bool reset_gpu_index,
         bool use_mlock,
         llama_progress_callback progress_callback,
         void * progress_callback_user_data) {
@@ -3114,7 +3113,8 @@ static void llm_load_sparse_model_tensors(
         }
     }
 
-    size_t vram_allocated_bytes = alloc.flush();
+    size_t vram_allocated_bytes = 0;
+    // size_t vram_allocated_bytes = alloc.flush();
 
     // print memory requirements
     {
@@ -3145,7 +3145,7 @@ static void llm_load_sparse_model_tensors(
     model.mapping = std::move(ml.mapping);
 
     // Offload FFN segments to GPU if possible
-    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes);
+    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
@@ -3908,7 +3908,7 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
             }
             double vram_budget_bytes = params.vram_budget_gb * 1024.0 * 1024.0 * 1024.0;
             llm_load_sparse_model_tensors(
-                ml, model, params.main_gpu, vram_budget_bytes, params.tensor_split, params.use_mlock,
+                ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.use_mlock,
                 params.progress_callback, params.progress_callback_user_data
             );
         } else {

@@ -88,30 +88,3 @@ def solve_gpu_split(
         aligned_lst.append(sum(ans[i * neuron:i * neuron + neuron] * batch))
 
     return aligned_lst
-
-
-if __name__ == "__main__":
-    
-    # Set up command line arguments
-    parser = argparse.ArgumentParser(description='Optimize neuron activation based on VRAM capacity and other parameters.')
-    parser.add_argument('--activation', type=str, required=True, help='Path to the directory containing activation data.')
-    parser.add_argument('--neuron', type=int, default=8192*4, help='Total number of neurons in the network.')
-    parser.add_argument('--capacity', type=int, default=int(8192*4*32*0.1), help='Total VRAM capacity for the model.')
-    parser.add_argument('--layer', type=int, default=59, help='Total number of layers in the neural network.')
-    parser.add_argument('--batch', type=int, default=32, help='Batch size for processing.')
-    parser.add_argument('--threshold', type=int, default=512, help='Threshold for splitting a layer across multiple GPUs.')
-    parser.add_argument('--output', type=str, required=True, help='File path for the output pickle file.')
-
-    args = parser.parse_args()
-
-    solved = solve_gpu_split(
-        activation_path=args.activation,
-        neuron=args.neuron,
-        layer=args.layer,
-        batch=args.batch,
-    )
-
-    print(f"solved: {solved}")
-
-    with open(args.output, "wb") as f:
-        pickle.dump(solved, f)

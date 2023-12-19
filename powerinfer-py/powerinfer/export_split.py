@@ -44,7 +44,7 @@ def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> 
         raw_dtype=GGMLQuantizationType.I32,
     )
 
-def export_split(activations_path: str, output_path: str, solved_list: list[int]):
+def export_split(activations_path: str, output_path: str, solved_list: list[int], vram_capacity: int):
     predictors = load_activation_weights(Path(activations_path)) # predictor => activation acount
     gguf_out = GGUFWriter(output_path, "generic.gpu_index")
     for i, (activation, selected_count) in enumerate(zip(predictors, solved_list)):
@@ -52,8 +52,8 @@ def export_split(activations_path: str, output_path: str, solved_list: list[int]
 
     # set kvs
     gguf_out.add_block_count(len(predictors))
-    gguf_out.add_uint64(gguf.Keys.Split.NEURON_COUNT, 0)
-    gguf_out.add_uint64(gguf.Keys.Split.VRAM_CAPACITY, 0)
+    # TODO: better to save the actual capacity that split neurons require
+    gguf_out.add_uint64(gguf.Keys.Split.VRAM_CAPACITY, vram_capacity)
 
     gguf_out.write_header_to_file()
     gguf_out.write_kv_data_to_file()
@@ -68,19 +68,3 @@ def export_split(activations_path: str, output_path: str, solved_list: list[int]
 
     print(f"exported GPU index to {output_path}")
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("predictors_path", help="path to the MLP predictors")
-    parser.add_argument(
-        "output_path",
-        help="path to the output GGML adapter",
-        default="./gpu-index.bin",
-    )
-    parser.add_argument("solver", help="path to the solver")
-
-    with open(parser.parse_args().solver, "rb") as f:
-        loaded_lst = pickle.load(f)
-
-    args = parser.parse_args()
-    export_split(args.predictors_path, args.output_path, loaded_lst)
