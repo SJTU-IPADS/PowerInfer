@@ -109,14 +109,7 @@ If you want to limit the VRAM usage of GPU:
   ./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --vram-budget $vram_gb
 ```
 
-As for now, it requires an offline-generated "GPU index" file to split FFNs on GPU. If you want to try it, please use the following instructions to generate the GPU index file:
-```bash
-python scripts/export-gpu-split.py $activation_count_path $output_idx_path solver
-```
-Then, you can use the following instructions to run PowerInfer with GPU index:
-```bash
-./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --gpu-index $split_path
-```
+As for now, it requires an offline-generated "GPU index" file to split FFNs on GPU. Temporarily, we have decided to disable this feature and will implement online FFN segmentation as soon as possible.
 
 ## Evaluation
 
