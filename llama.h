@@ -348,7 +348,7 @@ extern "C" {
                           const char * path_mlp,
                                 bool   use_mmap);
 
-    LLAMA_API int llama_model_apply_augmentation(struct llama_model * model);
+    LLAMA_API size_t llama_model_offload_ffn_split(struct llama_model * model);
 
     //
     // KV cache
