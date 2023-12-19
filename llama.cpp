@@ -2973,7 +2973,7 @@ struct buffered_tensor_allocator {
             for (ggml_tensor * meta_tensor : alloc_queues[level]) {
                 size_t tensor_data_size = ggml_nbytes(meta_tensor);
                 if (vram_allocated_bytes + tensor_data_size > vram_budget_bytes) {
-                    return;
+                    return vram_allocated_bytes;
                 }
                 // allocate in VRAM
                 ggml_set_backend(meta_tensor, GGML_BACKEND_GPU);
@@ -2982,7 +2982,7 @@ struct buffered_tensor_allocator {
         }
         ml.done_getting_tensors();
 #endif
-        return vram_allocated_bytes;
+        return 0;
     }
 };
 
