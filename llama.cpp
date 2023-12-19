@@ -2728,12 +2728,12 @@ struct llama_augmentation_model_loader {
         // const int64_t ggml_aux_tensor_size = 4 * (100 * 100 + 5120*40*4 * ggml_tensor_overhead() + (int64_t)13824*5120*40*4);
         int model_layer = model->layers.size();
         int ffn_dim = model->layers[0].ffn_up->ne[1];
-        const size_t ggml_aux_tensor_size = 4 * (100 * 100 + model_layer*ffn_dim*sizeof(float) * ggml_tensor_overhead() );
+        const size_t ggml_aux_tensor_size = 4 * (model_layer*ffn_dim*sizeof(float)*2+ model_layer*ffn_dim*sizeof(float) * ggml_tensor_overhead() );
 
         struct ggml_init_params params = {
             /*.mem_size   =*/ ggml_aux_tensor_size,
             /*.mem_buffer =*/ nullptr,
-            /*.no_alloc   =*/ false,
+            /*.no_alloc   =*/ true,
         };
         aux_ctx = ggml_init(params);
     }
@@ -2916,7 +2916,7 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     int slice_size = ffn_up->ne[1] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
     // For model arch with FFN gate, the gate is also sliced, otherwise only the up and down matrices are sliced
     int vram_bytes_per_slice = slice_size * (ffn_gate ? 3 : 2);
-    int neuron_cap = floor(vram_allocatable_bytes / vram_bytes_per_slice);
+    int neuron_cap = floor((double)vram_allocatable_bytes / vram_bytes_per_slice / 32) * 32;
 
     std::stringstream command_ss;
     command_ss << "python3 -m powerinfer"
