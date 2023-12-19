@@ -2893,7 +2893,7 @@ static bool load_gpu_split_from_split_file(llama_model & model, std::string spli
 static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes, bool no_cache) {
     const char * model_path = ml.file.fname.c_str();
     const char * model_basedir = dirname(const_cast<char *>(model_path));
-    std::string cached_split_path = std::string(model_basedir) + "/gpu-index.genearted.gguf";
+    std::string cached_split_path = std::string(model_path) + ".generated.gpuidx";
 
     // Load GPU split from previously generated cache
     if (access(cached_split_path.c_str(), F_OK) == 0 && !no_cache) {
@@ -2922,7 +2922,7 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     command_ss << "python3 -m powerinfer"
                << " --activation " << activation_path
                << " --layer " << model.hparams.n_layer
-               << " --neuron " << ffn_gate->ne[1]
+               << " --neuron " << ffn_up->ne[1]
                << " --capacity " << neuron_cap
                << " --vram-capacity " << vram_allocatable_bytes
                << " --output " << cached_split_path;
@@ -2952,6 +2952,7 @@ static void llm_load_sparse_model_tensors(
         llama_model & model,
         int main_gpu,
         long int vram_budget_bytes,
+        bool disable_ffn_split,
         bool reset_gpu_index,
         bool use_mlock,
         llama_progress_callback progress_callback,
@@ -3133,7 +3134,9 @@ static void llm_load_sparse_model_tensors(
     model.mapping = std::move(ml.mapping);
 
     // Offload FFN segments to GPU if possible
-    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index);
+    if (!disable_ffn_split) {
+        llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index);
+    }
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
@@ -3896,8 +3899,8 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
             }
             double vram_budget_bytes = params.vram_budget_gb * 1024.0 * 1024.0 * 1024.0;
             llm_load_sparse_model_tensors(
-                ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.use_mlock,
-                params.progress_callback, params.progress_callback_user_data
+                ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
+                params.use_mlock, params.progress_callback, params.progress_callback_user_data
             );
         } else {
             llm_load_tensors(

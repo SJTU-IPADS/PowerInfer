@@ -473,6 +473,8 @@ bool gpt_params_parse_ex(int argc, char ** argv, gpt_params & params) {
             params.lora_base = argv[i];
         } else if (arg == "--reset-gpu-index") {
             params.reset_gpu_index = true;
+        } else if (arg == "--disable-gpu-index") {
+            params.disale_gpu_index = true;
         } else if (arg == "--mmproj") {
             if (++i >= argc) {
                 invalid_param = true;
@@ -907,6 +909,7 @@ struct llama_model_params llama_model_params_from_gpt_params(const gpt_params & 
     mparams.use_mmap        = params.use_mmap;
     mparams.use_mlock       = params.use_mlock;
     mparams.reset_gpu_index = params.reset_gpu_index;
+    mparams.disable_gpu_index = params.disale_gpu_index;
 
     return mparams;
 }
@@ -1337,6 +1340,7 @@ void dump_non_result_info_yaml(FILE * stream, const gpt_params & params, const l
     }
     fprintf(stream, "lora_base: %s\n", params.lora_base.c_str());
     fprintf(stream, "reset_gpu_index: %s\n", params.reset_gpu_index ? "true" : "false");
+    fprintf(stream, "disable_gpu_index: %s\n", params.disale_gpu_index? "true": "false");
     fprintf(stream, "main_gpu: %d # default: 0\n", params.main_gpu);
     fprintf(stream, "memory_f32: %s # default: false\n", !params.memory_f16 ? "true" : "false");
     fprintf(stream, "mirostat: %d # default: 0 (disabled)\n", sparams.mirostat);

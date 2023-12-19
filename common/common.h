@@ -92,6 +92,7 @@ struct gpt_params {
     std::string lora_base  = "";                              // base model path for the lora adapter
 
     bool reset_gpu_index   = false; // refresh the gpu index file
+    bool disale_gpu_index  = false; // disable loading gpu index and splitting ffn
 
     int  ppl_stride        = 0;     // stride for perplexity calculations. If left at 0, the pre-existing approach will be used.
     int  ppl_output_type   = 0;     // = 0 -> ppl output is as usual, = 1 -> ppl output is num_tokens, ppl, one per line
