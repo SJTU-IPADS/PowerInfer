@@ -75,12 +75,7 @@ cd PowerInfer
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
-Using `make` on Linux or macOS:
-```bash
-make
-```
-
-Using `CMake`:
+Using `CMake` on Linux or macOS:
 * If you have one GPU:
 ```bash
 cmake -S . -B build -DLLAMA_CUBLAS=ON
