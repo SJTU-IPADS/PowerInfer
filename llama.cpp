@@ -2890,8 +2890,8 @@ static bool load_gpu_split_from_split_file(llama_model & model, std::string spli
 
 static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes, bool no_cache) {
     const char * model_path = ml.file.fname.c_str();
-    const char * model_basedir = dirname(const_cast<char *>(model_path));
     std::string cached_split_path = std::string(model_path) + ".generated.gpuidx";
+    const char * model_basedir = dirname(const_cast<char *>(model_path));
 
     // Load GPU split from previously generated cache
     if (access(cached_split_path.c_str(), F_OK) == 0 && !no_cache) {
