@@ -109,7 +109,7 @@ If you want to limit the VRAM usage of GPU:
   ./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --vram-budget $vram_gb
 ```
 
-As for now, it requires an offline-generated "GPU index" file to split FFNs on GPU. Temporarily, we have decided to disable this feature and will implement online FFN segmentation as soon as possible.
+As for now, it requires an offline-generated "GPU index" file to split FFNs on GPU. And we found these files are hard to maintain and distribute. We will ship automatic FFN split based on VRAM capacity via [#11](https://github.com/SJTU-IPADS/PowerInfer/pull/11) very soon.
 
 ## Evaluation
 
