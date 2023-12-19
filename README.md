@@ -124,6 +124,8 @@ We will release the code and data in the following order, please stay tuned!
 
 - [x] Release core code of PowerInfer, supporting Llama-2, Falcon-40B.
 - [ ] Support Mistral-7B
+- [ ] Support Windows
+- [ ] Support text-generation-webui
 - [ ] Release perplexity evaluation code
 - [ ] Support Metal for Mac
 - [ ] Release code for OPT models
