@@ -5,7 +5,7 @@ PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** 
 
 ## Demo 🔥
 
-https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d26ae05b-d0cf-40b6-8788-bda3fe447e28
+https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/fe441a42-5fce-448b-a3e5-ea4abb43ba23
 
 PowerInfer v.s. llama.cpp on a single RTX 4090(24G) running Falcon(ReLU)-40B-FP16 with a 11x speedup!
 
@@ -75,8 +75,8 @@ cd PowerInfer
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
-Using `CMake` on Linux or macOS:
-* If you have one GPU:
+Using `CMake`(3.13+) on Linux or macOS:
+* If you have an NVIDIA GPU:
 ```bash
 cmake -S . -B build -DLLAMA_CUBLAS=ON
 cmake --build build --config Release
