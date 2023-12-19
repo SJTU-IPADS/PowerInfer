@@ -61,6 +61,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <libgen.h>
 #include <forward_list>
 #include <fstream>
 #include <functional>
@@ -756,9 +757,10 @@ struct llama_buffer {
 struct llama_file {
     // use FILE * so we don't have to re-open the file to mmap
     FILE * fp;
+    std::string fname;
     size_t size;
 
-    llama_file(const char * fname, const char * mode) {
+    llama_file(const char * fname, const char * mode): fname(fname) {
         fp = std::fopen(fname, mode);
         if (fp == NULL) {
             throw std::runtime_error(format("failed to open %s: %s", fname, strerror(errno)));
@@ -2672,6 +2674,10 @@ struct llama_gpu_split_loader {
         mapping.reset(new llama_mmap(&file, /* prefetch */ 0, ggml_is_numa()));
     }
 
+    bool check_vram_allocable(size_t vram_budget) {
+        return true;
+    }
+
     int apply_tensors_to_base_model(llama_model * model) {
         // TODO: assert fp is at the end of headers
         if (n_tensors != model -> layers.size() * 2) {
@@ -2718,6 +2724,8 @@ struct llama_gpu_split_loader {
 
             LLAMA_LOG_INFO(".");
         }
+
+        // TODO: logging how much VRAM is used
 
         const int64_t t_mlp_us = ggml_time_us() - t_start_mlp_us;
         LLAMA_LOG_INFO(" done (%.2f ms)\n", t_mlp_us / 1000.0);
@@ -2978,30 +2986,63 @@ struct buffered_tensor_allocator {
     }
 };
 
-static int llm_generate_gpu_split_via_python(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes) {
-    char command_buffer[512];
-    sprintf(
-        command_buffer,
-        "python3 -m powerinfer --activation %s --neuron %d --capacity %d --layer %d --output %s", 
-        "model_path/../activation",
-        model.hparams.n_embd, // what?
-        vram_allocatable_bytes,
-        model.hparams.n_layer,
-        "model_path/../gpu-split.gguf"
-    );
-    return system(command_buffer);
+static bool load_gpu_split_from_split_file(llama_model & model, std::string split_path, size_t vram_budget) {
+    llama_gpu_split_loader loader(split_path, true);
+    return loader.check_vram_allocable(vram_budget) 
+        && loader.apply_tensors_to_base_model(&model) == 0;
 }
 
-static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model) {
-    // TODO: when GPU split cache exists, get total VRAM requirement from header;
-    // If applicable, use the cache to load the GPU split.
+static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes) {
+    const char * model_path = ml.file.fname.c_str();
+    const char * model_basedir = dirname(const_cast<char *>(model_path));
+    std::string cached_split_path = std::string(model_basedir) + "/gpu-split.gguf";
 
-    // Otherwise, generate the GPU split via Python.
-    if (llm_generate_gpu_split_via_python(ml, model, 0) != 0) {
-        LLAMA_LOG_ERROR("%s: error: failed to generate gpu split\n", __func__);
-        return;
+    // Load GPU split from previously generated cache
+    if (access(cached_split_path.c_str(), F_OK) == 0) {
+        if (load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes)) {
+            return true;
+        }
+        LLAMA_LOG_ERROR("%s: error: failed to apply previously generated gpu split from '%s'\n", __func__, cached_split_path.c_str());
     }
 
+    // Generate GPU split
+    std::string activation_path = std::string(model_basedir) + "/activation";
+    if (access(activation_path.c_str(), F_OK) != 0) {
+        LLAMA_LOG_ERROR("%s: error: activation files under '%s' not found\n", __func__, activation_path.c_str());
+        return false;
+    }
+
+    std::stringstream command_ss;
+    command_ss << "python3 -m powerinfer"
+               << " --activation " << activation_path
+               << " --neuron " << model.hparams.n_embd
+               << " --capacity " << vram_allocatable_bytes
+               << " --layer " << model.hparams.n_layer
+               << " --output " << cached_split_path;
+    if (system(command_ss.str().c_str()) != 0 || access(cached_split_path.c_str(), F_OK) != 0) {
+        LLAMA_LOG_ERROR("%s: error: failed to generate gpu split\n", __func__);
+        return false;
+    }
+
+    return load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes);
+}
+
+static void llm_generate_empty_gpu_split(llama_model_loader &ml, llama_model & model) {
+    // TODO: move code here & remove augmentation ml
+    llama_model_apply_augmentation(&model);
+}
+
+static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes) {
+#if defined(GGML_USE_CUBLAS)
+    if (vram_budget_bytes >= 256ull * 1024 * 1024) {
+        if (llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes)) {
+            return;
+        }
+        LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
+    }
+#endif
+    // Fall back to the empty GPU split
+    llm_generate_empty_gpu_split(ml, model);
 }
 
 static void llm_load_sparse_model_tensors(
@@ -3182,16 +3223,14 @@ static void llm_load_sparse_model_tensors(
 
     ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
 
-    // Try to partially offload FFNs if there is enough VRAM
-    if (vram_capacity - vram_allocated_bytes >= 512ull * 1024 * 1024) {
-
-    }
-
     if (progress_callback) {
         progress_callback(1.0f, progress_callback_user_data);
     }
 
     model.mapping = std::move(ml.mapping);
+
+    // Offload FFN segments to GPU if possible
+    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
