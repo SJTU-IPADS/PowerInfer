@@ -78,7 +78,7 @@ def solve_gpu_split(
     B = set()
 
     # Solving the ILP problem
-    (status, x) = ilp(c, G, h, None, None, B, I)
+    (status, x) = ilp(c, G, h, None, None, B, I, options={'tm_lim' : 30000}) # with 30s timeout
     print(f"ILP Status: {status}")
     ans = list(x)
     print(f"Total Activation Units: {sum(ans)}")

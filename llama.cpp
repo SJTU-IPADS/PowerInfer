@@ -2934,9 +2934,9 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     return load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes);
 }
 
-static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes, bool no_cache) {
+static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes, bool no_cache, bool no_offload) {
 #if defined(GGML_USE_CUBLAS)
-    if (vram_budget_bytes >= 256ull * 1024 * 1024) {
+    if (vram_budget_bytes >= 256ull * 1024 * 1024 && !no_offload) {
         if (!llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
         LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
         }
@@ -2952,8 +2952,8 @@ static void llm_load_sparse_model_tensors(
         llama_model & model,
         int main_gpu,
         long int vram_budget_bytes,
-        bool disable_ffn_split,
         bool reset_gpu_index,
+        bool disable_ffn_split,
         bool use_mlock,
         llama_progress_callback progress_callback,
         void * progress_callback_user_data) {
@@ -3134,9 +3134,7 @@ static void llm_load_sparse_model_tensors(
     model.mapping = std::move(ml.mapping);
 
     // Offload FFN segments to GPU if possible
-    if (!disable_ffn_split) {
-        llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index);
-    }
+    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index, disable_ffn_split);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
