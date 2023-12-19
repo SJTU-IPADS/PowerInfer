@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument('--layer', type=int, default=59, help='Total number of layers in the neural network.')
     parser.add_argument('--vram-capacity', type=int, help='Total VRAM capacity (Bytes) available for splitting')
     parser.add_argument('--batch', type=int, default=256, help='Batch size for processing.')
-    parser.add_argument('--threshold', type=int, default=512, help='Threshold for splitting a layer across multiple GPUs.')
+    parser.add_argument('--threshold', type=int, default=0, help='Threshold for splitting a layer across multiple GPUs.')
     parser.add_argument('--output', type=str, required=True, help='File path for the output pickle file.')
 
     args = parser.parse_args()

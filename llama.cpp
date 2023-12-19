@@ -2705,8 +2705,6 @@ struct llama_gpu_split_loader {
         };
         idx_loader->load_all_data(ctx_meta, cb, nullptr, nullptr);
 
-        // TODO: logging how much VRAM is used
-
         const int64_t t_mlp_us = ggml_time_us() - t_start_mlp_us;
         LLAMA_LOG_INFO(" done (%.2f ms)\n", t_mlp_us / 1000.0);
 
@@ -2733,7 +2731,7 @@ struct llama_augmentation_model_loader {
         struct ggml_init_params params = {
             /*.mem_size   =*/ ggml_aux_tensor_size,
             /*.mem_buffer =*/ nullptr,
-            /*.no_alloc   =*/ true,
+            /*.no_alloc   =*/ false,
         };
         aux_ctx = ggml_init(params);
     }
@@ -2789,7 +2787,7 @@ struct llama_augmentation_model_loader {
 
         layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
         layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
-        layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down, gpu_bucket);
+        layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
         
         if (layer.ffn_gate_gpu) {
             offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
@@ -2916,7 +2914,7 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     int slice_size = ffn_up->ne[1] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
     // For model arch with FFN gate, the gate is also sliced, otherwise only the up and down matrices are sliced
     int vram_bytes_per_slice = slice_size * (ffn_gate ? 3 : 2);
-    int neuron_cap = floor((double)vram_allocatable_bytes / vram_bytes_per_slice / 32) * 32;
+    int neuron_cap = floor((double)vram_allocatable_bytes / vram_bytes_per_slice / 32) * 32 * 4;
 
     std::stringstream command_ss;
     command_ss << "python3 -m powerinfer"
