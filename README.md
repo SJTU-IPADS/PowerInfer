@@ -62,10 +62,10 @@ And new features coming soon:
   
 ## Getting Started
 
-- [Installation](##setup--installation)
-- [Model Weights](##model-weights)
+- [Installation](#setup-and-installation)
+- [Model Weights](#model-weights)
 
-## Setup & Installation
+## Setup and Installation
 ### Get the Code
 
 ```bash
@@ -135,6 +135,7 @@ PowerInfer achieves up to 11x and 8x speedup for FP16 and INT4 models!
 We will release the code and data in the following order, please stay tuned!
 
 - [x] Release core code of PowerInfer, supporting Llama-2, Falcon-40B.
+- [ ] Support Mistral-7B
 - [ ] Release perplexity evaluation code
 - [ ] Support Metal for Mac
 - [ ] Release code for OPT models
