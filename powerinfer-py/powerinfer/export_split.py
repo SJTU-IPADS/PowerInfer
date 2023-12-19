@@ -24,14 +24,12 @@ def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> 
     print(
         f"{key} => {key} {gpu_idx.shape} {gpu_idx.dtype} {gpu_idx.nbytes/1024/1024} MiB"
     )
-    gguf.add_tensor_info(
-        name=key, 
-        tensor_shape=gpu_idx.shape[::-1], 
-        tensor_dtype=np.int32, 
-        tensor_nbytes=gpu_idx.nbytes, 
-        raw_dtype=GGMLQuantizationType.I32
+    gguf.add_tensor(
+        name=key,
+        tensor=gpu_idx,
+        raw_shape=gpu_idx.shape[::-1],
+        raw_dtype=GGMLQuantizationType.I32,
     )
-    gguf.add_tensor(key, gpu_idx, raw_dtype=GGMLQuantizationType.I32)
 
     indices = indices.numpy().astype(np.int32)
     gpu_bucket = np.sort(indices)
@@ -39,14 +37,12 @@ def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> 
     print(
         f"{key} => {key} {gpu_bucket.shape} {gpu_bucket.dtype} {gpu_bucket.nbytes/1024/1024} MiB"
     )
-    gguf.add_tensor_info(
-        name=key, 
-        tensor_shape=gpu_bucket.shape[::-1], 
-        tensor_dtype=np.int32, 
-        tensor_nbytes=gpu_bucket.nbytes,
-        raw_dtype=GGMLQuantizationType.I32
+    gguf.add_tensor(
+        name=key,
+        tensor=gpu_bucket,
+        raw_shape=gpu_bucket.shape[::-1],
+        raw_dtype=GGMLQuantizationType.I32,
     )
-    gguf.add_tensor(key, gpu_bucket, raw_dtype=GGMLQuantizationType.I32)
 
 def export_split(activations_path: str, output_path: str, solved_list: list[int]):
     predictors = load_activation_weights(Path(activations_path)) # predictor => activation acount
@@ -68,7 +64,7 @@ def export_split(activations_path: str, output_path: str, solved_list: list[int]
     with open(output_path, "r+b") as fout:
         POWERINFER_MAGIC = int.from_bytes(b"PWRI", "little")
         fout.write(struct.pack("<I", POWERINFER_MAGIC))
-        fout.write(struct.pack("<I", 1)) # version 1 for gpu-index
+        fout.write(struct.pack("<I", 3))
 
     print(f"exported GPU index to {output_path}")
 

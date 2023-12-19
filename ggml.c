@@ -19590,7 +19590,6 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             sparse_deriv = GGML_DENSE_INFERENCE;
         } else if (strncmp(magic, GGUF_POWERINFER_MAGIC, sizeof(magic)) == 0) {
             sparse_deriv = GGML_SPARSE_INFERENCE;
-            fprintf(stderr, "%s: PowerInfer derived model detected. Sparse inference will be used.\n", __func__);
         } else {
             fprintf(stderr, "%s: invalid magic characters %s.\n", __func__, magic);
             fclose(file);

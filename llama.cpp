@@ -217,6 +217,8 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
     { LLM_ARCH_REFACT,          "refact"    },
     { LLM_ARCH_BLOOM,           "bloom"     },
     { LLM_ARCH_STABLELM,        "stablelm"  },
+
+    { LLM_ARCH_UNKNOWN,         "unknown"   },
 };
 
 enum llm_kv {
@@ -267,6 +269,8 @@ enum llm_kv {
     LLM_KV_TOKENIZER_RWKV,
 
     LLM_KV_SPARSE_THRESHOLD,
+
+    LLM_KV_SPLIT_VRAM_CAPACITY,
 };
 
 static std::map<llm_kv, std::string> LLM_KV_NAMES = {
@@ -317,6 +321,8 @@ static std::map<llm_kv, std::string> LLM_KV_NAMES = {
     { LLM_KV_TOKENIZER_RWKV,                "tokenizer.rwkv.world"              },
 
     { LLM_KV_SPARSE_THRESHOLD,              "powerinfer.sparse_threshold" },
+
+    { LLM_KV_SPLIT_VRAM_CAPACITY,           "split.vram_capacity" },
 };
 
 struct LLM_KV {
@@ -2639,25 +2645,22 @@ struct llama_gpu_split_loader {
     size_t n_bytes = 0; // tensor data bytes
 
     const std::string fname;
-    llama_file file;
     int fver;
 
     bool use_mmap = false; // only supports mmap yet
     std::unique_ptr<llama_mmap> mapping;
     struct ggml_context * ctx_meta = nullptr;
 
+    llama_model_loader * idx_loader;
+    size_t vram_required = 0;
+
     llama_gpu_split_loader(const std::string & fname, bool use_mmap) : fname(fname), use_mmap(use_mmap), file(fname.c_str(), "rb") {
         GGML_ASSERT(use_mmap);
 
-        // verify magic and version
-        uint32_t magic = file.read_u32();
-        // TODO: assert on file magic once we have a stable format
-        GGML_ASSERT(magic == 0xDEADBEEF && "invalid file magic" || true);
+        idx_loader = new llama_model_loader(fname, use_mmap);
+        GGUF_GET_KEY(idx_loader->ctx_gguf, vram_required, gguf_get_val_u64, GGUF_TYPE_UINT64, true, LLM_KV_NAMES[LLM_KV_SPLIT_VRAM_CAPACITY]);
 
-        fver = file.read_u32();
-        GGML_ASSERT(fver == 1 && "unsupported file version");
-
-        n_tensors = file.read_u32();
+        n_tensors = idx_loader->n_tensors;
 
         // allocate memadata/data for mlp tensors
         // TODO: support allocating buffer for tensor data (when mmap is not used)
@@ -2675,55 +2678,34 @@ struct llama_gpu_split_loader {
     }
 
     bool check_vram_allocable(size_t vram_budget) {
-        return true;
+        return vram_budget >= vram_required;
     }
 
     int apply_tensors_to_base_model(llama_model * model) {
+        int n_layers = model->layers.size();
         // TODO: assert fp is at the end of headers
-        if (n_tensors != model -> layers.size() * 2) {
+        if (n_tensors != n_layers * 2) {
            LLAMA_LOG_ERROR("%s: error: the number of gpu splits does not match the layer of model\n", __func__);
             return 1;
         }
         LLAMA_LOG_INFO("%s: applying gpu_idx adapter from '%s' - please wait ...\n", __func__, fname.c_str());
         const int64_t t_start_mlp_us = ggml_time_us();
 
-        for (llama_layer &model_layer : model -> layers) {
-            ggml_tensor *mlp_fc1_tensor = load_mlp_tensor_from_stream();
-            ggml_tensor *mlp_fc2_tensor = load_mlp_tensor_from_stream();
-#ifdef GGML_USE_CUBLAS
-            // ggml_set_backend(mlp_fc1_tensor, GGML_BACKEND_GPU);
-            // ggml_cuda_transform_tensor(mlp_fc1_tensor->data, mlp_fc1_tensor);
-
-            // gpu bucket to GPU
-            ggml_set_backend(mlp_fc2_tensor, GGML_BACKEND_GPU);
-            ggml_cuda_transform_tensor(mlp_fc2_tensor->data, mlp_fc2_tensor);
-#endif // GGML_USE_CUBLAS
-            if (mlp_fc1_tensor == nullptr || mlp_fc2_tensor == nullptr) {
-                LLAMA_LOG_ERROR("%s: error: failed to load mlp tensors\n", __func__);
+        for (int il = 0; il < n_layers; il++) {
+            llama_layer &model_layer = model->layers[il];
+            ggml_tensor * gpu_idx = idx_loader->get_tensor_meta(il*2);
+            ggml_tensor * gpu_bucket = idx_loader->get_tensor_meta(il*2+1);
+            if (gpu_idx == nullptr || gpu_bucket == nullptr) {
+                LLAMA_LOG_ERROR("%s: error: failed to load gpu index or bucket\n", __func__);
                 return 1;
             }
-
-            // load model layer and check dimensions
-            // ggml_tensor *model_up_t = model_layer.ffn_up;
-            // GGML_ASSERT(model_up_t != nullptr);
-            // if (model_up_t->ne[0] != mlp_fc1_tensor->ne[0] ||
-            //     model_up_t->ne[1] != mlp_fc2_tensor->ne[1]) {
-            //     LLAMA_LOG_ERROR("%s: incompatible tensor dimensions (%" PRId64
-            //                     " and %" PRId64
-            //                     ");"
-            //                     " are you sure that this adapter is for this model?\n",
-            //                     __func__, model_up_t->ne[0], mlp_fc1_tensor->ne[1]);
-            //     return 1;
-            // }
-
-            // GGML_ASSERT(model_layer.mlp_pre_w1 == nullptr && model_layer.mlp_pre_w2 == nullptr);
-            model_layer.gpu_idx = mlp_fc1_tensor;
-            model_layer.gpu_bucket = mlp_fc2_tensor;
-            int *data1 = (int *)mlp_fc1_tensor->data;
-            int *data2 = (int *)mlp_fc2_tensor->data;
-
-            LLAMA_LOG_INFO(".");
+            model_layer.gpu_idx = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
+            model_layer.gpu_bucket = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_GPU);
         }
+        llama_progress_callback cb = [](float progress, void *ctx) {
+            LLAMA_LOG_INFO(".");
+        };
+        idx_loader->load_all_data(ctx_meta, cb, nullptr, nullptr);
 
         // TODO: logging how much VRAM is used
 
@@ -2731,81 +2713,6 @@ struct llama_gpu_split_loader {
         LLAMA_LOG_INFO(" done (%.2f ms)\n", t_mlp_us / 1000.0);
 
         return 0;
-    }
-
-    // Consumes the stream and returns a new mlp tensor.
-    // Returns nullptr on error.
-    // TODO: mmap mlp model file 
-    ggml_tensor *load_mlp_tensor_from_stream() {
-        uint32_t n_dims = file.read_u32();
-        uint32_t name_length = file.read_u32();
-        uint32_t ftype = file.read_u32();
-
-        uint32_t ne[2] = {1, 1};
-        for (int i = 0; i < n_dims; ++i) {
-            ne[i] = file.read_u32();
-        }
-
-        std::string tensor_name;
-        {
-            char buf[1024];
-            file.read_raw(buf, name_length);
-            tensor_name = std::string(buf, name_length);
-        }
-
-        // const std::string mlp_suffix = ".mlp";
-        // size_t pos = tensor_name.rfind(mlp_suffix);
-        // if (pos == std::string::npos) {
-        //     LLAMA_LOG_ERROR("%s: error: '%s' is not a mlp tensor\n", __func__,
-        //                                     tensor_name.c_str());
-        //     return nullptr;
-        // }
-
-        // std::string mlp_type = tensor_name.substr(pos + mlp_suffix.length());
-        // std::string base_name = tensor_name;
-        // base_name.erase(pos);
-        // LLAMA_LOG_INFO("%s: %s => %s (mlp type %s) (", __func__, tensor_name.c_str(),
-        //                             base_name.c_str(), mlp_type.c_str());
-        // for (int i = 0; i < n_dims; ++i) {
-        //     LLAMA_LOG_INFO("%d ", ne[i]);
-        // }
-        // LLAMA_LOG_INFO(")\n");
-        // LLAMA_LOG_INFO("tensor name %s\n", tensor_name.c_str());
-
-        // create ggml tensor
-        ggml_type wtype;
-        switch (ftype) {
-            case 0:
-                wtype = GGML_TYPE_F32;
-                break;
-            case 1:
-                wtype = GGML_TYPE_F16;
-                break;
-            case 18:
-                wtype = GGML_TYPE_I32;
-                break;
-            default: {
-                LLAMA_LOG_ERROR("%s: invalid tensor data type '%d'\n", __func__, ftype);
-                return nullptr;
-            }
-        }
-        ggml_tensor *mlp_tensor;
-        // if (n_dims != 2) {
-        //     LLAMA_LOG_ERROR("%s: unsupported tensor dimension %d\n", __func__, n_dims);
-        //     return nullptr;
-        // }
-        mlp_tensor = ggml_new_tensor_2d(ctx_meta, wtype, ne[0], ne[1]);
-        // ggml_set_name(mlp_tensor, "");
-
-        // load tensor data
-        size_t offset = file.tell();
-        size_t tensor_data_size = ggml_nbytes(mlp_tensor);
-        offset = (offset + 31) & -32;
-        file.seek(offset, SEEK_SET);
-        // point to the mmaped mlp model file
-        mlp_tensor -> data = (void *) (static_cast<char *>(mapping -> addr) + offset);
-        file.seek(tensor_data_size, SEEK_CUR);
-        return mlp_tensor;
     }
 };
 
@@ -3013,10 +2920,18 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     }
 
     std::stringstream command_ss;
+    int ffn_width = model.layers[0].ffn_up->ne[1];
+    float bpw = 2;
+    float bpr = model.hparams.n_embd * bpw;
+    float vram_per_neuron = "model has gate" ? bpr * 3 : bpr * 2; // vram bytes per neuron
+    int neuron_cap = floor(vram_allocatable_bytes / vram_per_neuron);
+
     command_ss << "python3 -m powerinfer"
                << " --activation " << activation_path
-               << " --neuron " << model.hparams.n_embd
-               << " --capacity " << vram_allocatable_bytes
+               << " --neuron " << ffn_width
+               << " --capacity " << neuron_cap
+               << " --batch " << 64
+               << " --threshold" << 384
                << " --layer " << model.hparams.n_layer
                << " --output " << cached_split_path;
     if (system(command_ss.str().c_str()) != 0 || access(cached_split_path.c_str(), F_OK) != 0) {
@@ -3963,6 +3878,10 @@ static void llm_load_tensors(
 static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params) {
     try {
         llama_model_loader ml(fname, params.use_mmap);
+
+        if (ml.sparse_deriv == GGML_SPARSE_INFERENCE) {
+            LLAMA_LOG_INFO("%s: PowerInfer model loaded. Sparse inference will be used.\n", __func__);
+        }
 
         model.hparams.vocab_only = params.vocab_only;
         model.sparse_deriv = ml.sparse_deriv;
