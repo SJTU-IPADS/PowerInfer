@@ -53,8 +53,13 @@ We have tested PowerInfer on the following platforms:
 - x86-64 CPU (with AVX2 instructions) on Linux
 - x86-64 CPU and NVIDIA GPU on Linux
 - Apple M Chips on macOS (As we do not optimize for Mac, the performance improvement is not significant now.)
-  
 
+And new features coming soon:
+
+- Mistral-7B model
+- Online fine-grained FFN offloading to GPU
+- Metal backend for sparse inference on macOS
+  
 ## Getting Started
 
 - [Installation](##setup--installation)
