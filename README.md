@@ -35,13 +35,13 @@ PowerInfer is a high-speed and easy-to-use inference engine for deploying LLMs l
 PowerInfer is fast with:
 
 - **Locality-centric design**: Utilizes sparse activation and 'hot'/'cold' neuron concept for efficient LLM inference, ensuring high speed with lower resource demands.
-- **Hybrid CPU/GPU Utilization**: Seamlessly integrates memory/computation capabilities of CPU and GPU for balanced workload and faster processing.
+- **Hybrid CPU/GPU Utilization**: Seamlessly integrates memory/computation capabilities of CPU and GPU for a balanced workload and faster processing.
 
 PowerInfer is flexible and easy to use with:
 
-- **Easy Integration**: Compatible with popular [ReLU-sparse models](https://huggingface.co/SparseLLM) as accurate as their dense counterparts.
-- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardwares, enabling low-latency LLM inference and serving on a single GPU.
-- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp such as server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
+- **Easy Integration**: Compatible with popular [ReLU-sparse models](https://huggingface.co/SparseLLM).
+- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardware, enabling low-latency LLM inference and serving on a single GPU.
+- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp such as server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purposes, but there will be no performance gain.
 
 You can use these models with PowerInfer today:
 
@@ -91,7 +91,7 @@ cmake --build build --config Release
 ## Model Weights
 
 PowerInfer models are stored in a special format called *PowerInfer GGUF* based on GGUF format, consisting of both LLM weights and predictor weights. 
-You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profiled model activation statistics under `activation/` for 'hot'-neuron offloading from each Hugging Face model repo under "PowerInfer GGUF Format" column. You can also convert them from the original model weights and predictor weights.
+You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profiled model activation statistics under `activation/` for 'hot'-neuron offloading from each Hugging Face model repo under the "PowerInfer GGUF Format" column. You can also convert them from the original model weights and predictor weights.
 
 | Base Model | PowerInfer GGUF Format | Original Model | Predictor |
 |------------|------------------|----------------|---------------------|
@@ -125,8 +125,8 @@ PowerInfer achieves up to 11x and 8x speedup for FP16 and INT4 models!
 
 ## FAQs
 1. What if I encountered `CUDA_ERROR_OUT_OF_MEMORY`?
-   - You can try to run with `--reset-gpu-index` argument to rebuild GPU index for this model to avoid any stale cache.
-   - Due to our current implementation, model offloading might not be accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading. 
+   - You can try to run with `--reset-gpu-index` argument to rebuild the GPU index for this model to avoid any stale cache.
+   - Due to our current implementation, model offloading might not be as accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading. 
 2. What if...
    - Issues are welcomed! Please feel free to open an issue and attach your running environment and running parameters. We will try our best to help you.
 
