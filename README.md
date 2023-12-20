@@ -148,6 +148,15 @@ If you want to limit the VRAM usage of GPU:
 ```
 Under CPU-GPU hybrid inference, PowerInfer will automatically offload all dense activation blocks to GPU and split FFN on GPU if possible. 
 
+## Quantization
+
+PowerInfer has optimized quantization support for INT4(`Q4_0`) models. You can use the following instructions to quantize PowerInfer GGUF model:
+```bash
+./build/bin/quantize /PATH/TO/MODEL /PATH/TO/OUTPUT/QUANTIZED/MODEL Q4_0
+# ./build/bin/quantize ./ReluFalcon-40B-PowerInfer-GGUF/falcon-40b-relu.powerinfer.gguf ./ReluFalcon-40B-PowerInfer-GGUF/falcon-40b-relu.q4.powerinfer.gguf Q4_0
+```
+Then you can use the quantized model for inference with PowerInfer with the same instructions as above.
+
 ## Evaluation
 
 ![github-eval-4090](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d700fa6c-77ba-462f-a2fc-3fd21c898f33)
