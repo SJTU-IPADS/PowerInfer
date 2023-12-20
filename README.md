@@ -57,7 +57,6 @@ We have tested PowerInfer on the following platforms:
 And new features coming soon:
 
 - Mistral-7B model
-- Online fine-grained FFN offloading to GPU
 - Metal backend for sparse inference on macOS
   
 ## Getting Started
