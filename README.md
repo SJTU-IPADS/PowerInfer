@@ -35,13 +35,13 @@ PowerInfer is a high-speed and easy-to-use inference engine for deploying LLMs l
 PowerInfer is fast with:
 
 - **Locality-centric design**: Utilizes sparse activation and 'hot'/'cold' neuron concept for efficient LLM inference, ensuring high speed with lower resource demands.
-- **Hybrid CPU/GPU Utilization**: Seamlessly integrates memory/computation capabilities of CPU and GPU for balanced workload and faster processing.
+- **Hybrid CPU/GPU Utilization**: Seamlessly integrates memory/computation capabilities of CPU and GPU for a balanced workload and faster processing.
 
 PowerInfer is flexible and easy to use with:
 
-- **Easy Integration**: Compatible with popular [ReLU-sparse models](https://huggingface.co/SparseLLM) as accurate as their dense counterparts.
-- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardwares, enabling low-latency LLM inference and serving on a single GPU.
-- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp such as server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purpose, but there will be no performance gain.
+- **Easy Integration**: Compatible with popular [ReLU-sparse models](https://huggingface.co/SparseLLM).
+- **Local Deployment Ease**: Designed and deeply optimized for local deployment on consumer-grade hardware, enabling low-latency LLM inference and serving on a single GPU.
+- **Backward Compatibility**: While distinct from llama.cpp, you can make use of most of `examples/` the same way as llama.cpp such as server and batched generation. PowerInfer also supports inference with llama.cpp's model weights for compatibility purposes, but there will be no performance gain.
 
 You can use these models with PowerInfer today:
 
@@ -57,7 +57,6 @@ We have tested PowerInfer on the following platforms:
 And new features coming soon:
 
 - Mistral-7B model
-- Online fine-grained FFN offloading to GPU
 - Metal backend for sparse inference on macOS
   
 ## Getting Started
@@ -91,14 +90,48 @@ cmake --build build --config Release
 ## Model Weights
 
 PowerInfer models are stored in a special format called *PowerInfer GGUF* based on GGUF format, consisting of both LLM weights and predictor weights. 
-You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profiled model activation statistics under `activation/` for 'hot'-neuron offloading from each Hugging Face model repo under "PowerInfer GGUF Format" column. You can also convert them from the original model weights and predictor weights.
 
-| Base Model | PowerInfer GGUF Format | Original Model | Predictor |
-|------------|------------------|----------------|---------------------|
-| LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |  [PowerInfer/ReluLLaMA-7B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-7B-Predictor)
-| LLaMA(ReLU)-2-13B    | [PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF)   | [SparseLLM/ReluLLaMA-13B](https://huggingface.co/SparseLLM/ReluLLaMA-13B)  |  [PowerInfer/ReluLLaMA-13B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-13B-Predictor)
-| Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    | [SparseLLM/ReluFalcon-40B](https://huggingface.co/SparseLLM/ReluFalcon-40B)      | [PowerInfer/ReluFalcon-40B-Predictor](https://huggingface.co/PowerInfer/ReluFalcon-40B-Predictor)
-| LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |  [PowerInfer/ReluLLaMA-70B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-70B-Predictor)
+### Download PowerInfer GGUF via Hugging Face
+
+You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profiled model activation statistics for 'hot'-neuron offloading from each Hugging Face repo below.
+
+| Base Model | PowerInfer GGUF |
+|------------|------------------|
+| LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    |
+| LLaMA(ReLU)-2-13B    | [PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF)   |
+| Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    |
+| LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    |
+
+We suggest downloading/cloning the whole repo so PowerInfer can automatically make use of such directory structure for feature-complete model offloading:
+```
+.
+├── *.powerinfer.gguf (Unquantized PowerInfer model)
+├── *.q4.powerinfer.gguf (INT4 quantized PowerInfer model, if available)
+├── activation (Profiled activation statistics for fine-grained FFN offloading)
+│   ├── activation_x.pt (Profiled activation statistics for layer x)
+│   └── ...
+├── *.[q4].powerinfer.gguf.genearted.gpuidx (Generated GPU index at runtime for corresponding model)
+```
+
+### Convert from Original Model Weights + Predictor Weights
+
+Hugging Face limits single model weight to 50GiB. For unquantized models >= 40B, you can convert PowerInfer GGUF from the original model weights and predictor weights obtained from Hugging Face.
+
+| Base Model | Original Model | Predictor |
+|------------|----------------|---------------------|
+| LLaMA(ReLU)-2-7B   | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |  [PowerInfer/ReluLLaMA-7B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-7B-Predictor)
+| LLaMA(ReLU)-2-13B    | [SparseLLM/ReluLLaMA-13B](https://huggingface.co/SparseLLM/ReluLLaMA-13B)  |  [PowerInfer/ReluLLaMA-13B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-13B-Predictor)
+| Falcon(ReLU)-40B    | [SparseLLM/ReluFalcon-40B](https://huggingface.co/SparseLLM/ReluFalcon-40B)      | [PowerInfer/ReluFalcon-40B-Predictor](https://huggingface.co/PowerInfer/ReluFalcon-40B-Predictor)
+| LLaMA(ReLU)-2-70B    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |  [PowerInfer/ReluLLaMA-70B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-70B-Predictor)
+
+You can use the following command to convert the original model weights and predictor weights to PowerInfer GGUF:
+```bash
+# make sure that you have done `pip install -r requirements.txt`
+python convert.py --outfile /PATH/TO/POWERINFER/GGUF/REPO/MODELNAME.powerinfer.gguf /PATH/TO/ORIGINAL/MODEL /PATH/TO/PREDICTOR
+# python convert.py --outfile ./ReluLLaMA-70B-PowerInfer-GGUF/llama-70b-relu.powerinfer.gguf ./SparseLLM/ReluLLaMA-70B ./PowerInfer/ReluLLaMA-70B-Predictor
+```
+For the same reason, we suggest keeping the same directory structure as PowerInfer GGUF repos after conversion.
+
 
 ## Inference
 
@@ -115,6 +148,15 @@ If you want to limit the VRAM usage of GPU:
 ```
 Under CPU-GPU hybrid inference, PowerInfer will automatically offload all dense activation blocks to GPU and split FFN on GPU if possible. 
 
+## Quantization
+
+PowerInfer has optimized quantization support for INT4(`Q4_0`) models. You can use the following instructions to quantize PowerInfer GGUF model:
+```bash
+./build/bin/quantize /PATH/TO/MODEL /PATH/TO/OUTPUT/QUANTIZED/MODEL Q4_0
+# ./build/bin/quantize ./ReluFalcon-40B-PowerInfer-GGUF/falcon-40b-relu.powerinfer.gguf ./ReluFalcon-40B-PowerInfer-GGUF/falcon-40b-relu.q4.powerinfer.gguf Q4_0
+```
+Then you can use the quantized model for inference with PowerInfer with the same instructions as above.
+
 ## Evaluation
 
 ![github-eval-4090](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d700fa6c-77ba-462f-a2fc-3fd21c898f33)
@@ -125,8 +167,8 @@ PowerInfer achieves up to 11x and 8x speedup for FP16 and INT4 models!
 
 ## FAQs
 1. What if I encountered `CUDA_ERROR_OUT_OF_MEMORY`?
-   - You can try to run with `--reset-gpu-index` argument to rebuild GPU index for this model to avoid any stale cache.
-   - Due to our current implementation, model offloading might not be accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading. 
+   - You can try to run with `--reset-gpu-index` argument to rebuild the GPU index for this model to avoid any stale cache.
+   - Due to our current implementation, model offloading might not be as accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading. 
 2. What if...
    - Issues are welcomed! Please feel free to open an issue and attach your running environment and running parameters. We will try our best to help you.
 

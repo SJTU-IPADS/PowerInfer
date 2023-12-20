@@ -8626,7 +8626,8 @@ static ggml_type get_k_quant_type(
         if (ftype == LLAMA_FTYPE_MOSTLY_Q2_K) new_type = GGML_TYPE_Q3_K;
     }
     else if (name.find("fc1.weight") != std::string::npos || name.find("fc2.weight") != std::string::npos) {
-        new_type = GGML_TYPE_Q5_0;
+        if (ftype == LLAMA_FTYPE_MOSTLY_Q4_0) new_type = GGML_TYPE_Q4_0;
+        else new_type = GGML_TYPE_Q5_0;
     }
     // This can be used to reduce the size of the Q5_K_S model.
     // The associated PPL increase is fully in line with the size reduction
