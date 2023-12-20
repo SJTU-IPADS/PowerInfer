@@ -110,7 +110,7 @@ We suggest downloading/cloning the whole repo so PowerInfer can automatically ma
 ├── activation (Profiled activation statistics for fine-grained FFN offloading)
 │   ├── activation_x.pt (Profiled activation statistics for layer x)
 │   └── ...
-├── *.[q4].powerinfer.gguf.genearted.gpuidx (Generated GPU index at runtime for corresponding model)
+├── *.[q4].powerinfer.gguf.generated.gpuidx (Generated GPU index at runtime for corresponding model)
 ```
 
 ### Convert from Original Model Weights + Predictor Weights
