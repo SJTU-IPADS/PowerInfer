@@ -180,7 +180,6 @@ class Params:
     rope_finetuned: bool | None = None
 
     ftype: GGMLFileType | None = None
-    arch: str | None = None
 
     # path to the directory containing the model files
     path_model: Path | None = None
@@ -264,7 +263,6 @@ class Params:
             f_rope_scale      = f_rope_scale,
             n_orig_ctx        = n_orig_ctx,
             rope_finetuned    = rope_finetuned,
-            arch        = config.get("model_type"),
         )
 
     # LLaMA v2 70B params.json
@@ -1198,21 +1196,27 @@ def main(args_in: list[str] | None = None) -> None:
     parser.add_argument("--outtype",     choices=output_choices, help="output format - note: q8_0 may be very slow (default: f16 or f32 based on input)", default="f16")
     parser.add_argument("--vocab-dir",   type=Path,              help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile",     type=Path,              help="path to write to; default: based on input")
-    parser.add_argument("model",         type=Path,              help="directory containing model file, or model file itself (*.pth, *.pt, *.bin, *.safetensors)")
     parser.add_argument("--ctx",         type=int,               help="model training context (default: based on input)")
     parser.add_argument("--concurrency", type=int,               help=f"concurrency used for conversion (default: {DEFAULT_CONCURRENCY})", default = DEFAULT_CONCURRENCY)
     parser.add_argument("--bigendian",   action="store_true",    help="model is executed on big endian machine")
-    parser.add_argument("mlp_model",     type=Path,              help="MLP model for sparse attention")
     parser.add_argument("--vocabtype",   choices=["spm", "bpe"], help="vocab format (default: spm)", default="spm")
+    parser.add_argument("model",         type=Path,              help="directory containing model file, or model file itself (*.pth, *.pt, *.bin, *.safetensors)")
+    parser.add_argument("mlp_model",     type=Path,              help="MLP model for sparse attention")
 
     args = parser.parse_args(args_in)
-    base_model_params = Params.load(lazy_load_file(args.model))
-    if base_model_params.arch != "llama":
-        # invoke another script to convert other models
-        print(f"Model architecture {base_model_params.arch} is not supported by this script. Trying with `convert-hf-to-powerinfer-gguf.py`...")
-        script_path = Path(__file__).resolve().parent / "convert-hf-to-powerinfer-gguf.py"
-        subprocess.run(["python3", str(script_path.absolute())] + sys.argv[1:])
-        return
+
+    try:
+        with open(args.model / "config.json", "r", encoding="utf-8") as f:
+            hf_config = json.load(f)
+        if model_type := hf_config.get("model_type") != "llama":
+            # invoke another script to convert other models
+            print(f"Model architecture {model_type} is not supported by this `convert.py`. Trying with `convert-hf-to-powerinfer-gguf.py`...")
+            script_path = Path(__file__).resolve().parent / "convert-hf-to-powerinfer-gguf.py"
+            subprocess.run(["python3", str(script_path.absolute())] + sys.argv[1:])
+            return
+    except FileNotFoundError:
+        print("Could not find config.json under the original model directory. ", file=sys.stderr)
+        sys.exit(1)
 
     if args.dump_single:
         model_plus = lazy_load_file(args.model)
