@@ -91,14 +91,48 @@ cmake --build build --config Release
 ## Model Weights
 
 PowerInfer models are stored in a special format called *PowerInfer GGUF* based on GGUF format, consisting of both LLM weights and predictor weights. 
-You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profiled model activation statistics under `activation/` for 'hot'-neuron offloading from each Hugging Face model repo under the "PowerInfer GGUF Format" column. You can also convert them from the original model weights and predictor weights.
 
-| Base Model | PowerInfer GGUF Format | Original Model | Predictor |
-|------------|------------------|----------------|---------------------|
-| LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |  [PowerInfer/ReluLLaMA-7B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-7B-Predictor)
-| LLaMA(ReLU)-2-13B    | [PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF)   | [SparseLLM/ReluLLaMA-13B](https://huggingface.co/SparseLLM/ReluLLaMA-13B)  |  [PowerInfer/ReluLLaMA-13B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-13B-Predictor)
-| Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    | [SparseLLM/ReluFalcon-40B](https://huggingface.co/SparseLLM/ReluFalcon-40B)      | [PowerInfer/ReluFalcon-40B-Predictor](https://huggingface.co/PowerInfer/ReluFalcon-40B-Predictor)
-| LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |  [PowerInfer/ReluLLaMA-70B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-70B-Predictor)
+### Download PowerInfer GGUF via Hugging Face
+
+You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profiled model activation statistics for 'hot'-neuron offloading from each Hugging Face repo below.
+
+| Base Model | PowerInfer GGUF |
+|------------|------------------|
+| LLaMA(ReLU)-2-7B   | [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF)    |
+| LLaMA(ReLU)-2-13B    | [PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-13B-PowerInfer-GGUF)   |
+| Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    |
+| LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    |
+
+We suggest downloading/cloning the whole repo so PowerInfer can automatically make use of such directory structure for feature-complete model offloading:
+```
+.
+├── *.powerinfer.gguf (Unquantized PowerInfer model)
+├── *.q4.powerinfer.gguf (INT4 quantized PowerInfer model, if available)
+├── activation (Profiled activation statistics for fine-grained FFN offloading)
+│   ├── activation_x.pt (Profiled activation statistics for layer x)
+│   └── ...
+├── *.[q4].powerinfer.gguf.genearted.gpuidx (Generated GPU index at runtime for corresponding model)
+```
+
+### Convert from Original Model Weights + Predictor Weights
+
+Hugging Face limits single model weight to 50GiB. For unquantized models >= 40B, you can convert PowerInfer GGUF from the original model weights and predictor weights obtained from Hugging Face.
+
+| Base Model | Original Model | Predictor |
+|------------|----------------|---------------------|
+| LLaMA(ReLU)-2-7B   | [SparseLLM/ReluLLaMA-7B](https://huggingface.co/SparseLLM/ReluLLaMA-7B)     |  [PowerInfer/ReluLLaMA-7B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-7B-Predictor)
+| LLaMA(ReLU)-2-13B    | [SparseLLM/ReluLLaMA-13B](https://huggingface.co/SparseLLM/ReluLLaMA-13B)  |  [PowerInfer/ReluLLaMA-13B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-13B-Predictor)
+| Falcon(ReLU)-40B    | [SparseLLM/ReluFalcon-40B](https://huggingface.co/SparseLLM/ReluFalcon-40B)      | [PowerInfer/ReluFalcon-40B-Predictor](https://huggingface.co/PowerInfer/ReluFalcon-40B-Predictor)
+| LLaMA(ReLU)-2-70B    | [SparseLLM/ReluLLaMA-70B](https://huggingface.co/SparseLLM/ReluLLaMA-70B)      |  [PowerInfer/ReluLLaMA-70B-Predictor](https://huggingface.co/PowerInfer/ReluLLaMA-70B-Predictor)
+
+You can use the following command to convert the original model weights and predictor weights to PowerInfer GGUF:
+```bash
+# make sure that you have done `pip install -r requirements.txt`
+python convert.py --outfile /PATH/TO/POWERINFER/GGUF/REPO/MODELNAME.powerinfer.gguf /PATH/TO/ORIGINAL/MODEL /PATH/TO/PREDICTOR
+# python convert.py --outfile ./ReluLLaMA-7B-PowerInfer-GGUF/llama-7b-relu.powerinfer.gguf ./SparseLLM/ReluLLaMA-7B ./PowerInfer/ReluLLaMA-7B-Predictor
+```
+For the same reason, we suggest keeping the same directory structure as PowerInfer GGUF repos after conversion.
+
 
 ## Inference
 
