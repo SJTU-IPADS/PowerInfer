@@ -146,7 +146,7 @@ If you want to limit the VRAM usage of GPU:
 ./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --vram-budget $vram_gb
 # ./build/bin/main -m ./ReluLLaMA-7B-PowerInfer-GGUF/llama-7b-relu.powerinfer.gguf -n 128 -t 8 -p "Once upon a time" --vram-budget 8
 ```
-Under CPU-GPU hybrid inference, PowerInfer will automatically offload all dense activation blocks to GPU and split FFN on GPU if possible. 
+Under CPU-GPU hybrid inference, PowerInfer will automatically offload all dense activation blocks to GPU, then split FFN and offload to GPU if possible. 
 
 ## Quantization
 
