@@ -193,11 +193,13 @@ More technical details can be found in our [paper](https://ipads.se.sjtu.edu.cn/
 If you find PowerInfer useful or relevant to your project and research, please kindly cite our paper:
 
 ```bibtex
-@techreport{song2023powerinfer,
-  author      = {Yixin Song and Zeyu Mi and Haotong Xie and Haibo Chen},
-  title       = {PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU},
-  institution = {Institute of Parallel and Distributed Systems (IPADS), Shanghai Jiao Tong University},
-  year        = {2023}
+@misc{song2023powerinfer,
+      title={PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU}, 
+      author={Yixin Song and Zeyu Mi and Haotong Xie and Haibo Chen},
+      year={2023},
+      eprint={2312.12456},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
 }
 ```
 
