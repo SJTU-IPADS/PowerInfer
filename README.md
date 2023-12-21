@@ -146,7 +146,7 @@ If you want to limit the VRAM usage of GPU:
 ./build/bin/main -m /PATH/TO/MODEL -n $output_token_count -t $thread_num -p $prompt --vram-budget $vram_gb
 # ./build/bin/main -m ./ReluLLaMA-7B-PowerInfer-GGUF/llama-7b-relu.powerinfer.gguf -n 128 -t 8 -p "Once upon a time" --vram-budget 8
 ```
-Under CPU-GPU hybrid inference, PowerInfer will automatically offload all dense activation blocks to GPU and split FFN on GPU if possible. 
+Under CPU-GPU hybrid inference, PowerInfer will automatically offload all dense activation blocks to GPU, then split FFN and offload to GPU if possible. 
 
 ## Quantization
 
@@ -159,17 +159,29 @@ Then you can use the quantized model for inference with PowerInfer with the same
 
 ## Evaluation
 
+We evaluated PowerInfer vs. llama.cpp on a single RTX 4090(24G) with a series of FP16 ReLU models under inputs of length 64, and the results are shown below. PowerInfer achieves up to 11x speedup on Falcon 40B and up to 3x speedup on Llama 2 70B.
+
 ![github-eval-4090](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/d700fa6c-77ba-462f-a2fc-3fd21c898f33)
+<sub>The X axis indicates the output length, and the Y axis represents the speedup compared with llama.cpp. The number above each bar indicates the end-to-end generation speed (total prompting + generation time / total tokens generated, in tokens/s).</sub>
+
+We also evaluated PowerInfer on a single RTX 2080Ti(11G) with INT4 ReLU models under inputs of length 8, and the results are illustrated in the same way as above. PowerInfer achieves up to 8x speedup on Falcon 40B and up to 3x speedup on Llama 2 70B.
 
 ![github-eval-2080ti-q4](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/0fc1bfc4-aafc-4e82-a865-bec0143aff1a)
 
-PowerInfer achieves up to 11x and 8x speedup for FP16 and INT4 models!
+Please refer to our [paper](https://ipads.se.sjtu.edu.cn/_media/publications/powerinfer-20231219.pdf) for more evaluation details.
 
 ## FAQs
 1. What if I encountered `CUDA_ERROR_OUT_OF_MEMORY`?
    - You can try to run with `--reset-gpu-index` argument to rebuild the GPU index for this model to avoid any stale cache.
-   - Due to our current implementation, model offloading might not be as accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading. 
-2. What if...
+   - Due to our current implementation, model offloading might not be as accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading.
+
+2. Does PowerInfer support mistral, original llama, Qwen, ...?
+   - Now we only support models with ReLU/ReGLU/Squared ReLU activation function. So we do not support these models now. It's worth mentioning that a [paper](https://arxiv.org/pdf/2310.04564.pdf) has demonstrated that using the ReLU/ReGLU activation function has a negligible impact on convergence and performance.
+
+3. Why is there a noticeable downgrade in the performance metrics of our current ReLU model, particularly the 70B model?
+   - In contrast to the typical requirement of around 2T tokens for LLM training, our model's fine-tuning was conducted with only 5B tokens. This insufficient retraining has resulted in the model's inability to regain its original performance. We are actively working on updating to a more capable model, so please stay tuned.
+
+4. What if...
    - Issues are welcomed! Please feel free to open an issue and attach your running environment and running parameters. We will try our best to help you.
 
 ## TODOs
@@ -193,11 +205,13 @@ More technical details can be found in our [paper](https://ipads.se.sjtu.edu.cn/
 If you find PowerInfer useful or relevant to your project and research, please kindly cite our paper:
 
 ```bibtex
-@techreport{song2023powerinfer,
-  author      = {Yixin Song and Zeyu Mi and Haotong Xie and Haibo Chen},
-  title       = {PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU},
-  institution = {Institute of Parallel and Distributed Systems (IPADS), Shanghai Jiao Tong University},
-  year        = {2023}
+@misc{song2023powerinfer,
+      title={PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU}, 
+      author={Yixin Song and Zeyu Mi and Haotong Xie and Haibo Chen},
+      year={2023},
+      eprint={2312.12456},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
 }
 ```
 
