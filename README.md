@@ -173,9 +173,13 @@ Please refer to our [paper](https://ipads.se.sjtu.edu.cn/_media/publications/pow
 ## FAQs
 1. What if I encountered `CUDA_ERROR_OUT_OF_MEMORY`?
    - You can try to run with `--reset-gpu-index` argument to rebuild the GPU index for this model to avoid any stale cache.
-   - Due to our current implementation, model offloading might not be as accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading. 
-2. What if...
-   - Issues are welcomed! Please feel free to open an issue and attach your running environment and running parameters. We will try our best to help you.
+   - Due to our current implementation, model offloading might not be as accurate as expected. You can try with `--vram-budget` with a slightly lower value or `--disable-gpu-index` to disable FFN offloading.
+
+2. Does PowerInfer support mistral, original llama, Qwen, ...?
+   - Now we only support models with ReLU/ReGLU/Squared ReLU activation function. So we do not support these models now.
+
+3. What if...
+   - Issues are welcomed! Please feel free to open an issu,e and attach your running environment and running parameters. We will try our best to help you.
 
 ## TODOs
 We will release the code and data in the following order, please stay tuned!
