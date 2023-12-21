@@ -179,10 +179,10 @@ Please refer to our [paper](https://ipads.se.sjtu.edu.cn/_media/publications/pow
    - Now we only support models with ReLU/ReGLU/Squared ReLU activation function. So we do not support these models now. It's worth mentioning that a [paper](https://arxiv.org/pdf/2310.04564.pdf) has demonstrated that using the ReLU/ReGLU activation function has a negligible impact on convergence and performance.
 
 3. Why is there a noticeable downgrade in the performance metrics of our current ReLU model, particularly the 70B model?
-   - Due to the typical requirement of around 2T tokens for LLM training, our model's fine-tuning was conducted with only 5B tokens. This insufficient retraining has resulted in the model's inability to regain its original performance. We are actively working on updating to a more capable model, so please stay tuned.
+   - In contrast to the typical requirement of around 2T tokens for LLM training, our model's fine-tuning was conducted with only 5B tokens. This insufficient retraining has resulted in the model's inability to regain its original performance. We are actively working on updating to a more capable model, so please stay tuned.
 
 4. What if...
-   - Issues are welcomed! Please feel free to open an issu,e and attach your running environment and running parameters. We will try our best to help you.
+   - Issues are welcomed! Please feel free to open an issue and attach your running environment and running parameters. We will try our best to help you.
 
 ## TODOs
 We will release the code and data in the following order, please stay tuned!
