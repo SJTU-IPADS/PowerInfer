@@ -2957,6 +2957,7 @@ static void llm_load_sparse_model_tensors(
         bool use_mlock,
         llama_progress_callback progress_callback,
         void * progress_callback_user_data) {
+    LLAMA_LOG_INFO("%s: vram_budget_bytes = %lld\n", __func__, vram_budget_bytes);
     model.t_start_us = ggml_time_us();
     auto & ctx     = model.ctx;
     auto & hparams = model.hparams;
@@ -3897,6 +3898,7 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
                 return false;
             }
             double vram_budget_bytes = params.vram_budget_gb * 1024.0 * 1024.0 * 1024.0;
+            LLAMA_LOG_INFO("%s: sparse inference - vram budget = %.2f GB\n", __func__, vram_budget_bytes / 1024.0 / 1024.0 / 1024.0);
             llm_load_sparse_model_tensors(
                 ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
                 params.use_mlock, params.progress_callback, params.progress_callback_user_data
