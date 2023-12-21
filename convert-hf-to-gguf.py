@@ -150,25 +150,21 @@ class Model:
 
     @staticmethod
     def from_model_architecture(model_architecture):
-        if model_architecture == "GPTNeoXForCausalLM":
-            return GPTNeoXModel
-        if model_architecture == "BloomForCausalLM":
-            return BloomModel
-        if model_architecture == "MPTForCausalLM":
-            return MPTModel
-        if model_architecture in ("BaichuanForCausalLM", "BaiChuanForCausalLM"):
-            return BaichuanModel
-        if model_architecture in ("FalconForCausalLM", "RWForCausalLM"):
-            return FalconModel
-        if model_architecture == "GPTBigCodeForCausalLM":
-            return StarCoderModel
-        if model_architecture == "GPTRefactForCausalLM":
-            return RefactModel
-        if model_architecture == "PersimmonForCausalLM":
-            return PersimmonModel
-        if model_architecture in ("StableLMEpochForCausalLM", "LlavaStableLMEpochForCausalLM"):
-            return StableLMModel
-        return Model
+        models = {
+            "GPTNeoXForCausalLM": GPTNeoXModel,
+            "BloomForCausalLM": BloomModel,
+            "MPTForCausalLM": MPTModel,
+            "BaichuanForCausalLM": BaichuanModel,
+            "BaiChuanForCausalLM": BaichuanModel,
+            "FalconForCausalLM": FalconModel,
+            "RWForCausalLM": FalconModel,
+            "GPTBigCodeForCausalLM": StarCoderModel,
+            "GPTRefactForCausalLM": RefactModel,
+            "PersimmonForCausalLM": PersimmonModel,
+            "StableLMEpochForCausalLM": StableLMModel,
+            "LlavaStableLMEpochForCausalLM": StableLMModel,
+        }
+        return models.get(model_architecture, Model)
 
     def _is_model_safetensors(self) -> bool:
         return Model.count_model_parts(self.dir_model, ".safetensors") > 0
@@ -185,26 +181,23 @@ class Model:
 
     def _get_model_architecture(self) -> gguf.MODEL_ARCH:
         arch = self.hparams["architectures"][0]
-        if arch == "GPTNeoXForCausalLM":
-            return gguf.MODEL_ARCH.GPTNEOX
-        if arch == "BloomForCausalLM":
-            return gguf.MODEL_ARCH.BLOOM
-        if arch == "MPTForCausalLM":
-            return gguf.MODEL_ARCH.MPT
-        if arch in ("BaichuanForCausalLM", "BaiChuanForCausalLM"):
-            return gguf.MODEL_ARCH.BAICHUAN
-        if arch == "FalconForCausalLM":
-            return gguf.MODEL_ARCH.FALCON
-        if arch == "GPTBigCodeForCausalLM":
-            return gguf.MODEL_ARCH.STARCODER
-        if arch == "GPTRefactForCausalLM":
-            return gguf.MODEL_ARCH.REFACT
-        if arch == "PersimmonForCausalLM":
-            return gguf.MODEL_ARCH.PERSIMMON
-        if arch in ("StableLMEpochForCausalLM", "LlavaStableLMEpochForCausalLM"):
-            return gguf.MODEL_ARCH.STABLELM
+        models_arch = {
+            "GPTNeoXForCausalLM": gguf.MODEL_ARCH.GPTNEOX,
+            "BloomForCausalLM": gguf.MODEL_ARCH.BLOOM,
+            "MPTForCausalLM": gguf.MODEL_ARCH.MPT,
+            "BaichuanForCausalLM": gguf.MODEL_ARCH.BAICHUAN,
+            "BaiChuanForCausalLM": gguf.MODEL_ARCH.BAICHUAN,
+            "FalconForCausalLM": gguf.MODEL_ARCH.FALCON,
+            "GPTBigCodeForCausalLM": gguf.MODEL_ARCH.STARCODER,
+            "GPTRefactForCausalLM": gguf.MODEL_ARCH.REFACT,
+            "PersimmonForCausalLM": gguf.MODEL_ARCH.PERSIMMON,
+            "StableLMEpochForCausalLM": gguf.MODEL_ARCH.STABLELM,
+            "LlavaStableLMEpochForCausalLM": gguf.MODEL_ARCH.STABLELM,
+        }
 
-        raise NotImplementedError(f'Architecture "{arch}" not supported!')
+        if arch not in models_arch:
+            raise NotImplementedError(f'Architecture "{arch}" not supported!')
+        return models_arch[arch]
 
     def _set_vocab_gpt2(self):
         dir_model = self.dir_model
