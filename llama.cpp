@@ -2957,7 +2957,6 @@ static void llm_load_sparse_model_tensors(
         bool use_mlock,
         llama_progress_callback progress_callback,
         void * progress_callback_user_data) {
-    LLAMA_LOG_INFO("%s: vram_budget_bytes = %lld\n", __func__, vram_budget_bytes);
     model.t_start_us = ggml_time_us();
     auto & ctx     = model.ctx;
     auto & hparams = model.hparams;
