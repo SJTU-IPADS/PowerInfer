@@ -261,6 +261,17 @@
         } \
     } while (0)
 
+#define GGML_ASSERT_DBG(x, s, ...) \
+    do { \
+        if (!(x)) { \
+            fprintf(stderr, "GGML_ASSERT: %s:%d: " s "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
+            fflush(stderr); \
+            fflush(stdout); \
+            ggml_print_backtrace(); \
+            exit(1); \
+        } \
+    } while (0)
+
 #ifndef NDEBUG
 #define GGML_UNREACHABLE() GGML_ASSERT(!"statement should not be reached")
 #elif defined(__GNUC__)

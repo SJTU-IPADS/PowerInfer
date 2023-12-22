@@ -2876,7 +2876,6 @@ struct buffered_tensor_allocator {
                 vram_allocated_bytes += tensor_data_size;
             }
         }
-        ml.done_getting_tensors();
 #endif
         return vram_allocated_bytes;
     }
@@ -2952,7 +2951,7 @@ static void llm_load_sparse_model_tensors(
         llama_model_loader & ml,
         llama_model & model,
         int main_gpu,
-        long int vram_budget_bytes,
+        long long vram_budget_bytes,
         bool reset_gpu_index,
         bool disable_ffn_split,
         bool use_mlock,
@@ -3012,7 +3011,7 @@ static void llm_load_sparse_model_tensors(
         // Let it be the rest of VRAM
         vram_capacity = ggml_cuda_get_free_memory(main_gpu);
     } else {
-        vram_capacity = vram_budget_bytes;
+        vram_capacity = std::min(vram_budget_bytes, (long long) ggml_cuda_get_free_memory(main_gpu));
     }
 #endif
 
@@ -3104,7 +3103,8 @@ static void llm_load_sparse_model_tensors(
     }
 
     size_t vram_allocated_bytes = alloc.flush();
-    GGML_ASSERT(vram_allocated_bytes < vram_capacity);
+    GGML_ASSERT_DBG(vram_allocated_bytes <= vram_capacity, "vram_allocated_bytes=%ld, vram_capacity=%ld", vram_allocated_bytes, vram_capacity);
+    ml.done_getting_tensors();
 
     // print memory requirements
     {
@@ -3897,6 +3897,7 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
                 return false;
             }
             double vram_budget_bytes = params.vram_budget_gb * 1024.0 * 1024.0 * 1024.0;
+            LLAMA_LOG_INFO("%s: sparse inference - vram budget = %.2f GB\n", __func__, vram_budget_bytes / 1024.0 / 1024.0 / 1024.0);
             llm_load_sparse_model_tensors(
                 ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
                 params.use_mlock, params.progress_callback, params.progress_callback_user_data
