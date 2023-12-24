@@ -4,7 +4,7 @@
 PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** for your device.
 
 **Latest News** 🔥
-- [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16!
+- [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16😜!
 - [2023/12/19] We officially released PowerInfer!
 ## Demo 🔥
 
