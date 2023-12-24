@@ -99,7 +99,7 @@
 // 
 
 // sparsity threshold for sparse matrix multiplication prediction
-float sparse_pred_threshold = 0.;
+// float sparse_pred_threshold = 0.;
 
 //
 // logging
