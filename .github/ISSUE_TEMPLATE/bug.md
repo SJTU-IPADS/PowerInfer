@@ -1,6 +1,6 @@
 ---
 name: Bug template
-about: Used to report bugs in llama.cpp
+about: Used to report bugs in PowerInfer
 labels: ["bug-unconfirmed"]
 assignees: ''
 
@@ -8,20 +8,19 @@ assignees: ''
 
 # Prerequisites
 
-Please answer the following questions for yourself before submitting an issue.
+Before submitting your question, please ensure the following:
 
-- [ ] I am running the latest code. Development is very rapid so there are no tagged versions as of now.
-- [ ] I carefully followed the [README.md](https://github.com/ggerganov/llama.cpp/blob/master/README.md).
+- [ ] I am running the latest version of PowerInfer. Development is rapid, and as of now, there are no tagged versions.
+- [ ] I have carefully read and followed the instructions in the [README.md](https://github.com/SJTU-IPADS/PowerInfer/blob/main/README.md).
 - [ ] I [searched using keywords relevant to my issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/filtering-and-searching-issues-and-pull-requests) to make sure that I am creating a new issue that is not already open (or closed).
-- [ ] I reviewed the [Discussions](https://github.com/ggerganov/llama.cpp/discussions), and have a new bug or useful enhancement to share.
 
 # Expected Behavior
 
-Please provide a detailed written description of what you were trying to do, and what you expected `llama.cpp` to do.
+Please provide a detailed written description of what you were trying to do, and what you expected PowerInfer to do.
 
 # Current Behavior
 
-Please provide a detailed written description of what `llama.cpp` did, instead.
+Please provide a detailed written description of what PowerInfer did, instead.
 
 # Environment and Context
 
