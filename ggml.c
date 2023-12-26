@@ -45,8 +45,6 @@ float sparse_pred_threshold = 0.;
 
 #if defined(_WIN32)
 
-#include <windows.h>
-
 typedef HANDLE pthread_t;
 
 typedef DWORD thread_ret_t;
