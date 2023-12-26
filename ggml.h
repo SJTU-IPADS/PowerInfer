@@ -213,7 +213,35 @@
   using std::memory_order;
   using std::memory_order_acquire;
 #else /* not __cplusplus */
-  #include <stdatomic.h>
+//   #include <stdatomic.h>
+
+typedef long LONG;
+typedef volatile LONG atomic_int;
+typedef atomic_int atomic_bool;
+// typedef _Atomic struct
+typedef struct
+{
+#if __GCC_ATOMIC_TEST_AND_SET_TRUEVAL == 1
+    _Bool __val;
+#else
+    unsigned char __val;
+#endif
+} atomic_flag;
+
+#define ATOMIC_FLAG_INIT	{ 0 }
+
+static void atomic_store(atomic_int* ptr, LONG val) {
+    InterlockedExchange(ptr, val);
+}
+static LONG atomic_load(atomic_int* ptr) {
+    return InterlockedCompareExchange(ptr, 0, 0);
+}
+static LONG atomic_fetch_add(atomic_int* ptr, LONG inc) {
+    return InterlockedExchangeAdd(ptr, inc);
+}
+static LONG atomic_fetch_sub(atomic_int* ptr, LONG dec) {
+    return atomic_fetch_add(ptr, -(dec));
+}
 #endif /* __cplusplus */
 
 #define GGML_FILE_MAGIC   0x67676d6c // "ggml"
