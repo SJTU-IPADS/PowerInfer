@@ -8,7 +8,7 @@ assignees: ''
 
 # Prerequisites
 
-Before submitting your question, please ensure the following:
+Before submitting your issue, please ensure the following:
 
 - [ ] I am running the latest version of PowerInfer. Development is rapid, and as of now, there are no tagged versions.
 - [ ] I have carefully read and followed the instructions in the [README.md](https://github.com/SJTU-IPADS/PowerInfer/blob/main/README.md).
