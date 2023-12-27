@@ -4485,6 +4485,8 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
     //     printf("row in gpu %d cols %d, value %d %d %d\n", id, ncols, *d, *(d+1), *(d+4095));
     // }
     // int id = row;
+    if (y[id] == 0)
+        return;
     if (idx[id] < dev_sparse_threshold) {
         return;
     }
