@@ -1804,6 +1804,7 @@ static void server_print_usage(const char *argv0, const gpt_params &params,
     printf("  -cb, --cont-batching  enable continuous batching (a.k.a dynamic batching) (default: disabled)\n");
     printf("    -spf FNAME, --system-prompt-file FNAME\n");
     printf("                        Set a file to load a system prompt (initial prompt of all slots), this is useful for chat applications.\n");
+    printf("  --vram-budget N       VRAM budget in GiB (default: -1, -1 = available VRAM)\n");
     printf("  --mmproj MMPROJ_FILE  path to a multimodal projector file for LLaVA.\n");
     printf("\n");
 }
@@ -2149,6 +2150,27 @@ static void server_params_parse(int argc, char **argv, server_params &sparams,
                 std::back_inserter(systm_content)
             );
             llama.process_system_prompt_data(json::parse(systm_content));
+        }
+        else if (arg == "--vram-budget")
+        {
+            if (++i >= argc)
+            {
+                invalid_param = true;
+                break;
+            }
+#ifdef GGML_USE_CUBLAS
+            params.vram_budget_gb = std::stof(argv[i]);
+#else
+            fprintf(stderr, "warning: PowerInfer was compiled without cuBLAS. It is not possible to set a VRAM budget.\n");
+#endif
+        }
+        else if (arg == "--reset-gpu-index")
+        {
+            params.reset_gpu_index = true;
+        } 
+        else if (arg == "--disable-gpu-index")
+        {
+            params.disale_gpu_index = true;
         }
         else if(arg == "--mmproj")
         {
