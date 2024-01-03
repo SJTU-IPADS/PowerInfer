@@ -776,6 +776,18 @@ struct llama_file {
         seek(0, SEEK_SET);
     }
 
+    std::string get_basedir() const {
+        const char * model_path = fname.c_str();
+#if defined(_WIN32)
+        size_t found = fname.find_last_of("/\\");
+        return fname.substr(0, found);
+#else
+        #include <libgen.h>
+        const char * base_dir = dirname(const_cast<char *>(model_path));
+        return std::string(base_dir);
+#endif
+    }
+
     size_t tell() const {
 #ifdef _WIN32
         __int64 ret = _ftelli64(fp);
@@ -2888,13 +2900,8 @@ static bool load_gpu_split_from_split_file(llama_model & model, std::string spli
 }
 
 static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes, bool no_cache) {
-    const char * model_path = ml.file.fname.c_str();
-    std::string cached_split_path = std::string(model_path) + ".generated.gpuidx";
-#if defined(_WIN32)
-    const char* model_basedir = getcwd(const_cast<char*>(model_path), ml.file.fname.size());
-#else
-    const char * model_basedir = dirname(const_cast<char *>(model_path));
-#endif
+    std::string cached_split_path = ml.file.fname + ".generated.gpuidx";
+    std::string model_basedir = ml.file.get_basedir();
 
     // Load GPU split from previously generated cache
     if (access(cached_split_path.c_str(), F_OK) == 0 && !no_cache) {
@@ -2905,7 +2912,12 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     }
 
     // Generate GPU split
-    std::string activation_path = std::string(model_basedir) + "/activation";
+    std::string activation_path = std::string(model_basedir);
+#if defined (_WIN32)
+    activation_path += "\\activation";
+#else
+    activation_path += "/activation";
+#endif
     if (access(activation_path.c_str(), F_OK) != 0) {
         LLAMA_LOG_ERROR("%s: error: activation files under '%s' not found\n", __func__, activation_path.c_str());
         return false;
@@ -2922,7 +2934,11 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     LLAMA_LOG_INFO("invoking powerinfer Python module to generate gpu split for %.2f MiB of VRAM\n", vram_allocatable_bytes / 1024.0 / 1024.0);
 
     std::stringstream command_ss;
+#if defined (_WIN32)
+    command_ss << "python -m powerinfer"
+#else
     command_ss << "python3 -m powerinfer"
+#endif
                << " --activation " << activation_path
                << " --layer " << model.hparams.n_layer
                << " --neuron " << ffn_up->ne[1]
