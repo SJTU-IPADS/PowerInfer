@@ -9,7 +9,7 @@ name = "powerinfer"
 authors = [
     {name = "Holden", email = "hodlenx@gmail.com"},
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 classifiers = ["License :: OSI Approved :: MIT License"]
 version="0.0.1"
 description="powerinfer.py: Python helpers for PowerInfer LLM inference engine"
