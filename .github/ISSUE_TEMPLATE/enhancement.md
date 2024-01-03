@@ -1,6 +1,6 @@
 ---
 name: Enhancement template
-about: Used to request enhancements for llama.cpp
+about: Used to request enhancements for PowerInfer
 labels: ["enhancement"]
 assignees: ''
 
@@ -8,20 +8,19 @@ assignees: ''
 
 # Prerequisites
 
-Please answer the following questions for yourself before submitting an issue.
+Before submitting your issue, please ensure the following:
 
-- [ ] I am running the latest code. Development is very rapid so there are no tagged versions as of now.
-- [ ] I carefully followed the [README.md](https://github.com/ggerganov/llama.cpp/blob/master/README.md).
+- [ ] I am running the latest version of PowerInfer. Development is rapid, and as of now, there are no tagged versions.
+- [ ] I have carefully read and followed the instructions in the [README.md](https://github.com/SJTU-IPADS/PowerInfer/blob/main/README.md).
 - [ ] I [searched using keywords relevant to my issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/filtering-and-searching-issues-and-pull-requests) to make sure that I am creating a new issue that is not already open (or closed).
-- [ ] I reviewed the [Discussions](https://github.com/ggerganov/llama.cpp/discussions), and have a new bug or useful enhancement to share.
 
 # Feature Description
 
-Please provide a detailed written description of what you were trying to do, and what you expected `llama.cpp` to do as an enhancement.
+Please provide a detailed written description of what you were trying to do, and what you expected PowerInfer to do as an enhancement.
 
 # Motivation
 
-Please provide a detailed written description of reasons why this feature is necessary and how it is useful to `llama.cpp` users.
+Please provide a detailed written description of reasons why this feature is necessary and how it is useful to PowerInfer users.
 
 # Possible Implementation
 

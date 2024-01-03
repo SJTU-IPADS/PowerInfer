@@ -3,6 +3,10 @@
 ## TL;DR
 PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** for your device.
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+[Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2)
+
 ## Latest News 🔥
 - [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16!
 - [2023/12/19] We officially released PowerInfer!
@@ -68,6 +72,8 @@ And new features coming soon:
 
 - Mistral-7B model
 - Metal backend for sparse inference on macOS
+
+Please kindly refer to our [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2) for our current focus of development. 
   
 ## Getting Started
 
@@ -75,6 +81,14 @@ And new features coming soon:
 - [Model Weights](#model-weights)
 
 ## Setup and Installation
+
+### Pre-requisites
+
+PowerInfer requires the following dependencies:
+
+- CMake (3.13+)
+- Python (3.8+) and pip (19.3+), for converting model weights and automatic FFN offloading
+
 ### Get the Code
 
 ```bash
@@ -91,7 +105,7 @@ Using `CMake`(3.13+) on Linux or macOS:
 cmake -S . -B build -DLLAMA_CUBLAS=ON
 cmake --build build --config Release
 ```
-* If you just CPU:
+* If you have just CPU:
 ```bash
 cmake -S . -B build
 cmake --build build --config Release

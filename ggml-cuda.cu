@@ -4485,6 +4485,8 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
     //     printf("row in gpu %d cols %d, value %d %d %d\n", id, ncols, *d, *(d+1), *(d+4095));
     // }
     // int id = row;
+    if (y[id] == 0)
+        return;
     if (idx[id] < dev_sparse_threshold) {
         return;
     }
@@ -7596,7 +7598,6 @@ inline void ggml_cuda_op_dequantize_axpy_batch(
                 int idx_ne = src1->ne[0];
                 dequantize_axpy_sparse_batch_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, idx_ne, src1_ncols, stream, (int *)dst_extra->data_device[0], (float *)dst->src[2]->data);
             }
-            dequantize_mul_mat_vec_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             break;
         case GGML_TYPE_Q4_1:
             dequantize_mul_mat_vec_q4_1_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);

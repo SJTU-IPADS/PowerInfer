@@ -27,6 +27,7 @@ Command line options:
 -   `-np N`, `--parallel N`: Set the number of slots for process requests (default: 1)
 -   `-cb`, `--cont-batching`: enable continuous batching (a.k.a dynamic batching) (default: disabled)
 -   `-spf FNAME`, `--system-prompt-file FNAME` Set a file to load "a system prompt (initial prompt of all slots), this is useful for chat applications. [See more](#change-system-prompt-on-runtime)
+-   `--vram-budget N`: VRAM budget in GiB (default: -1, -1 = available VRAM)
 -   `--mmproj MMPROJ_FILE`: Path to a multimodal projector file for LLaVA.
 
 ## Build
