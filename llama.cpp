@@ -49,6 +49,8 @@
     #include <stdio.h> // for _fseeki64
     #include <direct.h>
     #define F_OK 0
+#else
+    #include <libgen.h>
 #endif
 
 #include <algorithm>
@@ -63,7 +65,6 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
-// #include <libgen.h>
 #include <forward_list>
 #include <fstream>
 #include <functional>
