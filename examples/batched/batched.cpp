@@ -11,7 +11,7 @@ int main(int argc, char ** argv) {
     gpt_params params;
 
     if (argc == 1 || argv[1][0] == '-') {
-        printf("usage: %s MODEL_PATH [PROMPT] [PARALLEL] [LEN] [NGL] [N_THREAD] [MLP_PATH]\n" , argv[0]);
+        printf("usage: %s MODEL_PATH [PROMPT] [PARALLEL] [LEN] [N_THREAD] [VRAM_BUDGET] [NGL]\n" , argv[0]);
         return 1 ;
     }
 
@@ -23,6 +23,9 @@ int main(int argc, char ** argv) {
 
     // number of layers to offload to the GPU
     int n_gpu_layers = 0;
+
+    // vram budget in GiB
+    double vram_budget = -1;
 
     if (argc >= 2) {
         params.model = argv[1];
@@ -41,18 +44,19 @@ int main(int argc, char ** argv) {
     }
 
     if (argc >= 6) {
-        n_gpu_layers = std::atoi(argv[5]);
+        params.n_threads = std::atoi(argv[5]);
     }
 
     if (argc >= 7) {
-        params.n_threads = std::atoi(argv[6]);
+        vram_budget = std::atof(argv[6]);
     }
 
-    // For testing purposes, we always reset the GPU index
-    params.reset_gpu_index = true;
+    if (argc >= 8) {
+        n_gpu_layers = std::atoi(argv[7]);
+    }
 
-    printf("params: model = %s, prompt = %s, n_parallel = %d, n_len = %d, n_gpu_layers = %d, n_threads = %d, reset_gpu_index = true\n",
-           params.model.c_str(), params.prompt.c_str(), n_parallel, n_len, n_gpu_layers, params.n_threads);
+    printf("params: model = %s, prompt = %s, n_parallel = %d, n_len = %d, n_gpu_layers = %d, n_threads = %d, vram_budget = %.2f GiB, reset_gpu_index = true\n",
+           params.model.c_str(), params.prompt.c_str(), n_parallel, n_len, n_gpu_layers, params.n_threads, vram_budget);
 
     if (params.prompt.empty()) {
         params.prompt = "Hello my name is";
@@ -67,6 +71,9 @@ int main(int argc, char ** argv) {
     llama_model_params model_params = llama_model_default_params();
 
     model_params.n_gpu_layers = n_gpu_layers;
+    // For testing purposes, we always reset the GPU index
+    model_params.reset_gpu_index = true;
+    model_params.vram_budget_gb = vram_budget;
 
     llama_model * model = llama_load_model_from_file(params.model.c_str(), model_params);
 
