@@ -81,6 +81,14 @@ Please kindly refer to our [Project Kanban](https://github.com/orgs/SJTU-IPADS/p
 - [Model Weights](#model-weights)
 
 ## Setup and Installation
+
+### Pre-requisites
+
+PowerInfer requires the following dependencies:
+
+- CMake (3.13+)
+- Python (3.8+) and pip (19.3+), for converting model weights and automatic FFN offloading
+
 ### Get the Code
 
 ```bash
@@ -97,7 +105,7 @@ Using `CMake`(3.13+) on Linux or macOS:
 cmake -S . -B build -DLLAMA_CUBLAS=ON
 cmake --build build --config Release
 ```
-* If you just CPU:
+* If you have just CPU:
 ```bash
 cmake -S . -B build
 cmake --build build --config Release
