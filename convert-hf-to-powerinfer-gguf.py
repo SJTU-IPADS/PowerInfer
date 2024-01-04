@@ -18,6 +18,8 @@ import numpy as np
 import torch
 import torch.nn as tnn
 
+from dataclasses import dataclass
+
 if TYPE_CHECKING:
     from torch import Tensor
 
@@ -333,7 +335,7 @@ class LlamaModel(Model):
     def set_vocab(self):
         self._set_vocab_sentencepiece()
 
-    def set_gguf_parameters(self):
+    def set_gguf_parameters(self, params: PredictorParams):
         self.gguf_writer.add_name("Llama")
         self.gguf_writer.add_context_length(2048)  # not in config.json
         self.gguf_writer.add_embedding_length(self.hparams["hidden_size"])
@@ -347,6 +349,9 @@ class LlamaModel(Model):
         self.gguf_writer.add_layer_norm_rms_eps(self.hparams["rms_norm_eps"])
         self.gguf_writer.add_rope_freq_base(self.hparams["rope_theta"])
         self.gguf_writer.add_file_type(self.ftype)
+
+        if params.sparse_threshold is not None:
+            self.gguf_writer.add_sparse_threshold(params.sparse_threshold)
 
     def write_tensors(self):
         for name, data_torch in self.get_tensors():
@@ -406,7 +411,7 @@ class LlamaModel(Model):
 
 
 class FalconModel(Model):
-    def set_gguf_parameters(self):
+    def set_gguf_parameters(self, params: PredictorParams):
         block_count = self.hparams.get("num_hidden_layers")
         if block_count is None:
             block_count = self.hparams["n_layer"]  # old name
@@ -429,6 +434,9 @@ class FalconModel(Model):
         self.gguf_writer.add_head_count_kv(n_head_kv)
         self.gguf_writer.add_layer_norm_eps(self.hparams["layer_norm_epsilon"])
         self.gguf_writer.add_file_type(self.ftype)
+
+        if params.sparse_threshold is not None:
+            self.gguf_writer.add_sparse_threshold(params.sparse_threshold)
 
     def write_tensors(self):
         n_head = self.hparams.get("num_attention_heads")
@@ -506,6 +514,29 @@ class FalconModel(Model):
             self.gguf_writer.add_tensor(new_name, data)
 
 
+
+@dataclass
+class PredictorParams:
+    sparse_threshold: float | None = None
+
+    @staticmethod
+    def loadPredictorJson(config_path: Path) -> PredictorParams:
+        config = json.load(open(config_path))
+        return PredictorParams(
+            sparse_threshold = config.get("sparse_threshold"),
+        )
+
+    @staticmethod
+    def load(model_instance: Model) -> PredictorParams:
+        config_path   = model_instance.dir_mlp_pred  / "config.json"
+
+        if config_path.exists():
+            params = PredictorParams.loadPredictorJson(config_path)
+        else:
+            params = PredictorParams()
+
+        return params
+
 ###### CONVERSION LOGIC ######
 
 
@@ -581,7 +612,8 @@ model_instance = model_class(
 )
 
 print("Set model parameters")
-model_instance.set_gguf_parameters()
+params = PredictorParams.load(model_instance)
+model_instance.set_gguf_parameters(params)
 
 print("Set model tokenizer")
 model_instance.set_vocab()
