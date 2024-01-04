@@ -213,7 +213,11 @@
   using std::memory_order;
   using std::memory_order_acquire;
 #else /* not __cplusplus */
-  #include <stdatomic.h>
+#if defined(_WIN32)
+#    include "atomic_windows.h"
+#else
+#    include <stdatomic.h>
+#endif
 #endif /* __cplusplus */
 
 #define GGML_FILE_MAGIC   0x67676d6c // "ggml"

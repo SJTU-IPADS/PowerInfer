@@ -2454,19 +2454,19 @@ void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * res
         fx0 = _mm256_mul_ps(fx0, d);
 
 
-        __m256 by = _mm256_loadu_ps((const __m256 *)(vy+i*128));
+        __m256 by = _mm256_loadu_ps((const __m256 *)((char *)vy+i*128));
 
         by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)(vz + i*128), by);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128), by);
         //second phase
 
         x_0 = _mm256_extracti128_si256(m_x, 1);
         x0_32 = _mm256_cvtepi16_epi32(x_0);
         fx0 = _mm256_cvtepi32_ps(x0_32);
         fx0 = _mm256_mul_ps(fx0, d);
-        by = _mm256_loadu_ps((const __m256 *)(vy+i*128+32));
+        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+32));
         by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)(vz + i*128+32), by);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128+32), by);
 
         //third phase
         m_a = _mm256_extracti128_si256(bx, 1);
@@ -2476,19 +2476,19 @@ void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * res
         x0_32 = _mm256_cvtepi16_epi32(x_0);
         fx0 = _mm256_cvtepi32_ps(x0_32);
         fx0 = _mm256_mul_ps(fx0, d);
-        by = _mm256_loadu_ps((const __m256 *)(vy+i*128+64));
+        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+64));
 
         by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)(vz + i*128+64), by);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128+64), by);
 
         //fourth phase
         x_0 = _mm256_extracti128_si256(m_x, 1);
         x0_32 = _mm256_cvtepi16_epi32(x_0);
         fx0 = _mm256_cvtepi32_ps(x0_32);
         fx0 = _mm256_mul_ps(fx0, d);
-        by = _mm256_loadu_ps((const __m256 *)(vy+i*128+96));
+        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+96));
         by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)(vz + i*128+96), by);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128+96), by);
 
     }
 #else

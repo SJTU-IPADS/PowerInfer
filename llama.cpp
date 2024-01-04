@@ -47,6 +47,10 @@
     #include <windows.h>
     #include <io.h>
     #include <stdio.h> // for _fseeki64
+    #include <direct.h>
+    #define F_OK 0
+#else
+    #include <libgen.h>
 #endif
 
 #include <algorithm>
@@ -61,7 +65,6 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
-#include <libgen.h>
 #include <forward_list>
 #include <fstream>
 #include <functional>
@@ -97,9 +100,6 @@
 // 
 // global variables
 // 
-
-// sparsity threshold for sparse matrix multiplication prediction
-float sparse_pred_threshold = 0.;
 
 //
 // logging
@@ -776,6 +776,18 @@ struct llama_file {
         seek(0, SEEK_SET);
     }
 
+    std::string get_basedir() const {
+        const char * model_path = fname.c_str();
+#if defined(_WIN32)
+        size_t found = fname.find_last_of("/\\");
+        return fname.substr(0, found);
+#else
+        #include <libgen.h>
+        const char * base_dir = dirname(const_cast<char *>(model_path));
+        return std::string(base_dir);
+#endif
+    }
+
     size_t tell() const {
 #ifdef _WIN32
         __int64 ret = _ftelli64(fp);
@@ -1171,7 +1183,7 @@ struct llama_hparams {
     float f_max_alibi_bias;
     
     // sparse predictor threshold if sparse inference is enabled
-    float sparse_pred_threshold = atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD") ?: "0.0");
+    float sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD") ? getenv("LLAMA_SPARSE_PRED_THRESHOLD") : "0.0");
 
     bool operator!=(const llama_hparams & other) const {
         if (this->vocab_only  != other.vocab_only)  return true;
@@ -2765,7 +2777,7 @@ struct llama_augmentation_model_loader {
         const size_t row_data_size = ne0*ggml_type_size(type)/ggml_blck_size(type);
         for (int i = 0; i < gpu_rows; i++) {
             int32_t host_i = ((int32_t *)gpu_bucket->data)[i];
-            host_mat_row -> data = src -> data + host_i * row_data_size;
+            host_mat_row -> data = (char *)(src -> data) + host_i * row_data_size;
             char ** gpu_data_pp = reinterpret_cast<char **>(ggml_cuda_get_data_pp(device_mat_row));
             // printf("gpu_data_p: %p\n", *gpu_data_pp);
             ggml_cuda_cpy_1d(device_mat_row, host_mat_row);
@@ -2888,9 +2900,8 @@ static bool load_gpu_split_from_split_file(llama_model & model, std::string spli
 }
 
 static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes, bool no_cache) {
-    const char * model_path = ml.file.fname.c_str();
-    std::string cached_split_path = std::string(model_path) + ".generated.gpuidx";
-    const char * model_basedir = dirname(const_cast<char *>(model_path));
+    std::string cached_split_path = ml.file.fname + ".generated.gpuidx";
+    std::string model_basedir = ml.file.get_basedir();
 
     // Load GPU split from previously generated cache
     if (access(cached_split_path.c_str(), F_OK) == 0 && !no_cache) {
@@ -2901,7 +2912,12 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     }
 
     // Generate GPU split
-    std::string activation_path = std::string(model_basedir) + "/activation";
+    std::string activation_path = std::string(model_basedir);
+#if defined (_WIN32)
+    activation_path += "\\activation";
+#else
+    activation_path += "/activation";
+#endif
     if (access(activation_path.c_str(), F_OK) != 0) {
         LLAMA_LOG_ERROR("%s: error: activation files under '%s' not found\n", __func__, activation_path.c_str());
         return false;
@@ -2918,7 +2934,11 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     LLAMA_LOG_INFO("invoking powerinfer Python module to generate gpu split for %.2f MiB of VRAM\n", vram_allocatable_bytes / 1024.0 / 1024.0);
 
     std::stringstream command_ss;
+#if defined (_WIN32)
+    command_ss << "python -m powerinfer"
+#else
     command_ss << "python3 -m powerinfer"
+#endif
                << " --activation " << activation_path
                << " --layer " << model.hparams.n_layer
                << " --neuron " << ffn_up->ne[1]
@@ -3010,6 +3030,7 @@ static void llm_load_sparse_model_tensors(
     if (vram_budget_bytes < 0) {
         // Let it be the rest of VRAM
         vram_capacity = ggml_cuda_get_free_memory(main_gpu);
+        printf("vram_capacity: %lld\n", vram_capacity);
     } else {
         vram_capacity = std::min(vram_budget_bytes, (long long) ggml_cuda_get_free_memory(main_gpu));
     }

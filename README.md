@@ -64,9 +64,9 @@ You can use these models with PowerInfer today:
 
 We have tested PowerInfer on the following platforms:
 
-- x86-64 CPU (with AVX2 instructions) on Linux
-- x86-64 CPU and NVIDIA GPU on Linux
-- Apple M Chips on macOS (As we do not optimize for Mac, the performance improvement is not significant now.)
+- x86-64 CPUs with AVX2 instructions, with or without NVIDIA GPUs, under **Linux**.
+- x86-64 CPUs with AVX2 instructions, with or without NVIDIA GPUs, under **Windows**.
+- Apple M Chips (CPU only) on **macOS**. (As we do not optimize for Mac, the performance improvement is not significant now.)
 
 And new features coming soon:
 
@@ -99,7 +99,7 @@ pip install -r requirements.txt # install Python helpers' dependencies
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
-Using `CMake`(3.13+) on Linux or macOS:
+Using `CMake`(3.13+):
 * If you have an NVIDIA GPU:
 ```bash
 cmake -S . -B build -DLLAMA_CUBLAS=ON
