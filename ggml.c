@@ -14392,8 +14392,11 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
     // int *gid = (int *)(dst->src[3]->data);
     // printf("down %d up %d ne00 %d\n", ir10, ir11, ne00);
 
-    // float vec[ne00*4];
-    float* vec = (float *)malloc(ne00 * 4 * sizeof(float));
+#if defined(_MSC_VER)
+    float* vec = (float *)_malloca(ne00 * 4 * sizeof(float));
+#else
+    float vec[ne00*4];
+#endif
     void *vy = vec;
     memset(vy, 0, ne00*4);
     char* src0_row = (char *) src0->data;
@@ -14439,7 +14442,6 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
     }
 #endif
     atomic_flag_clear(&g_axpy_dense_lock);
-    free(vec);
 }
 
 atomic_flag g_axpy_lock = ATOMIC_FLAG_INIT;
@@ -14534,8 +14536,11 @@ static void ggml_compute_forward_mul_mat_axpy(
     int idx_row_size = src2->nb[1];
     int *gid = (int *)(dst->src[3]->data);
 
-    // float vec[ne00*4];
-    float* vec = (float*)malloc(ne00 * 4 * sizeof(float));
+#if defined(_MSC_VER)
+    float* vec = (float *)_malloca(ne00 * 4 * sizeof(float));
+#else
+    float vec[ne00*4];
+#endif
     void *vy = vec;
     char* src0_row = (char *) src0->data;
     ggml_fp16_t * src1_ptr = NULL;
@@ -14595,7 +14600,6 @@ static void ggml_compute_forward_mul_mat_axpy(
 #endif
         atomic_flag_clear(&g_axpy_lock);
     }
-    free(vec);
 }
 static void ggml_compute_forward_mul_mat_axpy_q4_0(
         const struct ggml_compute_params * params,
@@ -14685,8 +14689,11 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
     int *gid = (int *)(dst->src[3]->data);
     // printf("down %d up %d ne00 %d\n", ir10, ir11, ne00);
 
-    // float vec[ne00*4];
-    float* vec = (float*)malloc(ne00 * 4 * sizeof(float));
+#if defined(_MSC_VER)
+    float* vec = (float *)_malloca(ne00 * 4 * sizeof(float));
+#else
+    float vec[ne00*4];
+#endif
     void *vy = vec;
     char* src0_row = (char *) src0->data;
     for (int col_idx = 0; col_idx < nr1; col_idx++) {
@@ -14751,7 +14758,6 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
 #endif
         atomic_flag_clear(&g_axpy_lock);
     }
-    free(vec);
 }
 atomic_flag g_axpy_head_lock = ATOMIC_FLAG_INIT;
 static void ggml_compute_forward_mul_mat_axpy_head(
@@ -14840,8 +14846,11 @@ static void ggml_compute_forward_mul_mat_axpy_head(
     // int *gid = (int *)(dst->src[3]->data);
     // printf("down %d up %d ne00 %d\n", ir10, ir11, ne00);
 
-    // float vec[ne00*4];
-    float* vec = (float*)malloc(ne00 * 4 * sizeof(float));
+#if defined(_MSC_VER)
+    float* vec = (float *)_malloca(ne00 * 4 * sizeof(float));
+#else
+    float vec[ne00*4];
+#endif
     void *vy = vec;
     memset(vy, 0, ne00*4);
     char* src0_row = (char *) src0->data;
@@ -14890,7 +14899,6 @@ static void ggml_compute_forward_mul_mat_axpy_head(
     }
 #endif
     atomic_flag_clear(&g_axpy_head_lock);
-    free(vec);
 }
 
 /////////////////////////////////
