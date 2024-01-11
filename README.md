@@ -8,6 +8,7 @@ PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** 
 [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2)
 
 ## Latest News 🔥
+- [2024/1/11] We supported Windows with GPU inference!
 - [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16!
 - [2023/12/19] We officially released PowerInfer!
 ## Demo 🔥
@@ -64,9 +65,9 @@ You can use these models with PowerInfer today:
 
 We have tested PowerInfer on the following platforms:
 
-- x86-64 CPU (with AVX2 instructions) on Linux
-- x86-64 CPU and NVIDIA GPU on Linux
-- Apple M Chips on macOS (As we do not optimize for Mac, the performance improvement is not significant now.)
+- x86-64 CPUs with AVX2 instructions, with or without NVIDIA GPUs, under **Linux**.
+- x86-64 CPUs with AVX2 instructions, with or without NVIDIA GPUs, under **Windows**.
+- Apple M Chips (CPU only) on **macOS**. (As we do not optimize for Mac, the performance improvement is not significant now.)
 
 And new features coming soon:
 
@@ -79,6 +80,7 @@ Please kindly refer to our [Project Kanban](https://github.com/orgs/SJTU-IPADS/p
 
 - [Installation](#setup-and-installation)
 - [Model Weights](#model-weights)
+- [Inference](#inference)
 
 ## Setup and Installation
 
@@ -99,7 +101,7 @@ pip install -r requirements.txt # install Python helpers' dependencies
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
-Using `CMake`(3.13+) on Linux or macOS:
+Using `CMake`(3.13+):
 * If you have an NVIDIA GPU:
 ```bash
 cmake -S . -B build -DLLAMA_CUBLAS=ON
@@ -181,6 +183,9 @@ PowerInfer has optimized quantization support for INT4(`Q4_0`) models. You can u
 ```
 Then you can use the quantized model for inference with PowerInfer with the same instructions as above.
 
+## More Documentation
+- [Performance troubleshooting](./docs/token_generation_performance_tips.md)
+
 ## Evaluation
 
 We evaluated PowerInfer vs. llama.cpp on a single RTX 4090(24G) with a series of FP16 ReLU models under inputs of length 64, and the results are shown below. PowerInfer achieves up to 11x speedup on Falcon 40B and up to 3x speedup on Llama 2 70B.
@@ -213,7 +218,7 @@ We will release the code and data in the following order, please stay tuned!
 
 - [x] Release core code of PowerInfer, supporting Llama-2, Falcon-40B.
 - [ ] Support Mistral-7B
-- [ ] Support Windows
+- [x] Support Windows
 - [ ] Support text-generation-webui
 - [ ] Release perplexity evaluation code
 - [ ] Support Metal for Mac
