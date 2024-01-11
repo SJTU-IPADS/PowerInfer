@@ -194,6 +194,9 @@ We also evaluated PowerInfer on a single RTX 2080Ti(11G) with INT4 ReLU models u
 
 Please refer to our [paper](https://ipads.se.sjtu.edu.cn/_media/publications/powerinfer-20231219.pdf) for more evaluation details.
 
+## Docs
+- [Performance troubleshooting](./docs/token_generation_performance_tips.md)
+
 ## FAQs
 1. What if I encountered `CUDA_ERROR_OUT_OF_MEMORY`?
    - You can try to run with `--reset-gpu-index` argument to rebuild the GPU index for this model to avoid any stale cache.
