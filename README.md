@@ -8,6 +8,7 @@ PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** 
 [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2)
 
 ## Latest News 🔥
+- [2024/1/11] We supported Windows with GPU inference!
 - [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16!
 - [2023/12/19] We officially released PowerInfer!
 ## Demo 🔥
@@ -79,6 +80,7 @@ Please kindly refer to our [Project Kanban](https://github.com/orgs/SJTU-IPADS/p
 
 - [Installation](#setup-and-installation)
 - [Model Weights](#model-weights)
+- [Inference](#inference)
 
 ## Setup and Installation
 
@@ -181,6 +183,9 @@ PowerInfer has optimized quantization support for INT4(`Q4_0`) models. You can u
 ```
 Then you can use the quantized model for inference with PowerInfer with the same instructions as above.
 
+## More Documentation
+- [Performance troubleshooting](./docs/token_generation_performance_tips.md)
+
 ## Evaluation
 
 We evaluated PowerInfer vs. llama.cpp on a single RTX 4090(24G) with a series of FP16 ReLU models under inputs of length 64, and the results are shown below. PowerInfer achieves up to 11x speedup on Falcon 40B and up to 3x speedup on Llama 2 70B.
@@ -193,9 +198,6 @@ We also evaluated PowerInfer on a single RTX 2080Ti(11G) with INT4 ReLU models u
 ![github-eval-2080ti-q4](https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/0fc1bfc4-aafc-4e82-a865-bec0143aff1a)
 
 Please refer to our [paper](https://ipads.se.sjtu.edu.cn/_media/publications/powerinfer-20231219.pdf) for more evaluation details.
-
-## Docs
-- [Performance troubleshooting](./docs/token_generation_performance_tips.md)
 
 ## FAQs
 1. What if I encountered `CUDA_ERROR_OUT_OF_MEMORY`?
@@ -216,7 +218,7 @@ We will release the code and data in the following order, please stay tuned!
 
 - [x] Release core code of PowerInfer, supporting Llama-2, Falcon-40B.
 - [ ] Support Mistral-7B
-- [ ] Support Windows
+- [x] Support Windows
 - [ ] Support text-generation-webui
 - [ ] Release perplexity evaluation code
 - [ ] Support Metal for Mac
