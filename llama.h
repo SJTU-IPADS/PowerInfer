@@ -323,6 +323,10 @@ extern "C" {
             const char * fname_out,
             const llama_model_quantize_params * params);
 
+    // Reserve KV cache in VRAM. This is an optimization to allocate KV cache before 
+    // FFN layers being split and offloaded to GPU. 
+    LLAMA_API void llama_reserve_model_kv_cache(struct llama_model * model, const struct llama_context_params * cparams);
+
     // Apply a LoRA adapter to a loaded model
     // path_base_model is the path to a higher quality model to use as a base for
     // the layers modified by the adapter. Can be NULL to use the current loaded model.

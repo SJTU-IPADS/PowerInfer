@@ -961,6 +961,7 @@ void llama_batch_add(
 
 std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_params(gpt_params & params) {
     auto mparams = llama_model_params_from_gpt_params(params);
+    auto cparams = llama_context_params_from_gpt_params(params);
 
     llama_model * model  = llama_load_model_from_file(params.model.c_str(), mparams);
     if (model == NULL) {
@@ -968,7 +969,26 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
         return std::make_tuple(nullptr, nullptr);
     }
 
-    auto cparams = llama_context_params_from_gpt_params(params);
+    if (llama_use_sparse_inference(model)) {
+        llama_reserve_model_kv_cache(model, &cparams);
+        fprintf(stderr, "%s: postprocessing PowerInfer model '%s'\n", __func__, params.model.c_str());
+        if (!params.mlp_adapter.empty()) {
+            fprintf(stderr, "%s: warning: --mlp-adapter is deprecated and has no effect\n", __func__);
+            int err = llama_model_apply_mlp_from_file(model, params.mlp_adapter.c_str(), true);
+            if (err != 0) {
+                fprintf(stderr, "%s: error: failed to apply mlp adapter\n", __func__);
+                llama_free_model(model);
+                return std::make_tuple(nullptr, nullptr);
+            }
+        }
+
+        if (llama_model_apply_augmentation(model) != 0) {
+            fprintf(stderr, "%s: error: failed to apply augmentation\n", __func__);
+            llama_free_model(model);
+            return std::make_tuple(nullptr, nullptr);
+        }
+    }
+
     llama_context * lctx = llama_new_context_with_model(model, cparams);
     if (lctx == NULL) {
         fprintf(stderr, "%s: error: failed to create context with model '%s'\n", __func__, params.model.c_str());
