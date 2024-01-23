@@ -102,11 +102,6 @@
 //
 size_t vram_budget_bytes = 0;
 
-// 
-// global variables (should be removed after a better design)
-//
-size_t vram_budget_bytes = 0;
-
 //
 // logging
 //
@@ -3016,15 +3011,15 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     return load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes);
 }
 
-static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes, bool no_cache, bool no_offload) {
-#if defined(GGML_USE_CUBLAS)
-    if (vram_budget_bytes >= 512ull * 1024 * 1024 && !no_offload) {
-        vram_budget_bytes -= 512ull * 1024 * 1024; // leave 512 MiB as a safety margin
-        if (!llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
-        LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
-        }
+static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, bool no_cache, bool no_offload) {
+    if (!ggml_cublas_loaded()) {
+        throw std::runtime_error(format("cannot offload to GPU: " GGML_CUDA_NAME " not loaded"));
     }
-#endif
+
+    if (!no_offload && !llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
+        LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
+    }
+
     // Apply GPU index and split FFNs to GPU
     size_t ffn_offloaded_bytes = llama_model_offload_ffn_split(&model);
     LLAMA_LOG_INFO("%s: offloaded %.2f MiB of FFN weights to GPU\n", __func__, ffn_offloaded_bytes / 1024.0 / 1024.0);
@@ -3033,6 +3028,7 @@ static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, siz
 static void llm_load_sparse_model_tensors(
         llama_model_loader & ml,
         llama_model & model,
+        const llama_context_params & cparams,
         int main_gpu,
         long int vram_budget_bytes,
         bool reset_gpu_index,
@@ -3182,14 +3178,12 @@ static void llm_load_sparse_model_tensors(
     // print memory requirements
     {
         // this is the total memory required to run the inference
-        size_t mem_required =
-            ctx_size +
-            mmapped_size - vram_allocated_bytes; // weights in VRAM not in memory
+        size_t mem_required = ctx_size + mmapped_size;
 
         LLAMA_LOG_INFO("%s: mem required  = %7.2f MB\n", __func__, mem_required / 1024.0 / 1024.0);
 
 #if defined(GGML_USE_CUBLAS) || defined(GGML_USE_CLBLAST)
-        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, vram_allocated_bytes / 1024.0 / 1024.0);
+        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
 #endif
     }
 
@@ -3207,8 +3201,13 @@ static void llm_load_sparse_model_tensors(
 
     model.mapping = std::move(ml.mapping);
 
+    // Reserve KV cache in VRAM
+    if (ggml_cublas_loaded()) {
+        llama_reserve_model_kv_cache(&model, &cparams);
+    }
+
     // Offload FFN segments to GPU if possible
-    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index, disable_ffn_split);
+    llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
@@ -3961,7 +3960,7 @@ static void llm_load_tensors(
     model.t_load_us = ggml_time_us() - model.t_start_us;
 }
 
-static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params) {
+static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params, const llama_context_params & cparams) {
     try {
         llama_model_loader ml(fname, params.use_mmap);
 
@@ -3996,7 +3995,7 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
                 llama_set_vram_budget(params.vram_budget_gb, params.main_gpu);
             }
             llm_load_sparse_model_tensors(
-                ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
+                ml, model, cparams, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
                 params.use_mlock, params.progress_callback, params.progress_callback_user_data
             );
         } else {
@@ -9417,7 +9416,8 @@ int64_t llama_time_us(void) {
 
 struct llama_model * llama_load_model_from_file(
                              const char * path_model,
-              struct llama_model_params   params) {
+              struct llama_model_params   params,
+              struct llama_context_params cparams) {
     ggml_time_init();
 
     llama_model * model = new llama_model;
@@ -9438,7 +9438,7 @@ struct llama_model * llama_load_model_from_file(
         };
     }
 
-    if (!llama_model_load(path_model, *model, params)) {
+    if (!llama_model_load(path_model, *model, params, cparams)) {
         LLAMA_LOG_ERROR("%s: failed to load model\n", __func__);
         delete model;
         return nullptr;
