@@ -192,8 +192,8 @@ static size_t llama_set_vram_budget(double budget_gb, int gpu_device) {
 
     if (budget_gb < 0) {
         // if the user didn't specify a budget, use all available memory
-        // and leave 128 MB as a safety margin
-        vram_budget_bytes = ggml_cuda_get_free_memory(gpu_device) - 128 * 1024 * 1024;
+        // and leave 256 MB as a safety margin
+        vram_budget_bytes = ggml_cuda_get_free_memory(gpu_device) - 256 * 1024 * 1024;
     } else {
         // otherwise, use the specified budget
         vram_budget_bytes = (size_t) (budget_gb * 1024 * 1024 * 1024);
@@ -1468,6 +1468,9 @@ struct llama_model {
 
     int64_t t_load_us = 0;
     int64_t t_start_us = 0;
+
+    // neuron size of spilt and offloaded FFN
+    size_t ffn_offloaded_bytes = 0;
 
     ~llama_model() {
         if (ctx) {
@@ -3011,7 +3014,7 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     return load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes);
 }
 
-static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, bool no_cache, bool no_offload) {
+static size_t llm_load_gpu_split(llama_model_loader & ml, llama_model & model, bool no_cache, bool no_offload) {
     if (!ggml_cublas_loaded()) {
         throw std::runtime_error(format("cannot offload to GPU: " GGML_CUDA_NAME " not loaded"));
     }
@@ -3023,6 +3026,8 @@ static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, boo
     // Apply GPU index and split FFNs to GPU
     size_t ffn_offloaded_bytes = llama_model_offload_ffn_split(&model);
     LLAMA_LOG_INFO("%s: offloaded %.2f MiB of FFN weights to GPU\n", __func__, ffn_offloaded_bytes / 1024.0 / 1024.0);
+
+    return ffn_offloaded_bytes;
 }
 
 static void llm_load_sparse_model_tensors(
@@ -3207,7 +3212,7 @@ static void llm_load_sparse_model_tensors(
     }
 
     // Offload FFN segments to GPU if possible
-    llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
+    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
@@ -9597,7 +9602,7 @@ struct llama_context * llama_new_context_with_model(
             size_t total_vram_size = model_vram_size + ctx_vram_size;
 
             LLAMA_LOG_INFO("%s: total VRAM used: %.2f MB (model: %.2f MB, context: %.2f MB)\n", __func__,
-                    total_vram_size / 1024.0 / 1024.0,
+                    (total_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
                     model_vram_size / 1024.0 / 1024.0,
                     ctx_vram_size / 1024.0 / 1024.0);
 #endif
