@@ -349,11 +349,6 @@ extern "C" {
                       const char * path_base_model,
                              int   n_threads);
 
-    LLAMA_API int llama_model_apply_gpu_idx_from_file(
-                  struct llama_model * model,
-                          const char * path_mlp,
-                                bool   use_mmap);
-
     LLAMA_API size_t llama_model_offload_ffn_split(struct llama_model * model);
 
     //

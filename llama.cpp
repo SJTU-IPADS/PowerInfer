@@ -186,9 +186,10 @@ static std::string format(const char * fmt, ...) {
 }
 
 static size_t llama_set_vram_budget(double budget_gb, int gpu_device) {
-#if not defined(GGML_USE_CUBLAS)
-    throw std::runtime_error("CUDA is not enabled");
-#endif
+#if defined(GGML_USE_CUBLAS)
+    if (!ggml_cublas_loaded()) {
+        throw std::runtime_error("CUDA is not loaded");
+    }
 
     if (budget_gb < 0) {
         // if the user didn't specify a budget, use all available memory
@@ -200,6 +201,9 @@ static size_t llama_set_vram_budget(double budget_gb, int gpu_device) {
     }
 
     return vram_budget_bytes;
+#else
+    return 0;
+#endif
 }
 
 static bool llama_reduce_vram_budget(size_t budget_bytes) {
@@ -2925,6 +2929,7 @@ struct buffered_tensor_allocator {
     // we allocate the tensor in CPU memory.
     // Returns: equivalent of the model's n_gpu_layers
     int flush() {
+#if defined(GGML_USE_CUBLAS)
         if (!ggml_cublas_loaded()) {
             return 0;
         }
@@ -2951,6 +2956,9 @@ struct buffered_tensor_allocator {
         }
         ml.done_getting_tensors();
         return offloaded_layers;
+#else // GGML_USE_CUBLAS
+        return 0;
+#endif
     }
 };
 
@@ -3015,13 +3023,14 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
 }
 
 static size_t llm_load_gpu_split(llama_model_loader & ml, llama_model & model, bool no_cache, bool no_offload) {
+#if defined (GGML_USE_CUBLAS)
     if (!ggml_cublas_loaded()) {
         throw std::runtime_error(format("cannot offload to GPU: " GGML_CUDA_NAME " not loaded"));
     }
-
     if (!no_offload && !llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
         LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
     }
+#endif
 
     // Apply GPU index and split FFNs to GPU
     size_t ffn_offloaded_bytes = llama_model_offload_ffn_split(&model);
@@ -3207,10 +3216,7 @@ static void llm_load_sparse_model_tensors(
     model.mapping = std::move(ml.mapping);
 
     // Reserve KV cache in VRAM
-    if (ggml_cublas_loaded()) {
-        llama_reserve_model_kv_cache(&model, &cparams);
-    }
-
+    llama_reserve_model_kv_cache(&model, &cparams);
     // Offload FFN segments to GPU if possible
     model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
 
@@ -3220,6 +3226,11 @@ static void llm_load_sparse_model_tensors(
 }
 
 void llama_reserve_model_kv_cache(llama_model *model, const llama_context_params *cparams) {
+#if defined(GGML_USE_CUBLAS)
+    if (!ggml_cublas_loaded()) {
+        throw std::runtime_error(format("cannot offload to GPU: " GGML_CUDA_NAME " not loaded"));
+    }
+
     const llama_hparams &hparams = model->hparams;
     if (model->n_gpu_layers < hparams.n_layer + 1) {
         // should only reserve kv cache for models with all layers offloaded
@@ -3242,6 +3253,7 @@ void llama_reserve_model_kv_cache(llama_model *model, const llama_context_params
         }
         model->n_gpu_layers++;
     }
+#endif
 }
 
 static void llm_load_tensors(
@@ -3996,9 +4008,9 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
                 LLAMA_LOG_WARN("%s: sparse inference ignores n_gpu_layers, you can use --vram-budget option instead\n", __func__);
                 return false;
             }
-            if (ggml_cublas_loaded()) {
-                llama_set_vram_budget(params.vram_budget_gb, params.main_gpu);
-            }
+#if defined GGML_USE_CUBLAS
+            llama_set_vram_budget(params.vram_budget_gb, params.main_gpu);
+#endif
             llm_load_sparse_model_tensors(
                 ml, model, cparams, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
                 params.use_mlock, params.progress_callback, params.progress_callback_user_data
@@ -9751,16 +9763,6 @@ int llama_model_apply_lora_from_file(const struct llama_model * model, const cha
         LLAMA_LOG_ERROR("%s: failed to apply lora adapter: %s\n", __func__, err.what());
         return 1;
     }
-}
-
-int llama_model_apply_gpu_idx_from_file(struct llama_model * model, const char * path_mlp, bool use_mmap) {
-    llama_gpu_split_loader * mlp_ml = new llama_gpu_split_loader(path_mlp, use_mmap);
-    if (mlp_ml -> apply_tensors_to_base_model(model) > 0) {
-        LLAMA_LOG_ERROR("%s: failed to apply gpu split\n", __func__);
-        return 1;
-    }
-    model -> mlp_model_loader = std::unique_ptr<llama_gpu_split_loader>(mlp_ml);
-    return 0;
 }
 
 size_t llama_model_offload_ffn_split(struct llama_model * model) {
