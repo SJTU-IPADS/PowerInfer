@@ -274,8 +274,12 @@ extern "C" {
 
     LLAMA_API struct llama_model * llama_load_model_from_file(
                              const char * path_model,
+            struct llama_model_params     params);
+
+    LLAMA_API struct llama_model * llama_load_model_from_file_with_context(
+                             const char * path_model,
             struct llama_model_params     params,
-            struct llama_context_params   cparams);
+            struct llama_context_params * cparams);
 
     LLAMA_API void llama_free_model(struct llama_model * model);
 

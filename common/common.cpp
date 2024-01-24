@@ -963,7 +963,7 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
     auto mparams = llama_model_params_from_gpt_params(params);
     auto cparams = llama_context_params_from_gpt_params(params);
 
-    llama_model * model  = llama_load_model_from_file(params.model.c_str(), mparams, cparams);
+    llama_model * model  = llama_load_model_from_file_with_context(params.model.c_str(), mparams, &cparams);
     if (model == NULL) {
         fprintf(stderr, "%s: error: failed to load model '%s'\n", __func__, params.model.c_str());
         return std::make_tuple(nullptr, nullptr);

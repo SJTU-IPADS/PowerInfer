@@ -3042,7 +3042,7 @@ static size_t llm_load_gpu_split(llama_model_loader & ml, llama_model & model, b
 static void llm_load_sparse_model_tensors(
         llama_model_loader & ml,
         llama_model & model,
-        const llama_context_params & cparams,
+        const llama_context_params * cparams,
         int main_gpu,
         long int vram_budget_bytes,
         bool reset_gpu_index,
@@ -3216,7 +3216,9 @@ static void llm_load_sparse_model_tensors(
     model.mapping = std::move(ml.mapping);
 
     // Reserve KV cache in VRAM
-    llama_reserve_model_kv_cache(&model, &cparams);
+    if (cparams != NULL) {
+        llama_reserve_model_kv_cache(&model, cparams);
+    }
     // Offload FFN segments to GPU if possible
     model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
 
@@ -3977,7 +3979,7 @@ static void llm_load_tensors(
     model.t_load_us = ggml_time_us() - model.t_start_us;
 }
 
-static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params, const llama_context_params & cparams) {
+static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params, const llama_context_params * cparams) {
     try {
         llama_model_loader ml(fname, params.use_mmap);
 
@@ -9431,10 +9433,11 @@ int64_t llama_time_us(void) {
     return ggml_time_us();
 }
 
-struct llama_model * llama_load_model_from_file(
-                             const char * path_model,
-              struct llama_model_params   params,
-              struct llama_context_params cparams) {
+struct llama_model * llama_load_model_from_file_with_context(
+    const char * path_model,
+    struct llama_model_params   params,
+    struct llama_context_params * cparams
+) {
     ggml_time_init();
 
     llama_model * model = new llama_model;
@@ -9462,6 +9465,12 @@ struct llama_model * llama_load_model_from_file(
     }
 
     return model;
+}
+
+struct llama_model * llama_load_model_from_file(
+                             const char * path_model,
+              struct llama_model_params   params) {
+    return llama_load_model_from_file_with_context(path_model, params, nullptr);
 }
 
 void llama_free_model(struct llama_model * model) {
