@@ -98,8 +98,9 @@
 #define LLAMA_MAX_NODES 4096
 
 // 
-// global variables
-// 
+// global variables (should be removed after a better design)
+//
+size_t vram_budget_bytes = 0;
 
 //
 // logging
@@ -182,6 +183,40 @@ static std::string format(const char * fmt, ...) {
     va_end(ap2);
     va_end(ap);
     return std::string(buf.data(), size);
+}
+
+static size_t llama_set_vram_budget(double budget_gb, int gpu_device) {
+#if defined(GGML_USE_CUBLAS)
+    if (!ggml_cublas_loaded()) {
+        throw std::runtime_error("CUDA is not loaded");
+    }
+
+    if (budget_gb < 0) {
+        // if the user didn't specify a budget, use all available memory
+        // and leave 256 MB as a safety margin
+        vram_budget_bytes = ggml_cuda_get_free_memory(gpu_device) - 256 * 1024 * 1024;
+    } else {
+        // otherwise, use the specified budget
+        vram_budget_bytes = (size_t) (budget_gb * 1024 * 1024 * 1024);
+    }
+
+    return vram_budget_bytes;
+#else
+    return 0;
+#endif
+}
+
+static bool llama_reduce_vram_budget(size_t budget_bytes) {
+#if not defined(GGML_USE_CUBLAS)
+    throw std::runtime_error("CUDA is not enabled");
+#endif
+
+    if (vram_budget_bytes >= budget_bytes) {
+        vram_budget_bytes -= budget_bytes;
+        return true;
+    }
+    
+    return false;
 }
 
 //
@@ -607,20 +642,20 @@ struct LLM_TN {
 
     llm_arch arch;
 
-    std::pair<std::string, tensor_offloading_levels> operator()(llm_tensor tensor) const {
-        return std::make_pair(LLM_TENSOR_NAMES[arch].at(tensor), get_offloading_level(tensor));
+    std::pair<std::string, llm_tensor> operator()(llm_tensor tensor) const {
+        return std::make_pair(LLM_TENSOR_NAMES[arch].at(tensor), tensor);
     }
 
-    std::pair<std::string, tensor_offloading_levels> operator()(llm_tensor tensor, const std::string & suffix) const {
-        return std::make_pair(LLM_TENSOR_NAMES[arch].at(tensor) + "." + suffix, get_offloading_level(tensor));
+    std::pair<std::string, llm_tensor> operator()(llm_tensor tensor, const std::string & suffix) const {
+        return std::make_pair(LLM_TENSOR_NAMES[arch].at(tensor) + "." + suffix, tensor);
     }
 
-    std::pair<std::string, tensor_offloading_levels> operator()(llm_tensor tensor, int bid) const {
-        return std::make_pair(::format(LLM_TENSOR_NAMES[arch].at(tensor).c_str(), bid), get_offloading_level(tensor));
+    std::pair<std::string, llm_tensor> operator()(llm_tensor tensor, int bid) const {
+        return std::make_pair(::format(LLM_TENSOR_NAMES[arch].at(tensor).c_str(), bid), tensor);
     }
 
-    std::pair<std::string, tensor_offloading_levels> operator()(llm_tensor tensor, const std::string & suffix, int bid) const {
-        return std::make_pair(::format(LLM_TENSOR_NAMES[arch].at(tensor).c_str(), bid) + "." + suffix, get_offloading_level(tensor));
+    std::pair<std::string, llm_tensor> operator()(llm_tensor tensor, const std::string & suffix, int bid) const {
+        return std::make_pair(::format(LLM_TENSOR_NAMES[arch].at(tensor).c_str(), bid) + "." + suffix, tensor);
     }
 };
 
@@ -1438,6 +1473,9 @@ struct llama_model {
     int64_t t_load_us = 0;
     int64_t t_start_us = 0;
 
+    // neuron size of spilt and offloaded FFN
+    size_t ffn_offloaded_bytes = 0;
+
     ~llama_model() {
         if (ctx) {
             ggml_free(ctx);
@@ -1522,7 +1560,6 @@ struct llama_context {
 //
 // kv cache helpers
 //
-
 static bool llama_kv_cache_init(
         const struct llama_hparams & hparams,
              struct llama_kv_cache & cache,
@@ -1981,7 +2018,7 @@ struct llama_model_loader {
         return tensor;
     }
 
-    struct ggml_tensor * create_tensor(struct ggml_context * ctx, const std::pair<std::string, tensor_offloading_levels> & tn, const std::vector<int64_t> & ne, ggml_backend_type backend) {
+    struct ggml_tensor * create_tensor(struct ggml_context * ctx, const std::pair<std::string, llm_tensor> & tn, const std::vector<int64_t> & ne, ggml_backend_type backend) {
         return create_tensor(ctx, tn.first, ne, backend);
     }
 
@@ -2847,14 +2884,16 @@ struct llama_augmentation_model_loader {
 struct buffered_tensor_allocator {
     llama_model_loader &ml;
     ggml_context *ctx;
-    std::map<tensor_offloading_levels, std::vector<ggml_tensor *>> alloc_queues;
-    const size_t vram_budget_bytes;
+    std::map<tensor_offloading_levels, std::vector<std::tuple<int, llm_tensor, ggml_tensor *>>> alloc_queues;
+    const llama_hparams & hparams;
     size_t vram_allocated_bytes = 0;
+    int offloaded_layers = 0; // mocks the model's n_gpu_layers
 
-    buffered_tensor_allocator(llama_model_loader &ml, ggml_context *ctx, size_t vram_budget_bytes) : ctx(ctx), ml(ml), vram_budget_bytes(vram_budget_bytes) {}
+    buffered_tensor_allocator(llama_model_loader &ml, ggml_context *ctx, const llama_hparams &hparams) : ml(ml), ctx(ctx), hparams(hparams) {}
 
-    ggml_tensor * buffered_alloc(const std::string & name, const tensor_offloading_levels &level, const std::vector<int64_t> & ne) {
+    ggml_tensor * buffered_alloc(const std::string & name, const llm_tensor tensor_type, const std::vector<int64_t> & ne, const int i_layer) {
 #if defined(GGML_USE_CUBLAS)
+        tensor_offloading_levels level = get_offloading_level(tensor_type);
         if (level == TENSOR_NO_OFFLOAD || level == TENSOR_OFFLOAD_FFN) {
             return ml.create_tensor(ctx, name, ne, GGML_BACKEND_CPU);
         }
@@ -2863,33 +2902,63 @@ struct buffered_tensor_allocator {
         ggml_set_no_alloc(ctx, true);
         ggml_tensor * meta_tensor = ml.create_tensor(ctx, name, ne, GGML_BACKEND_CPU);
         ggml_set_no_alloc(ctx, no_alloc);
-        alloc_queues[level].push_back(meta_tensor);
+        alloc_queues[level].push_back(std::make_tuple(i_layer, tensor_type, meta_tensor));
         return meta_tensor;
 #else
         return ml.create_tensor(ctx, name, ne, GGML_BACKEND_CPU);
 #endif
     }
 
+    bool offload_tensor(ggml_tensor * meta_tensor) {
+        size_t tensor_data_size = ggml_nbytes(meta_tensor);
+        if (!llama_reduce_vram_budget(tensor_data_size)) {
+            return false;
+        }
+        // allocate in VRAM
+        ggml_set_backend(meta_tensor, GGML_BACKEND_GPU);
+        vram_allocated_bytes += tensor_data_size;
+        return true;
+    }
+
+    bool reserve(size_t tensor_bytes) {
+        return llama_reduce_vram_budget(tensor_bytes);
+    }
+
     // For GPU tensors, we need to allocate them in VRAM as much as possible,
     // and update the tensor data in-place. If the VRAM budget is exceeded,
     // we allocate the tensor in CPU memory.
-    size_t flush() {
+    // Returns: equivalent of the model's n_gpu_layers
+    int flush() {
 #if defined(GGML_USE_CUBLAS)
+        if (!ggml_cublas_loaded()) {
+            return 0;
+        }
+        
         // iterate over offloading priorities
-        for (int enum_i = TENSOR_OFFLOAD_ATTN; enum_i <= TENSOR_OFFLOAD_KV_CACHE; enum_i ++) {
+        for (int enum_i = TENSOR_OFFLOAD_ATTN; enum_i <= TENSOR_OFFLOAD_OUTPUT; enum_i ++) {
             tensor_offloading_levels level = static_cast<tensor_offloading_levels>(enum_i);
-            for (ggml_tensor * meta_tensor : alloc_queues[level]) {
-                size_t tensor_data_size = ggml_nbytes(meta_tensor);
-                if (vram_allocated_bytes + tensor_data_size > vram_budget_bytes) {
-                    return vram_allocated_bytes;
+            for (auto tensor_tup : alloc_queues[level]) {
+                const int i_layer = std::get<0>(tensor_tup);
+                const llm_tensor tensor_type = std::get<1>(tensor_tup);
+                ggml_tensor * meta_tensor = std::get<2>(tensor_tup);
+                if (!offload_tensor(meta_tensor)) {
+                    ml.done_getting_tensors();
+                    return offloaded_layers;
                 }
-                // allocate in VRAM
-                ggml_set_backend(meta_tensor, GGML_BACKEND_GPU);
-                vram_allocated_bytes += tensor_data_size;
+
+                if (level == TENSOR_OFFLOAD_ATTN && tensor_type == LLM_TENSOR_ATTN_OUT) {
+                    // offloaded_layers = i_layer; // update as the previous layer
+                    offloaded_layers = i_layer + 1;
+                } else if (level == TENSOR_OFFLOAD_OUTPUT) {
+                    offloaded_layers = hparams.n_layer + 1; // indicate all layers + output are offloaded
+                }
             }
         }
+        ml.done_getting_tensors();
+        return offloaded_layers;
+#else // GGML_USE_CUBLAS
+        return 0;
 #endif
-        return vram_allocated_bytes;
     }
 };
 
@@ -2953,25 +3022,29 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     return load_gpu_split_from_split_file(model, cached_split_path, vram_allocatable_bytes);
 }
 
-static void llm_load_gpu_split(llama_model_loader & ml, llama_model & model, size_t vram_budget_bytes, bool no_cache, bool no_offload) {
-#if defined(GGML_USE_CUBLAS)
-    if (vram_budget_bytes >= 512ull * 1024 * 1024 && !no_offload) {
-        vram_budget_bytes -= 512ull * 1024 * 1024; // leave 512 MiB as a safety margin
-        if (!llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
+static size_t llm_load_gpu_split(llama_model_loader & ml, llama_model & model, bool no_cache, bool no_offload) {
+#if defined (GGML_USE_CUBLAS)
+    if (!ggml_cublas_loaded()) {
+        throw std::runtime_error(format("cannot offload to GPU: " GGML_CUDA_NAME " not loaded"));
+    }
+    if (!no_offload && !llm_load_gpu_split_with_budget(ml, model, vram_budget_bytes, no_cache)) {
         LLAMA_LOG_ERROR("%s: error: failed to generate gpu split, an empty one will be used\n", __func__);
-        }
     }
 #endif
+
     // Apply GPU index and split FFNs to GPU
     size_t ffn_offloaded_bytes = llama_model_offload_ffn_split(&model);
     LLAMA_LOG_INFO("%s: offloaded %.2f MiB of FFN weights to GPU\n", __func__, ffn_offloaded_bytes / 1024.0 / 1024.0);
+
+    return ffn_offloaded_bytes;
 }
 
 static void llm_load_sparse_model_tensors(
         llama_model_loader & ml,
         llama_model & model,
+        const llama_context_params * cparams,
         int main_gpu,
-        long long vram_budget_bytes,
+        long int vram_budget_bytes,
         bool reset_gpu_index,
         bool disable_ffn_split,
         bool use_mlock,
@@ -3010,7 +3083,6 @@ static void llm_load_sparse_model_tensors(
 
     enum ggml_backend_type llama_backend_offload = GGML_BACKEND_CPU;
     enum ggml_backend_type llama_backend_offload_split = GGML_BACKEND_CPU;
-    size_t vram_capacity = 0;
 
 #ifdef GGML_USE_CUBLAS
     if (ggml_cublas_loaded()) {
@@ -3026,21 +3098,12 @@ static void llm_load_sparse_model_tensors(
         llama_backend_offload_split = GGML_BACKEND_GPU;
 #endif
 
-#if defined(GGML_USE_CUBLAS)
-    if (vram_budget_bytes < 0) {
-        // Let it be the rest of VRAM
-        vram_capacity = ggml_cuda_get_free_memory(main_gpu);
-        printf("vram_capacity: %lld\n", vram_capacity);
-    } else {
-        vram_capacity = std::min(vram_budget_bytes, (long long) ggml_cuda_get_free_memory(main_gpu));
-    }
-#endif
-
-    buffered_tensor_allocator alloc(ml, ctx, vram_capacity);
-    auto create_tensor = [&alloc] (
-        const std::pair<std::string, tensor_offloading_levels> & tn, 
+    buffered_tensor_allocator alloc(ml, ctx, hparams);
+    uint32_t current_layer = 0;
+    auto create_tensor = [&alloc, &current_layer] (
+        const std::pair<std::string, llm_tensor> & tn, 
         const std::vector<int64_t> & ne) -> ggml_tensor * {
-        return alloc.buffered_alloc(tn.first, tn.second, ne);
+        return alloc.buffered_alloc(tn.first, tn.second, ne, current_layer);
     };
 
     {
@@ -3065,7 +3128,7 @@ static void llm_load_sparse_model_tensors(
                     const uint32_t n_ff = hparams.n_ff;
                     model.layers.resize(n_layer);
 
-                    for (uint32_t i = 0; i < n_layer; ++i) {
+                    for (uint32_t &i = current_layer; i < n_layer; ++i) {
                        auto & layer = model.layers[i];
 
                         layer.attn_norm = create_tensor(tn(LLM_TENSOR_ATTN_NORM, "weight", i), {n_embd});
@@ -3099,7 +3162,7 @@ static void llm_load_sparse_model_tensors(
 
                     model.layers.resize(n_layer);
 
-                    for (uint32_t i = 0; i < n_layer; ++i) {
+                    for (uint32_t &i = current_layer; i < n_layer; ++i) {
                         auto & layer = model.layers[i];
 
                         layer.attn_norm   = create_tensor(tn(LLM_TENSOR_ATTN_NORM,   "weight", i), {n_embd});
@@ -3123,21 +3186,18 @@ static void llm_load_sparse_model_tensors(
         }
     }
 
-    size_t vram_allocated_bytes = alloc.flush();
-    GGML_ASSERT_DBG(vram_allocated_bytes <= vram_capacity, "vram_allocated_bytes=%ld, vram_capacity=%ld", vram_allocated_bytes, vram_capacity);
-    ml.done_getting_tensors();
+    model.n_gpu_layers = alloc.flush();
+    LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
 
     // print memory requirements
     {
         // this is the total memory required to run the inference
-        size_t mem_required =
-            ctx_size +
-            mmapped_size - vram_allocated_bytes; // weights in VRAM not in memory
+        size_t mem_required = ctx_size + mmapped_size;
 
         LLAMA_LOG_INFO("%s: mem required  = %7.2f MB\n", __func__, mem_required / 1024.0 / 1024.0);
 
 #if defined(GGML_USE_CUBLAS) || defined(GGML_USE_CLBLAST)
-        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, vram_allocated_bytes / 1024.0 / 1024.0);
+        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
 #endif
     }
 
@@ -3155,14 +3215,47 @@ static void llm_load_sparse_model_tensors(
 
     model.mapping = std::move(ml.mapping);
 
+    // Reserve KV cache in VRAM
+    if (cparams != NULL) {
+        llama_reserve_model_kv_cache(&model, cparams);
+    }
     // Offload FFN segments to GPU if possible
-    llm_load_gpu_split(ml, model, vram_capacity - vram_allocated_bytes, reset_gpu_index, disable_ffn_split);
+    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
     model.t_load_us = ggml_time_us() - model.t_start_us;
+}
 
-    model.n_gpu_layers = -1; // TODO: based on offloading results, by category?
+void llama_reserve_model_kv_cache(llama_model *model, const llama_context_params *cparams) {
+#if defined(GGML_USE_CUBLAS)
+    if (!ggml_cublas_loaded()) {
+        throw std::runtime_error(format("cannot offload to GPU: " GGML_CUDA_NAME " not loaded"));
+    }
+
+    const llama_hparams &hparams = model->hparams;
+    if (model->n_gpu_layers < hparams.n_layer + 1) {
+        // should only reserve kv cache for models with all layers offloaded
+        return;
+    }
+
+    const uint32_t n_embd  = hparams.n_embd_gqa();
+    const uint32_t n_layer = hparams.n_layer;
+
+    const int64_t n_mem      = n_layer*cparams->n_ctx;
+    const int64_t n_elements = n_embd*n_mem;
+
+    const ggml_type wtype = cparams->f16_kv ? GGML_TYPE_F16 : GGML_TYPE_F32;
+    const size_t cache_size = n_elements*ggml_type_size(wtype);
+
+    // reserve for k cache and v cache
+    for (int i = 0; i < 2; i++) {
+        if (!llama_reduce_vram_budget(cache_size)) {
+            return;
+        }
+        model->n_gpu_layers++;
+    }
+#endif
 }
 
 static void llm_load_tensors(
@@ -3886,7 +3979,7 @@ static void llm_load_tensors(
     model.t_load_us = ggml_time_us() - model.t_start_us;
 }
 
-static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params) {
+static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params, const llama_context_params * cparams) {
     try {
         llama_model_loader ml(fname, params.use_mmap);
 
@@ -3917,10 +4010,11 @@ static bool llama_model_load(const std::string & fname, llama_model & model, con
                 LLAMA_LOG_WARN("%s: sparse inference ignores n_gpu_layers, you can use --vram-budget option instead\n", __func__);
                 return false;
             }
-            double vram_budget_bytes = params.vram_budget_gb * 1024.0 * 1024.0 * 1024.0;
-            LLAMA_LOG_INFO("%s: sparse inference - vram budget = %.2f GB\n", __func__, vram_budget_bytes / 1024.0 / 1024.0 / 1024.0);
+#if defined GGML_USE_CUBLAS
+            llama_set_vram_budget(params.vram_budget_gb, params.main_gpu);
+#endif
             llm_load_sparse_model_tensors(
-                ml, model, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
+                ml, model, cparams, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
                 params.use_mlock, params.progress_callback, params.progress_callback_user_data
             );
         } else {
@@ -4231,14 +4325,6 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     ggml_tensor *idx_g = nullptr;
     ggml_tensor *cur_c = nullptr;
     ggml_tensor *third = nullptr;
-
-    if (pred_inpl->backend != pre_w1->backend) {
-        if (pre_w1->backend == GGML_BACKEND_CPU) {
-            pred_inpl = ggml_dup(ctx, pred_inpl);
-        } else {
-            // NOOP for now
-        }
-    }
 
     // prepare sparse idx
     idx = ggml_mul_mat(ctx, pre_w1, pred_inpl);
@@ -5997,6 +6083,11 @@ static struct ggml_cgraph * llama_build_graph(
 
     // this callback allows us to apply custom logic to each tensor (e.g. ggml-alloc, offloading, etc.)
     // TODO: will be removed with backend v2
+
+    // For sparse deriv, we offload layers from the starting layer to the end.
+    // For dense deriv, we offload layers from the end to the starting layer.
+    bool offload_starting_layers = lctx.model.sparse_deriv;
+
     llm_build_cb cb = [&](struct ggml_tensor * cur, const char * name, int il) {
         if (il >= 0) {
             ggml_format_name(cur, "%s-%d", name, il);
@@ -6128,6 +6219,7 @@ static struct ggml_cgraph * llama_build_graph(
 
         const int n_gpu_layers = model.n_gpu_layers;
         const int i_gpu_start  = n_layer - n_gpu_layers;
+        const int i_gpu_end = n_gpu_layers;
 
         // should we offload the final norm? yes if we are not computing embeddings
         const bool offload_emb = lctx.embedding.empty();
@@ -6172,7 +6264,8 @@ static struct ggml_cgraph * llama_build_graph(
                 break;
             case OFFLOAD_FUNC:
                 if (n_gpu_layers < n_layer) {
-                    if (il < i_gpu_start) {
+                    if ((offload_starting_layers && il >= i_gpu_end)
+                        || (!offload_starting_layers && il < i_gpu_start)) {
                         func_e = OFFLOAD_FUNC_NOP;
                     }
                 }
@@ -6455,10 +6548,10 @@ static int llama_decode_internal(
         model.arch == LLM_ARCH_STARCODER  ||
         model.arch == LLM_ARCH_STABLELM;
 
-    const bool fully_offloaded = model.n_gpu_layers >= (int) hparams.n_layer + 3;
-    if (ggml_cpu_has_cublas() && full_offload_supported && fully_offloaded) {
-        n_threads = 8;
-    }
+    // const bool fully_offloaded = model.n_gpu_layers >= (int) hparams.n_layer + 3;
+    // if (ggml_cpu_has_cublas() && full_offload_supported && fully_offloaded) {
+    //     n_threads = 8;
+    // }
 
 #if GGML_USE_MPI
     const int64_t n_layer = hparams.n_layer;
@@ -9340,9 +9433,11 @@ int64_t llama_time_us(void) {
     return ggml_time_us();
 }
 
-struct llama_model * llama_load_model_from_file(
-                             const char * path_model,
-              struct llama_model_params   params) {
+struct llama_model * llama_load_model_from_file_with_context(
+    const char * path_model,
+    struct llama_model_params   params,
+    struct llama_context_params * cparams
+) {
     ggml_time_init();
 
     llama_model * model = new llama_model;
@@ -9363,13 +9458,19 @@ struct llama_model * llama_load_model_from_file(
         };
     }
 
-    if (!llama_model_load(path_model, *model, params)) {
+    if (!llama_model_load(path_model, *model, params, cparams)) {
         LLAMA_LOG_ERROR("%s: failed to load model\n", __func__);
         delete model;
         return nullptr;
     }
 
     return model;
+}
+
+struct llama_model * llama_load_model_from_file(
+                             const char * path_model,
+              struct llama_model_params   params) {
+    return llama_load_model_from_file_with_context(path_model, params, nullptr);
 }
 
 void llama_free_model(struct llama_model * model) {
@@ -9522,7 +9623,7 @@ struct llama_context * llama_new_context_with_model(
             size_t total_vram_size = model_vram_size + ctx_vram_size;
 
             LLAMA_LOG_INFO("%s: total VRAM used: %.2f MB (model: %.2f MB, context: %.2f MB)\n", __func__,
-                    total_vram_size / 1024.0 / 1024.0,
+                    (total_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
                     model_vram_size / 1024.0 / 1024.0,
                     ctx_vram_size / 1024.0 / 1024.0);
 #endif
@@ -9671,16 +9772,6 @@ int llama_model_apply_lora_from_file(const struct llama_model * model, const cha
         LLAMA_LOG_ERROR("%s: failed to apply lora adapter: %s\n", __func__, err.what());
         return 1;
     }
-}
-
-int llama_model_apply_gpu_idx_from_file(struct llama_model * model, const char * path_mlp, bool use_mmap) {
-    llama_gpu_split_loader * mlp_ml = new llama_gpu_split_loader(path_mlp, use_mmap);
-    if (mlp_ml -> apply_tensors_to_base_model(model) > 0) {
-        LLAMA_LOG_ERROR("%s: failed to apply gpu split\n", __func__);
-        return 1;
-    }
-    model -> mlp_model_loader = std::unique_ptr<llama_gpu_split_loader>(mlp_ml);
-    return 0;
 }
 
 size_t llama_model_offload_ffn_split(struct llama_model * model) {

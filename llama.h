@@ -276,6 +276,11 @@ extern "C" {
                              const char * path_model,
             struct llama_model_params     params);
 
+    LLAMA_API struct llama_model * llama_load_model_from_file_with_context(
+                             const char * path_model,
+            struct llama_model_params     params,
+            struct llama_context_params * cparams);
+
     LLAMA_API void llama_free_model(struct llama_model * model);
 
     LLAMA_API struct llama_context * llama_new_context_with_model(
@@ -323,6 +328,10 @@ extern "C" {
             const char * fname_out,
             const llama_model_quantize_params * params);
 
+    // Reserve KV cache in VRAM. This is an optimization to allocate KV cache before 
+    // FFN layers being split and offloaded to GPU. 
+    LLAMA_API void llama_reserve_model_kv_cache(struct llama_model * model, const struct llama_context_params * cparams);
+
     // Apply a LoRA adapter to a loaded model
     // path_base_model is the path to a higher quality model to use as a base for
     // the layers modified by the adapter. Can be NULL to use the current loaded model.
@@ -343,11 +352,6 @@ extern "C" {
                            float   scale,
                       const char * path_base_model,
                              int   n_threads);
-
-    LLAMA_API int llama_model_apply_gpu_idx_from_file(
-                  struct llama_model * model,
-                          const char * path_mlp,
-                                bool   use_mmap);
 
     LLAMA_API size_t llama_model_offload_ffn_split(struct llama_model * model);
 
