@@ -8,12 +8,15 @@ from pathlib import Path
 import os
 import struct
 import numpy as np
+import re
 
 def load_activation_weights(models_base: Path):
     # TODO: might need a specification file to indicate which models to load.
     # But for now, let's assume it is a plain directory of activation_{0, ... , n_layers - 1}.pt
     *_, files = next(os.walk(models_base))
-    return [torch.load(models_base / f"activation_{i}.pt") for i in range(len(files))]
+    activation_files = [f for f in files if re.match(r"activation_\d+.pt", f)]
+    activation_files.sort()
+    return [torch.load(models_base / f) for f in activation_files]
 
 def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> None:
     _, indices = torch.topk(activation, k=int(select_count))
