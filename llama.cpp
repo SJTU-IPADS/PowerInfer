@@ -2294,6 +2294,8 @@ static void llm_load_hparams(
     if (gguf_get_sparse_deriv(ctx)) {
         // read sparse threshold override if sparse deriv is enabled
         GGUF_GET_KEY(ctx, hparams.sparse_pred_threshold, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_SPARSE_THRESHOLD));
+        if (getenv("LLAMA_SPARSE_PRED_THRESHOLD"))
+            hparams.sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
     }
 
     // arch-specific KVs
