@@ -128,7 +128,13 @@ You can obtain PowerInfer GGUF weights at `*.powerinfer.gguf` as well as profile
 | Falcon(ReLU)-40B    | [PowerInfer/ReluFalcon-40B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluFalcon-40B-PowerInfer-GGUF)    |
 | LLaMA(ReLU)-2-70B    | [PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-70B-PowerInfer-GGUF)    |
 
-We suggest downloading/cloning the whole repo so PowerInfer can automatically make use of such directory structure for feature-complete model offloading:
+We recommend using [`huggingface-cli`](https://huggingface.co/docs/huggingface_hub/guides/cli) to download the whole model repo. For example, the following command will download [PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF](https://huggingface.co/PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF) into the `./ReluLLaMA-7B` directory.
+
+```shell
+huggingface-cli download --resume-download --local-dir ReluLLaMA-7B --local-dir-use-symlinks False PowerInfer/ReluLLaMA-7B-PowerInfer-GGUF
+```
+
+As such, PowerInfer can automatically make use of the following directory structure for feature-complete model offloading:
 ```
 .
 ├── *.powerinfer.gguf (Unquantized PowerInfer model)
