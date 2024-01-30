@@ -73,6 +73,9 @@
 #define cudaStreamWaitEvent(stream, event, flags) hipStreamWaitEvent(stream, event, flags)
 #define cudaStream_t hipStream_t
 #define cudaSuccess hipSuccess
+// fix cuda function not defined for rocm
+#define cudaMemGetInfo hipMemGetInfo
+#define cudaMemcpyToSymbol hipMemcpyToSymbol
 #else
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
