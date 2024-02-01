@@ -14442,6 +14442,9 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
     }
 #endif
     atomic_flag_clear(&g_axpy_dense_lock);
+#if defined(_MSC_VER)
+    _freea(vec);
+#endif
 }
 
 atomic_flag g_axpy_lock = ATOMIC_FLAG_INIT;
@@ -14600,6 +14603,9 @@ static void ggml_compute_forward_mul_mat_axpy(
 #endif
         atomic_flag_clear(&g_axpy_lock);
     }
+#if defined(_MSC_VER)
+    _freea(vec);
+#endif
 }
 static void ggml_compute_forward_mul_mat_axpy_q4_0(
         const struct ggml_compute_params * params,
@@ -14758,6 +14764,9 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
 #endif
         atomic_flag_clear(&g_axpy_lock);
     }
+#if defined(_MSC_VER)
+    _freea(vec);
+#endif
 }
 atomic_flag g_axpy_head_lock = ATOMIC_FLAG_INIT;
 static void ggml_compute_forward_mul_mat_axpy_head(
@@ -14899,6 +14908,9 @@ static void ggml_compute_forward_mul_mat_axpy_head(
     }
 #endif
     atomic_flag_clear(&g_axpy_head_lock);
+#if defined(_MSC_VER)
+    _freea(vec);
+#endif
 }
 
 /////////////////////////////////
