@@ -2833,7 +2833,7 @@ struct llama_augmentation_model_loader {
     size_t slice_ffn_mat_to_gpu(llama_layer & layer) {
         std::vector<uint8_t> work_buffer;
         ggml_tensor * gpu_idx = layer.gpu_idx;
-        ggml_tensor *gpu_bucket = layer.gpu_bucket;
+        ggml_tensor * gpu_bucket = layer.gpu_bucket;
         size_t offloaded_bytes = 0;
 
         layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
@@ -4330,7 +4330,6 @@ static struct ggml_tensor * llm_build_ffn_sparse(
 
     // prepare sparse idx
     idx = ggml_mul_mat(ctx, pre_w1, pred_inpl);
-    // no offlaoad
     cb(idx, "mlp_pre_w1", il);
     idx = ggml_relu(ctx, idx);
     cb(idx, "relu_pre", il);
@@ -4349,6 +4348,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb(tmp2, "ffn_up_sparse_gpu", il);
     }
     tmp = ggml_add(ctx, tmp, tmp2);
+    cb(tmp, "ffn_up_sparse_merged", il);
 #endif
 
 
@@ -4362,14 +4362,15 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         GGML_ASSERT(type_gate == LLM_FFN_PAR);
         third = cur;
         cur = ggml_mul_mat_idx(ctx, gate, cur, idx, gpu_index);
-        cb(cur, "ffn_gate", il);
+        cb(cur, "ffn_gate_sparse", il);
 #ifdef GGML_USE_CUBLAS
         tmp2 = ggml_mul_mat_special(ctx, gate_gpu, third, idx, gpu_bucket, gate);
         if (tmp2 != NULL) {
             ggml_cuda_assign_buffers_no_alloc(tmp2);
-            cb(tmp2, "ffn_up_sparse_gpu", il);
+            cb(tmp2, "ffn_gate_sparse_gpu", il);
         }
         cur = ggml_add(ctx, cur, tmp2);
+        cb(cur, "ffn_gate_sparse_merged", il);
 #endif
 
         if (gate_b) {
@@ -4397,24 +4398,23 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     }
 
     third = cur;
+    tmp = ggml_axpy(ctx, down_t, third, idx, gpu_index);
+    cb(tmp, "ffn_down_sparse", il);
 #ifdef GGML_USE_CUBLAS
     cur = ggml_axpy(ctx, down_gpu, cur, idx, gpu_bucket);
     if (cur != NULL) {
         ggml_cuda_assign_buffers_no_alloc(cur);
-        cb(cur, "ffn_down", il);
+        cb(cur, "ffn_down_sparse_gpu", il);
     }
-#endif
-    tmp = ggml_axpy(ctx, down_t, third, idx, gpu_index);
-    cb(tmp, "ffn_down_gpu", il);
-#ifdef GGML_USE_CUBLAS
     cur = ggml_add(ctx, cur, tmp);
+    cb(cur, "ffn_down_sparse_merged", il);
 #else
     cur = tmp;
 #endif
 
     if (down_b) {
         cur = ggml_add(ctx, cur, down_b);
-        cb(cur, "ffn_down", il);
+        cb(cur, "ffn_down_b", il);
     }
 
     return cur;
