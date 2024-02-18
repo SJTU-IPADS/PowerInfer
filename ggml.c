@@ -14922,10 +14922,20 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         return;
     }
 
+    printf("%s: op = %d, backend = %d\n", ggml_get_name(tensor), tensor->op, tensor->backend);
+    for (int i = 0; i < GGML_MAX_SRC; i++) {
+        if (tensor->src[i]) {
+            printf("src[%d]: %s, backend = %d\n", i, ggml_get_name(tensor->src[i]), tensor->src[i]->backend);
+        }
+    }
+
 #ifdef GGML_USE_CUBLAS
     bool skip_cpu = ggml_cuda_compute_forward(params, tensor);
     if (skip_cpu) {
+        printf("skip_cpu\n");
         return;
+    } else {
+        printf("compute on cpu\n");
     }
     GGML_ASSERT(tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU);
     GGML_ASSERT(tensor->src[1] == NULL || tensor->src[1]->backend == GGML_BACKEND_CPU);
