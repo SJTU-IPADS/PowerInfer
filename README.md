@@ -88,7 +88,7 @@ Please kindly refer to our [Project Kanban](https://github.com/orgs/SJTU-IPADS/p
 
 PowerInfer requires the following dependencies:
 
-- CMake (3.13+)
+- CMake (3.17+)
 - Python (3.8+) and pip (19.3+), for converting model weights and automatic FFN offloading
 
 ### Get the Code
@@ -101,7 +101,7 @@ pip install -r requirements.txt # install Python helpers' dependencies
 ### Build
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
-Using `CMake`(3.13+):
+Using `CMake`(3.17+):
 * If you have an NVIDIA GPU:
 ```bash
 cmake -S . -B build -DLLAMA_CUBLAS=ON
