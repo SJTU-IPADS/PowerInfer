@@ -1,7 +1,8 @@
 ---
 name: Bug template
 about: Used to report bugs in PowerInfer
-labels: ["bug-unconfirmed"]
+title: ''
+labels: question
 assignees: ''
 
 ---

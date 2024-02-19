@@ -1,7 +1,8 @@
 ---
 name: Question template
 about: Used for general questions and inquiries about PowerInfer
-labels: ["question"]
+title: ''
+labels: question
 assignees: ''
 
 ---
