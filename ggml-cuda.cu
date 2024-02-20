@@ -9208,18 +9208,10 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
     const bool any_on_device = tensor->backend == GGML_BACKEND_GPU
         || (tensor->src[0] != nullptr && (tensor->src[0]->backend == GGML_BACKEND_GPU || tensor->src[0]->backend == GGML_BACKEND_GPU_SPLIT))
         || (tensor->src[1] != nullptr && tensor->src[1]->backend == GGML_BACKEND_GPU);
-    
-    if (!any_on_device) {
-        if (tensor->op != GGML_OP_MUL_MAT && tensor->op != GGML_OP_AXPY)
-        {
-            return false;
-        }
+
+    if (!any_on_device && tensor->op != GGML_OP_MUL_MAT) {
+        return false;
     }
-
-
-    // if (!any_on_device && tensor->op != GGML_OP_MUL_MAT) {
-    //     return false;
-    // }
 
     if (tensor->op == GGML_OP_MUL_MAT) {
         if (tensor->src[0]->ne[3] != tensor->src[1]->ne[3]) {
@@ -9273,10 +9265,6 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             func = ggml_cuda_mul_mat;
             break;
         case GGML_OP_AXPY:
-            // if (!any_on_device && tensor->ne[1] < 80) {
-            if (!any_on_device) {
-                return false;
-            }
             func = ggml_cuda_axpy;
             break;
         case GGML_OP_SCALE:

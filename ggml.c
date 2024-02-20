@@ -4161,8 +4161,11 @@ struct ggml_tensor * ggml_axpy(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        struct ggml_tensor  * c,
-        struct ggml_tensor  * d) {
+        struct ggml_tensor  * sparse_idx,
+        // When using GPU, this tensor is gpu_bucket to map the index back to the original tensor;
+        // When using CPU, this tensor is gpu_index to indicate which row are offloaded to GPU.
+        struct ggml_tensor  * gpu_aux,
+                         bool full_gpu) {
     if (a == NULL || b == NULL)
         return NULL;
     GGML_ASSERT(!ggml_is_transposed(a));
@@ -4179,8 +4182,11 @@ struct ggml_tensor * ggml_axpy(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = c;
-    result->src[3] = d;
+    result->src[2] = sparse_idx;
+    result->src[3] = gpu_aux;
+
+    int32_t params[] = { full_gpu ? 1 : 0 };
+    ggml_set_op_params(result, params, sizeof(params));
 
     return result;
 }

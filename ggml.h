@@ -1105,10 +1105,11 @@ extern "C" {
             struct ggml_tensor *ref);
     GGML_API struct ggml_tensor *ggml_axpy(
             struct ggml_context *ctx,
-            struct ggml_tensor *a,
-            struct ggml_tensor *b,
-            struct ggml_tensor *c,
-            struct ggml_tensor *d);
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * sparse_idx,
+            struct ggml_tensor  * gpu_aux,
+                             bool full_gpu);
 
     // A: m columns, n rows,
     // B: p columns, n rows,
