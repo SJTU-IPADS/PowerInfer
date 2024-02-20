@@ -4400,10 +4400,23 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb(up_out, "ffn_up_b", il);
     }
 
+    if (gate) {
+        // TODO: only support par for now
+        GGML_ASSERT(type_gate == LLM_FFN_PAR);
+        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_short, "gate");
+        if (gate_b) {
+            gate_out = ggml_add(ctx, gate_out, gate_b);
+            cb(gate_out, "ffn_gate_b", il);
+        }
+        cur = gate_out;
+    } else {
+        cur = up_out;
+    }
+
     switch (type_op) {
         case LLM_FFN_RELU:
             {
-                cur = ggml_relu(ctx, up_out);
+                cur = ggml_relu(ctx, cur);
                 cb(cur, "ffn_relu", il);
             } break;
         default:
@@ -4411,19 +4424,8 @@ static struct ggml_tensor * llm_build_ffn_sparse(
             GGML_ASSERT(type_op == LLM_FFN_RELU);
     }
 
-    ggml_tensor * gate_out = nullptr;
-    if (gate) {
-        // TODO: only support par for now
-        GGML_ASSERT(type_gate == LLM_FFN_PAR);
-        gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_short, "gate");
-        if (gate_b) {
-            gate_out = ggml_add(ctx, gate_out, gate_b);
-            cb(gate_out, "ffn_gate_b", il);
-        }
-    }
-
     if (type_gate == LLM_FFN_PAR) {
-        cur = ggml_mul(ctx, cur, gate_out);
+        cur = ggml_mul(ctx, cur, up_out);
         cb(cur, "ffn_gate_par", il);
     }
 
