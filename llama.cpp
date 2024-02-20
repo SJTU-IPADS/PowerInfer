@@ -4384,6 +4384,20 @@ static struct ggml_tensor * llm_build_sparse_axpy(
     return out;
 }
 
+static bool is_gpu_idx_full(
+       struct ggml_context * ctx,
+        struct ggml_tensor * gpu_index) {
+    ggml_cgraph * gf = ggml_new_graph(ctx);
+    ggml_tensor * sum = ggml_sum(ctx, gpu_index);
+    ggml_build_forward_expand(gf, sum);
+
+    std::vector<uint8_t> work_buffer;
+    ggml_graph_compute_helper(work_buffer, gf, 1);
+
+    int64_t sum_val = ggml_get_data_i32(sum)[0];
+    return sum_val == gpu_index->ne[0];
+}
+
 static struct ggml_tensor * llm_build_ffn_sparse(
         struct ggml_context * ctx,
          struct ggml_tensor * cur,
@@ -4410,6 +4424,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     llm_build_cb_short cb_short = [&](ggml_tensor * cur, const char * name) {
         cb(cur, name, il);
     };
+
     // prepare sparse idx
     ggml_tensor * idx = ggml_mul_mat(ctx, pre_w1, pred_inpl);
     cb(idx, "mlp_pre_hidden", il);
@@ -4418,9 +4433,13 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     idx = ggml_mul_mat(ctx, pre_w2, idx);
     cb(idx, "mlp_pre_out", il);
 
+    // bool full_gpu = is_gpu_idx_full(ctx, gpu_index);
+    bool full_gpu = true;
+
+    // printf("FULL GPU: %d\n", full_gpu); 
 
     // FFN up
-    struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_short, "up", true);
+    struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_short, "up", full_gpu);
     if (up_b) {
         up_out = ggml_add(ctx, up_out, up_b);
         cb(up_out, "ffn_up_b", il);
@@ -4429,7 +4448,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     if (gate) {
         // TODO: only support par for now
         GGML_ASSERT(type_gate == LLM_FFN_PAR);
-        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_short, "gate", true);
+        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_short, "gate", full_gpu);
         if (gate_b) {
             gate_out = ggml_add(ctx, gate_out, gate_b);
             cb(gate_out, "ffn_gate_b", il);
@@ -4455,7 +4474,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb(cur, "ffn_gate_par", il);
     }
 
-    cur = llm_build_sparse_axpy(ctx, down_t, cur, idx, down_gpu, gpu_index, gpu_bucket, cb_short, "down", true);
+    cur = llm_build_sparse_axpy(ctx, down_t, cur, idx, down_gpu, gpu_index, gpu_bucket, cb_short, "down", full_gpu);
 
     if (down_b) {
         cur = ggml_add(ctx, cur, down_b);
