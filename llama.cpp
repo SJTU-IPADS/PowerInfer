@@ -4287,7 +4287,7 @@ static struct ggml_tensor * llm_build_ffn(
     }
 
     // cur = ggml_mul_mat(ctx, down, cur);
-    cur = ggml_axpy(ctx, down, cur, NULL, NULL, false);
+    cur = ggml_axpy(ctx, down, cur, NULL, NULL);
     if (down_b) {
         cb(cur, "ffn_down", il);
     }
@@ -4357,7 +4357,7 @@ static struct ggml_tensor * llm_build_sparse_axpy(
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
     if (full_gpu) {
-        out = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket, full_gpu);
+        out = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
         GGML_ASSERT(out != nullptr && "full_gpu");
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
@@ -4365,15 +4365,18 @@ static struct ggml_tensor * llm_build_sparse_axpy(
     }
 #endif
 
+    bool hybrid_split = false;
 #ifdef GGML_USE_CUBLAS
-    ggml_tensor * out_gpu = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket, full_gpu);
+    hybrid_split = true;
+    ggml_tensor * out_gpu = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
     if (out_gpu != NULL) {
         cb(out_gpu, (full_name + "_gpu").c_str());
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
     }
 #endif
 
-    out = ggml_axpy(ctx, w_t, x, sparse_idx, gpu_index, full_gpu);
+    // TODO: should pass NULL as hybrid_aux when hybrid_split is false
+    out = ggml_axpy(ctx, w_t, x, sparse_idx, gpu_index);
     cb(out, full_name.c_str());
 
 #ifdef GGML_USE_CUBLAS
@@ -4446,8 +4449,6 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     cb(idx, "mlp_pre_out", il);
 
     bool full_gpu = is_gpu_idx_full(ctx, gpu_index);
-
-    printf("FULL GPU: %d\n", full_gpu); 
 
     // FFN up
     struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_short, "up", full_gpu);

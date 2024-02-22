@@ -1108,8 +1108,7 @@ extern "C" {
             struct ggml_tensor  * a,
             struct ggml_tensor  * b,
             struct ggml_tensor  * sparse_idx,
-            struct ggml_tensor  * gpu_aux,
-                             bool full_gpu);
+            struct ggml_tensor  * hybrid_aux);
 
     // A: m columns, n rows,
     // B: p columns, n rows,

@@ -4479,7 +4479,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
     if (row >= nrows) {
         return;
     }
-    int id = lst[row];
+    int id = lst == NULL ? row : lst[row];
     const int tid = threadIdx.x;
     short *d = (short *)((char *)vx + ncols * row * 2);
     // if (tid == 0) {
@@ -7457,6 +7457,7 @@ inline void ggml_cuda_op_mul_mat_transpose_gemm(
     (void) src1_ddq_i;
     (void) src1_padded_row_size;
 }
+
 inline void ggml_cuda_op_dequantize_axpy_vec(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
@@ -7465,6 +7466,7 @@ inline void ggml_cuda_op_dequantize_axpy_vec(
 
     const int64_t ne00 = src0->ne[0];
     const int64_t row_diff = row_high - row_low;
+    const bool full_gpu_compute = dst->op_params[0] > 0;
 
     // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
 #ifdef GGML_CUDA_F16
@@ -7484,24 +7486,23 @@ inline void ggml_cuda_op_dequantize_axpy_vec(
 #else
     const dfloat * src1_dfloat = (const dfloat *) src1_ddf_i; // dfloat == float, no conversion
 #endif // GGML_CUDA_F16
-    struct ggml_tensor_extra_gpu *idx_extra = NULL;
-    struct ggml_tensor_extra_gpu *dst_extra = NULL;
+    float * idx_data = NULL;
+    int * row_lookup = NULL;
     if (dst->src[2] != NULL) {
-        idx_extra = (ggml_tensor_extra_gpu *)dst->src[2]->extra;
-        // dst_extra = (ggml_tensor_extra_gpu *) dst->src[3]->extra;
+        idx_data = static_cast<float *>(dst->src[2]->data);
+    }
+    if (dst->src[3] != NULL) {
+        ggml_tensor_extra_gpu * gpu_bucket_extra = static_cast<ggml_tensor_extra_gpu *>(dst->src[3]->extra);
+        row_lookup = static_cast<int *>(gpu_bucket_extra->data_device[0]);
     }
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
-            if (dst->src[2] == NULL) {
-                cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
+            cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
+            if (idx_data == NULL) {
                 dequantize_axpy_vec_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
+            } else {
+                dequantize_axpy_sparse_vec_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream, row_lookup, idx_data);
             }
-            else {
-                dst_extra = (ggml_tensor_extra_gpu *) dst->src[3]->extra;
-                cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
-                dequantize_axpy_sparse_vec_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream, (int *)dst_extra->data_device[0], (float *)dst->src[2]->data);
-            }
-            // dequantize_mul_mat_vec_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             break;
         case GGML_TYPE_Q4_1:
             dequantize_mul_mat_vec_q4_1_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
@@ -7531,13 +7532,11 @@ inline void ggml_cuda_op_dequantize_axpy_vec(
             dequantize_mul_mat_vec_q6_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
             break;
         case GGML_TYPE_F16:
-            if (dst->src[2] == NULL) {
-                cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
+            cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
+            if (idx_data == NULL) {
                 convert_axpy_vec_f16_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             } else {
-                dst_extra = (ggml_tensor_extra_gpu *) dst->src[3]->extra;
-                cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
-                convert_axpy_sparse_vec_f16_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream, (int *)dst_extra->data_device[0], (float *)dst->src[2]->data);
+                convert_axpy_sparse_vec_f16_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream, row_lookup, idx_data);
             }
             break;
         default:
@@ -7557,6 +7556,7 @@ inline void ggml_cuda_op_dequantize_axpy_vec(
     (void) src1_ncols;
     (void) src1_padded_row_size;
 }
+
 inline void ggml_cuda_op_dequantize_axpy_batch(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,

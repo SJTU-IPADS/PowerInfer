@@ -4162,12 +4162,12 @@ struct ggml_tensor * ggml_axpy(
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
         struct ggml_tensor  * sparse_idx,
+        // Under CPU + GPU hybrid inference:
         // When using GPU, this tensor is gpu_bucket to map the index back to the original tensor;
         // When using CPU, this tensor is gpu_index to indicate which row are offloaded to GPU.
-        struct ggml_tensor  * gpu_aux,
-                         bool full_gpu) {
-    if (a == NULL || b == NULL)
-        return NULL;
+        // Under full GPU/GPU inference, it is NULL.
+        struct ggml_tensor  * hybrid_aux) {
+    GGML_ASSERT(a != NULL && b != NULL);
     GGML_ASSERT(!ggml_is_transposed(a));
     bool is_node = false;
 
@@ -4183,9 +4183,9 @@ struct ggml_tensor * ggml_axpy(
     result->src[0] = a;
     result->src[1] = b;
     result->src[2] = sparse_idx;
-    result->src[3] = gpu_aux;
+    result->src[3] = hybrid_aux;
 
-    int32_t params[] = { full_gpu ? 1 : 0 };
+    int32_t params[] = { hybrid_aux ? 1 : 0 };
     ggml_set_op_params(result, params, sizeof(params));
 
     return result;
