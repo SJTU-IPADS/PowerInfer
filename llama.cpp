@@ -4387,14 +4387,26 @@ static struct ggml_tensor * llm_build_sparse_axpy(
 static bool is_gpu_idx_full(
        struct ggml_context * ctx,
         struct ggml_tensor * gpu_index) {
-    ggml_cgraph * gf = ggml_new_graph(ctx);
-    ggml_tensor * sum = ggml_sum(ctx, gpu_index);
+    ggml_context * ctx_aux = ggml_init({
+        /* mem_size */ 1 << 10,
+    });
+
+    GGML_ASSERT(ctx_aux);
+
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx_aux, 1, false);
+    ggml_tensor * sum = ggml_sum(ctx_aux, gpu_index);
+
+    ggml_set_name(sum, "gpu_index_sum");
     ggml_build_forward_expand(gf, sum);
 
-    std::vector<uint8_t> work_buffer;
-    ggml_graph_compute_helper(work_buffer, gf, 1);
+    // TODO: +1 worker for GPU under hybrid inference but no use
+    // ggml_graph_compute_helper(work_buffer, gf, 2);
+    ggml_graph_compute_with_ctx(ctx, gf, 2);
 
-    int64_t sum_val = ggml_get_data_i32(sum)[0];
+    int32_t sum_val = ggml_get_i32_1d(sum, 0);
+
+    ggml_free(ctx_aux);
+
     return sum_val == gpu_index->ne[0];
 }
 
@@ -4433,10 +4445,9 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     idx = ggml_mul_mat(ctx, pre_w2, idx);
     cb(idx, "mlp_pre_out", il);
 
-    // bool full_gpu = is_gpu_idx_full(ctx, gpu_index);
-    bool full_gpu = true;
+    bool full_gpu = is_gpu_idx_full(ctx, gpu_index);
 
-    // printf("FULL GPU: %d\n", full_gpu); 
+    printf("FULL GPU: %d\n", full_gpu); 
 
     // FFN up
     struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_short, "up", full_gpu);
