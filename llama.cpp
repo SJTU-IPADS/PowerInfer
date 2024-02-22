@@ -4357,7 +4357,7 @@ static struct ggml_tensor * llm_build_sparse_axpy(
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
     if (full_gpu) {
-        out = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
+        out = ggml_axpy(ctx, wt_gpu, x, sparse_idx, NULL);
         GGML_ASSERT(out != nullptr && "full_gpu");
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());

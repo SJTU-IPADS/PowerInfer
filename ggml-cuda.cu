@@ -4553,12 +4553,12 @@ template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
 static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int src1_ne0, int src1_ncols, int *lst, float *idx) {
     // qk = quantized weights per x block
     // qr = number of quantized weights per data value in x block
-    const int row = blockIdx.y*blockDim.y + threadIdx.y;
+    const int gpu_row = blockIdx.y*blockDim.y + threadIdx.y;
 
-    if (row >= nrows) {
+    if (gpu_row >= nrows) {
         return;
     }
-    int id = lst[row];
+    int row = lst == NULL ? gpu_row : lst[gpu_row];
     const int bid = blockIdx.y;
 
     extern __shared__ float shared_dst[]; // TODO:dynamic
@@ -4568,7 +4568,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
     const int iter_stride = 2*GGML_CUDA_DMMV_X;
     const int vals_per_iter = iter_stride / WARP_SIZE; // num quantized vals per thread and i iter
     const int y_offset = qr == 1 ? 1 : qk/2;
-    float * loop_idx = idx;;
+    float * loop_idx = idx;
     dfloat * loop_y = (dfloat *)y;
     float * loop_dst = dst;
 
@@ -4580,7 +4580,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
     // __syncthreads();
     for (int col_id = 0; col_id < src1_ncols; col_id++) {
         __syncthreads();
-        if (loop_idx[id] < dev_sparse_threshold) {
+        if (loop_idx[row] < dev_sparse_threshold) {
             loop_dst += ncols;
             loop_idx += src1_ne0;
             loop_y += src1_ne0;
@@ -4591,7 +4591,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
         for (int i = 0; i < ncols; i += iter_stride)
         {
             const int col = i + vals_per_iter * tid;
-            const int ib = (row * ncols + col) / qk; // x block index
+            const int ib = (gpu_row * ncols + col) / qk; // x block index
             const int iqs = (col % qk) / qr;         // x quant index
             const int iybs = col - col % qk;         // y block start index
 
@@ -4608,10 +4608,10 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
 
                 // matrix multiplication
                 // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
-                tmp = v.x * loop_y[id];
+                tmp = v.x * loop_y[row];
                 /* atomicAdd((float *)&dst[iybs + iqs + j/qr + 0], tmp); */
                 shared_dst[iybs + iqs + j / qr + 0] = tmp;
-                tmp = v.y * loop_y[id];
+                tmp = v.y * loop_y[row];
                 /* atomicAdd((float *)&dst[iybs + iqs + j/qr + y_offset], tmp); */
                 shared_dst[iybs + iqs + j / qr + y_offset] = tmp;
             }
