@@ -4482,12 +4482,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
     int id = lst == NULL ? row : lst[row];
     const int tid = threadIdx.x;
     short *d = (short *)((char *)vx + ncols * row * 2);
-    // if (tid == 0) {
-    //     for(int i = 0; i < 4096; i++)
-    //         printf("%d ", *(d+i));
-    //     printf("row in gpu %d cols %d, value %d %d %d\n", id, ncols, *d, *(d+1), *(d+4095));
-    // }
-    // int id = row;
+
     if (y[id] == 0)
         return;
     if (idx[id] < dev_sparse_threshold) {
@@ -4495,12 +4490,8 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
     }
 
     const int bid = blockIdx.y;
-    // if (bid == 0) global_lock = 0;
 
     extern __shared__ float shared_dst[]; // TODO:dynamic
-
-    // if (tid == 0)
-    //     printf("row %d y[row] %f\n", row, y[row]);
 
     const int iter_stride = 2*GGML_CUDA_DMMV_X;
     const int vals_per_iter = iter_stride / WARP_SIZE; // num quantized vals per thread and i iter
@@ -4532,10 +4523,8 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
             // matrix multiplication
             // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
             tmp = v.x * y[id];
-            /* atomicAdd((float *)&dst[iybs + iqs + j/qr + 0], tmp); */
             shared_dst[iybs + iqs + j/qr + 0] = tmp;
             tmp = v.y * y[id];
-            /* atomicAdd((float *)&dst[iybs + iqs + j/qr + y_offset], tmp); */
             shared_dst[iybs + iqs + j/qr + y_offset] = tmp;
             
         }
@@ -4543,9 +4532,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse(const void * __restrict__ 
     __syncthreads();
 
     for (int i = 0; i < ncols; i += GGML_CUDA_DMMV_X) {
-        // dst[i+tid] += shared_dst[i+tid]; 
         atomicAdd(&dst[i+tid], shared_dst[i+tid]);
-        // printf("%f", dst[i+tid]);
     }
 }
 
@@ -4609,10 +4596,8 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
                 // matrix multiplication
                 // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
                 tmp = v.x * loop_y[row];
-                /* atomicAdd((float *)&dst[iybs + iqs + j/qr + 0], tmp); */
                 shared_dst[iybs + iqs + j / qr + 0] = tmp;
                 tmp = v.y * loop_y[row];
-                /* atomicAdd((float *)&dst[iybs + iqs + j/qr + y_offset], tmp); */
                 shared_dst[iybs + iqs + j / qr + y_offset] = tmp;
             }
         }
@@ -4620,67 +4605,15 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
 
         for (int i = 0; i < ncols; i += GGML_CUDA_DMMV_X)
         {
-            // dst[i+tid] += shared_dst[i+tid];
             atomicAdd(&loop_dst[i + tid], shared_dst[i + tid]);
             shared_dst[i+tid] = 0;
         }
         loop_dst += ncols;
         loop_idx += src1_ne0;
         loop_y += src1_ne0;
-        // printf("cols %d rows %d\n", ncols, nrows);
-        
     }
 }
 
-template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
-static __global__ void dequantize_axpy_sparse(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int * lst, float * idx) {
-    // qk = quantized weights per x block
-    // qr = number of quantized weights per data value in x block
-    const int row = blockIdx.y*blockDim.y + threadIdx.y;
-
-    if (row >= nrows) {
-        return;
-    }
-    int id = lst[row];
-    if (idx[id] < dev_sparse_threshold) {
-        return;
-    }
-
-    const int tid = threadIdx.x;
-
-    const int iter_stride = 2*GGML_CUDA_DMMV_X;
-    const int vals_per_iter = iter_stride / WARP_SIZE; // num quantized vals per thread and i iter
-    const int y_offset = qr == 1 ? 1 : qk/2;
-
-// partial sum for each thread
-    float tmp = 0.0f;
-
-    for (int i = 0; i < ncols; i += iter_stride) {
-        const int col = i + vals_per_iter*tid;
-        const int ib = (row*ncols + col)/qk; // x block index
-        const int iqs = (col%qk)/qr; // x quant index
-        const int iybs = col - col%qk; // y block start index
-
-// processing >2 values per i iter is faster for fast GPUs
-#pragma unroll
-        for (int j = 0; j < vals_per_iter; j += 2) {
-            // process 2 vals per j iter
-
-            // dequantize
-            // for qr = 2 the iqs needs to increase by 1 per j iter because 2 weights per data val
-            dfloat2 v;
-            dequantize_kernel(vx, ib, iqs + j/qr, v);
-
-            // matrix multiplication
-            // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
-            tmp = v.x * y[iybs + iqs + j/qr + 0];
-            atomicAdd((float *)&dst[iybs + iqs + j/qr + 0], tmp);
-            tmp = v.y * y[iybs + iqs + j/qr + y_offset];
-            atomicAdd((float *)&dst[iybs + iqs + j/qr + y_offset], tmp);
-        }
-    }
-
-}
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
 static __global__ void dequantize_mul_mat_vec_sparse(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int * lst, float * idx) {
     // qk = quantized weights per x block
