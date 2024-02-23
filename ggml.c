@@ -3150,10 +3150,6 @@ static struct ggml_tensor * ggml_add_impl(
         bool inplace) {
     // TODO: support less-strict constraint
     //       GGML_ASSERT(ggml_can_repeat(b, a));
-    if (a == NULL)
-        return b;
-    if (b == NULL)
-        return a;
     GGML_ASSERT(ggml_can_repeat_rows(b, a));
 
     bool is_node = false;
@@ -4107,9 +4103,6 @@ struct ggml_tensor * ggml_mul_mat_special(
         struct ggml_tensor  * c,
         struct ggml_tensor  * d,
         struct ggml_tensor  * ref) {
-    if (a == NULL || b == NULL)
-        return NULL;
-
     bool is_node = false;
 
     if (a->grad || b->grad) {
@@ -4136,8 +4129,6 @@ struct ggml_tensor * ggml_mul_mat_idx(
         struct ggml_tensor  * b,
         struct ggml_tensor  * c,
         struct ggml_tensor  * d) {
-    if (a == NULL || b == NULL)
-        return NULL;
     GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;

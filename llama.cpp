@@ -4316,8 +4316,8 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
     if (full_gpu) {
+        GGML_ASSERT(up_gpu && "full_gpu but no up_gpu");
         out = ggml_mul_mat_special(ctx, up_gpu, inp, idx, gpu_bucket, up);
-        GGML_ASSERT(out != nullptr && "full_gpu");
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
         return out;
@@ -4328,13 +4328,13 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
     cb(out, full_name.c_str());
 
 #ifdef GGML_USE_CUBLAS
-    ggml_tensor * out_gpu = ggml_mul_mat_special(ctx, up_gpu, inp, idx, gpu_bucket, up);
-    if (out_gpu != NULL) {
+    if (up_gpu) {
+        ggml_tensor * out_gpu = ggml_mul_mat_special(ctx, up_gpu, inp, idx, gpu_bucket, up);
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
         cb(out_gpu, (full_name + "_gpu").c_str());
+        out = ggml_add(ctx, out, out_gpu);
+        cb(out, (full_name + "_merged").c_str());
     }
-    out = ggml_add(ctx, out, out_gpu);
-    cb(out, (full_name + "_merged").c_str());
 #endif
 
     return out;
@@ -4357,8 +4357,8 @@ static struct ggml_tensor * llm_build_sparse_axpy(
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
     if (full_gpu) {
+        GGML_ASSERT(wt_gpu && "full_gpu but no wt_gpu");
         out = ggml_axpy(ctx, wt_gpu, x, sparse_idx, NULL);
-        GGML_ASSERT(out != nullptr && "full_gpu");
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
         return out;
@@ -4368,8 +4368,9 @@ static struct ggml_tensor * llm_build_sparse_axpy(
     bool hybrid_split = false;
 #ifdef GGML_USE_CUBLAS
     hybrid_split = true;
-    ggml_tensor * out_gpu = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
-    if (out_gpu != NULL) {
+    ggml_tensor * out_gpu = NULL;
+    if (wt_gpu) {
+        out_gpu = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
         cb(out_gpu, (full_name + "_gpu").c_str());
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
     }
@@ -4380,8 +4381,10 @@ static struct ggml_tensor * llm_build_sparse_axpy(
     cb(out, full_name.c_str());
 
 #ifdef GGML_USE_CUBLAS
-    out = ggml_add(ctx, out, out_gpu);
-    cb(out, (full_name + "_merged").c_str());
+    if (out_gpu) {
+        out = ggml_add(ctx, out, out_gpu);
+        cb(out, (full_name + "_merged").c_str());
+    }
 #endif
 
     return out;
