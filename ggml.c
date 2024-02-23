@@ -4098,6 +4098,7 @@ struct ggml_tensor * ggml_mul_mat(
 
     return result;
 }
+
 // ggml_mul_mat_idx for GPU
 struct ggml_tensor * ggml_mul_mat_special(
         struct ggml_context * ctx,
@@ -4127,7 +4128,8 @@ struct ggml_tensor * ggml_mul_mat_special(
 
     return result;
 }
-// ggml_mul_mat_idx for CPU and axpy in GPU
+
+// ggml_mul_mat_idx for CPU 
 struct ggml_tensor * ggml_mul_mat_idx(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
