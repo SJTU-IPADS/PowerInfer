@@ -14446,8 +14446,6 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
 #endif
 }
 
-atomic_flag g_axpy_lock = ATOMIC_FLAG_INIT;
-atomic_int g_axpy_control = 0;
 static void ggml_compute_forward_mul_mat_axpy(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -14509,7 +14507,6 @@ static void ggml_compute_forward_mul_mat_axpy(
             }
         }
         atomic_store(params->aic, 0);
-        atomic_store(&g_axpy_control, 0);
 
         return;
     }
@@ -14534,9 +14531,9 @@ static void ggml_compute_forward_mul_mat_axpy(
 
     // src1 rows
     const int64_t nr1 = ne11*ne12*ne13;
-    float *idx = src2->data;
+    float *sparse_idx = src2->data;
     int idx_row_size = src2->nb[1];
-    int *gid = (int *)(dst->src[3]->data);
+    int *gpu_idx = dst->src[3] ? (int *)(dst->src[3]->data) : NULL;
 
 #if defined(_MSC_VER)
     float* vec = (float *)_malloca(ne00 * 4 * sizeof(float));
@@ -14548,7 +14545,7 @@ static void ggml_compute_forward_mul_mat_axpy(
     ggml_fp16_t * src1_ptr = NULL;
     for (int col_idx = 0; col_idx < nr1; col_idx++) {
         src1_ptr = (ggml_fp16_t *)((char *)wdata + col_idx * row_size);
-        idx = (float *)((char *)src2->data + col_idx * idx_row_size);
+        sparse_idx = (float *)((char *)src2->data + col_idx * idx_row_size);
         memset(vy, 0, ne00*4);
         // maybe write a special axpy for batch 1
         // while(true) {
@@ -14559,20 +14556,14 @@ static void ggml_compute_forward_mul_mat_axpy(
                 }
 		        if (src1_ptr[ir1]==0)
 			        continue;
-                if (gid[ir1] == 1) {
+                if (!gpu_idx || gpu_idx[ir1] == 1) {
                     continue;
                 }
-                if (idx[ir1] < threshold)
+                if (sparse_idx[ir1] < threshold)
                     continue;
                 // ggml_axpy_normal_f16(ne00, src0_row+nb01*ir1, vy, vy, wdata[ir1]);
                 ggml_axpy_avx_f16(ne00, (ggml_fp16_t *)(src0_row+nb01*ir1), (ggml_fp16_t *)vy, vy, src1_ptr[ir1]);
             }
-
-            // 获取锁
-            while (atomic_flag_test_and_set(&g_axpy_lock))
-            {
-                // 如果锁已经被占用，则等待
-        }
         
         float *res = (float *)((char *)(dst->data) + col_idx * nb1);
         float *tmp = (float *)vy;
@@ -14600,12 +14591,12 @@ static void ggml_compute_forward_mul_mat_axpy(
             res[i] += tmp[i];
         }
 #endif
-        atomic_flag_clear(&g_axpy_lock);
     }
 #if defined(_MSC_VER)
     _freea(vec);
 #endif
 }
+
 static void ggml_compute_forward_mul_mat_axpy_q4_0(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -14728,12 +14719,6 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
         //         break;
         // }
 
-        // 获取锁
-        while (atomic_flag_test_and_set(&g_axpy_lock))
-        {
-            // 如果锁已经被占用，则等待
-        }
-
         // float *res = (float *)(dst->data);
         float *res = (float *)((char *)(dst->data) + col_idx * nb1);
         float *tmp = (float *)vy;
@@ -14761,7 +14746,6 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
             res[i] += tmp[i];
         }
 #endif
-        atomic_flag_clear(&g_axpy_lock);
     }
 #if defined(_MSC_VER)
     _freea(vec);
