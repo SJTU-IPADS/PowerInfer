@@ -4095,13 +4095,12 @@ struct ggml_tensor * ggml_mul_mat(
     return result;
 }
 
-// ggml_mul_mat_idx for GPU
 struct ggml_tensor * ggml_mul_mat_idx_upscale(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        struct ggml_tensor  * c,
-        struct ggml_tensor  * d,
+        struct ggml_tensor  * sparse_idx,
+        struct ggml_tensor  * gpu_bucket,
                       int64_t result_ne0) {
     bool is_node = false;
 
@@ -4116,8 +4115,8 @@ struct ggml_tensor * ggml_mul_mat_idx_upscale(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = c;
-    result->src[3] = d;
+    result->src[2] = sparse_idx;
+    result->src[3] = gpu_bucket;
 
     return result;
 }
