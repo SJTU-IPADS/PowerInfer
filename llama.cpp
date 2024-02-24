@@ -4317,7 +4317,8 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
     // Full offloading fast path
     if (full_gpu) {
         GGML_ASSERT(up_gpu && "full_gpu but no up_gpu");
-        out = ggml_mul_mat_special(ctx, up_gpu, inp, idx, gpu_bucket, up);
+        // TODO: use full gpu op
+        out = ggml_mul_mat_idx_upscale(ctx, up_gpu, inp, idx, gpu_bucket, up->ne[1]);
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
         return out;
@@ -4329,7 +4330,7 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
 
 #ifdef GGML_USE_CUBLAS
     if (up_gpu) {
-        ggml_tensor * out_gpu = ggml_mul_mat_special(ctx, up_gpu, inp, idx, gpu_bucket, up);
+        ggml_tensor * out_gpu = ggml_mul_mat_idx_upscale(ctx, up_gpu, inp, idx, gpu_bucket, out->ne[0]);
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
         cb(out_gpu, (full_name + "_gpu").c_str());
         out = ggml_add(ctx, out, out_gpu);

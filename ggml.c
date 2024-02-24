@@ -4096,20 +4096,20 @@ struct ggml_tensor * ggml_mul_mat(
 }
 
 // ggml_mul_mat_idx for GPU
-struct ggml_tensor * ggml_mul_mat_special(
+struct ggml_tensor * ggml_mul_mat_idx_upscale(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
         struct ggml_tensor  * c,
         struct ggml_tensor  * d,
-        struct ggml_tensor  * ref) {
+                      int64_t result_ne0) {
     bool is_node = false;
 
     if (a->grad || b->grad) {
         is_node = true;
     }
 
-    const int64_t ne[4] = { ref->ne[1], b->ne[1], b->ne[2], b->ne[3] };
+    const int64_t ne[4] = { result_ne0, b->ne[1], b->ne[2], b->ne[3] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
     result->op   = GGML_OP_MUL_MAT;
@@ -4122,13 +4122,12 @@ struct ggml_tensor * ggml_mul_mat_special(
     return result;
 }
 
-// ggml_mul_mat_idx for CPU 
 struct ggml_tensor * ggml_mul_mat_idx(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        struct ggml_tensor  * c,
-        struct ggml_tensor  * d) {
+        struct ggml_tensor  * sparse_idx,
+        struct ggml_tensor  * gpu_idx) {
     GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;
@@ -4144,8 +4143,8 @@ struct ggml_tensor * ggml_mul_mat_idx(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = c;
-    result->src[3] = d;
+    result->src[2] = sparse_idx;
+    result->src[3] = gpu_idx;
 
     return result;
 }
