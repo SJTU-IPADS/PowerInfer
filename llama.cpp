@@ -4318,7 +4318,7 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
     if (full_gpu) {
         GGML_ASSERT(up_gpu && "full_gpu but no up_gpu");
         // TODO: use full gpu op
-        out = ggml_mul_mat_idx_upscale(ctx, up_gpu, inp, idx, gpu_bucket, up->ne[1]);
+        out = ggml_mul_mat_idx(ctx, up_gpu, inp, idx, NULL);
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
         return out;

@@ -4126,6 +4126,8 @@ struct ggml_tensor * ggml_mul_mat_idx(
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
         struct ggml_tensor  * sparse_idx,
+        // Under hybrid inference, this tensor is to indicate which row are offloaded to GPU;
+        // When using full GPU inference, it is NULL.
         struct ggml_tensor  * gpu_idx) {
     GGML_ASSERT(!ggml_is_transposed(a));
 

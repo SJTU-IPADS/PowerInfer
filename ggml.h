@@ -1094,14 +1094,14 @@ extern "C" {
             struct ggml_context *ctx,
             struct ggml_tensor *a,
             struct ggml_tensor *b,
-            struct ggml_tensor *idx,
-            struct ggml_tensor *d);
+            struct ggml_tensor *sparse_idx,
+            struct ggml_tensor *gpu_idx);
     GGML_API struct ggml_tensor *ggml_mul_mat_idx_upscale(
             struct ggml_context *ctx,
             struct ggml_tensor *a,
             struct ggml_tensor *b,
-            struct ggml_tensor *idx,
-            struct ggml_tensor *d,
+            struct ggml_tensor *sparse_idx,
+            struct ggml_tensor *gpu_bucket,
                         int64_t result_ne0);
     GGML_API struct ggml_tensor *ggml_axpy(
             struct ggml_context *ctx,
