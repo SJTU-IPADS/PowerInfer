@@ -4771,7 +4771,11 @@ struct llm_build_context {
                         LLM_NORM_RMS, cb, il);
                 no_offload_cb(cur, "ffn_norm", il);
 
-                if (1) {
+                if (llama_use_sparse_inference(&model)) {
+                    llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
+                        std::string name_str = std::string(name) + "-" + std::to_string(il);
+                        ggml_set_name(cur, name_str.c_str());
+                    };
                     cur = llm_build_ffn_sparse(ctx0, cur,
                         model.layers[il].ffn_up,   NULL,
                         model.layers[il].ffn_gate, NULL,
@@ -4782,7 +4786,7 @@ struct llm_build_context {
                         ffn_inp, // as for now, llama's pred use the same input as the ffn
                         model.layers[il].gpu_idx, 
                         model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu, // TODO: disable gpu offloading as for now
-                        LLM_FFN_RELU, LLM_FFN_PAR, no_offload_cb, il);
+                        LLM_FFN_RELU, LLM_FFN_PAR, cbs);
                 } else {
                     // fallback to dense
                     cur = llm_build_ffn(ctx0, cur,
@@ -4791,134 +4795,6 @@ struct llm_build_context {
                         model.layers[il].ffn_down_t, NULL,
                         LLM_FFN_RELU, LLM_FFN_PAR, cb, il);
                 }
-                // cb(cur, "ffn_out", il);
-            }
-
-            cur = ggml_add(ctx0, cur, ffn_inp);
-            cb(cur, "l_out", il);
-
-            // input for next layer
-            inpL = cur;
-        }
-
-        cur = inpL;
-
-        cur = llm_build_norm(ctx0, cur, hparams,
-                model.output_norm, NULL,
-                LLM_NORM_RMS, cb, -1);
-        cb(cur, "result_norm", -1);
-
-        // lm_head
-        cur = ggml_mul_mat(ctx0, model.output, cur);
-        cb(cur, "result_output", -1);
-
-        ggml_build_forward_expand(gf, cur);
-
-        return gf;
-    }
-
-    struct ggml_cgraph * build_llama_dense() {
-        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, LLAMA_MAX_NODES, false);
-
-        GGML_ASSERT(n_embd_head == hparams.n_rot);
-
-        struct ggml_tensor * cur;
-        struct ggml_tensor * inpL;
-
-        inpL = llm_build_inp_embd(ctx0, hparams, batch, model.tok_embd, cb);
-        cb(inpL, "inp_embd", -1);
-
-        // inp_pos - contains the positions
-        struct ggml_tensor * inp_pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
-        cb(inp_pos, "inp_pos", -1);
-
-        // KQ_scale
-        struct ggml_tensor * KQ_scale = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 1);
-        cb(KQ_scale, "KQ_scale", -1);
-
-        // KQ_mask (mask for 1 head, it will be broadcasted to all heads)
-        struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
-        cb(KQ_mask, "KQ_mask", -1);
-
-        // shift the entire K-cache if needed
-        if (do_rope_shift) {
-            llm_build_k_shift(ctx0, hparams, cparams, kv_self, gf, LLM_ROPE, n_ctx, n_embd_head, freq_base, freq_scale, cb);
-        }
-
-        for (int il = 0; il < n_layer; ++il) {
-            struct ggml_tensor * inpSA = inpL;
-
-            // norm
-            cur = llm_build_norm(ctx0, inpL, hparams,
-                    model.layers[il].attn_norm, NULL,
-                    LLM_NORM_RMS, cb, il);
-            cb(cur, "attn_norm", il);
-
-            // self-attention
-            {
-                // compute Q and K and RoPE them
-                struct ggml_tensor * Qcur = ggml_mul_mat(ctx0, model.layers[il].wq, cur);
-                cb(Qcur, "Qcur", il);
-
-                struct ggml_tensor * Kcur = ggml_mul_mat(ctx0, model.layers[il].wk, cur);
-                cb(Kcur, "Kcur", il);
-
-                struct ggml_tensor * Vcur = ggml_mul_mat(ctx0, model.layers[il].wv, cur);
-                cb(Vcur, "Vcur", il);
-
-                Qcur = ggml_rope_custom(
-                    ctx0, ggml_reshape_3d(ctx0, Qcur, n_embd_head, n_head,    n_tokens), inp_pos,
-                    n_embd_head, 0, 0, n_orig_ctx, freq_base, freq_scale,
-                    ext_factor, attn_factor, beta_fast, beta_slow
-                );
-                cb(Qcur, "Qcur", il);
-
-                Kcur = ggml_rope_custom(
-                    ctx0, ggml_reshape_3d(ctx0, Kcur, n_embd_head, n_head_kv, n_tokens), inp_pos,
-                    n_embd_head, 0, 0, n_orig_ctx, freq_base, freq_scale,
-                    ext_factor, attn_factor, beta_fast, beta_slow
-                );
-                cb(Kcur, "Kcur", il);
-
-                std::tie(k_cpy, v_cpy) = llm_build_kv_store(ctx0, hparams, kv_self, gf, Kcur, Vcur, n_ctx, n_tokens, kv_head, cb, il);
-
-                cur = llm_build_kqv(ctx0, hparams, kv_self,
-                        model.layers[il].wo, NULL,
-                        Qcur, KQ_scale, KQ_mask, n_ctx, n_tokens, n_kv, -1.0f, cb, il);
-                cb(cur, "kqv_out", il);
-            }
-
-            struct ggml_tensor * ffn_inp = ggml_add(ctx0, cur, inpSA);
-            cb(ffn_inp, "ffn_inp", il);
-
-            // feed-forward network
-            {
-                cur = llm_build_norm(ctx0, ffn_inp, hparams,
-                        model.layers[il].ffn_norm, NULL,
-                        LLM_NORM_RMS, cb, il);
-                no_offload_cb(cur, "ffn_norm", il);
-
-                if (0) {
-                    cur = llm_build_ffn_sparse(ctx0, cur,
-                        model.layers[il].ffn_up,   NULL,
-                        model.layers[il].ffn_gate, NULL,
-                        model.layers[il].ffn_down, NULL,
-                        model.layers[il].ffn_down_t,
-                        model.layers[il].mlp_pre_w1,
-                        model.layers[il].mlp_pre_w2,
-                        ffn_inp, // as for now, llama's pred use the same input as the ffn
-                        model.layers[il].gpu_idx, 
-                        model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu, // TODO: disable gpu offloading as for now
-                        LLM_FFN_RELU, LLM_FFN_PAR, no_offload_cb, il);
-                } else {
-                    // fallback to dense
-                    cur = llm_build_ffn(ctx0, cur,
-                        model.layers[il].ffn_up,   NULL,
-                        model.layers[il].ffn_gate, NULL,
-                        model.layers[il].ffn_down_t, NULL,
-                        LLM_FFN_RELU, LLM_FFN_PAR, cb, il);
-                }
-                // cb(cur, "ffn_out", il);
             }
 
             cur = ggml_add(ctx0, cur, ffn_inp);
@@ -5154,6 +5030,11 @@ struct llm_build_context {
             attn_norm->src[3] = ffn_inp;
             // cur->ne[1] is the input length. we use dense ffn at prompting phase for bettern perf
             if (llama_use_sparse_inference(&model)) {
+                llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
+                    std::string name_str = std::string(name) + "-" + std::to_string(il);
+                    ggml_set_name(cur, name_str.c_str());
+                };
+
                 cur = llm_build_ffn_sparse(ctx0, attn_norm,
                     model.layers[il].ffn_up,   NULL,
                     NULL, NULL,
@@ -5164,7 +5045,7 @@ struct llm_build_context {
                     inpL,
                     model.layers[il].gpu_idx, 
                     model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu, // TODO: disable gpu offloading as for now
-                    LLM_FFN_RELU, LLM_FFN_SEQ, no_offload_cb, il);
+                    LLM_FFN_RELU, LLM_FFN_SEQ, cbs);
             } else {
                 cur = llm_build_ffn(ctx0, attn_norm, // !! use the attn norm, not the result
                         model.layers[il].ffn_up,   NULL,
@@ -6415,10 +6296,6 @@ static struct ggml_cgraph * llama_build_graph(
         case LLM_ARCH_LLAMA:
             {
                 result = llm.build_llama();
-                // if (llm.n_tokens < 80)
-                //     result = llm.build_llama();
-                // else 
-                //     result = llm.build_llama_dense();
             } break;
         case LLM_ARCH_BAICHUAN:
             {
