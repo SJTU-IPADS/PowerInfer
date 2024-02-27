@@ -411,6 +411,7 @@ extern "C" {
         GGML_OP_GROUP_NORM,
 
         GGML_OP_MUL_MAT,
+        GGML_OP_MUL_MAT_SPARSE,
         GGML_OP_AXPY,
         GGML_OP_OUT_PROD,
 

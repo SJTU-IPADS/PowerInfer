@@ -8318,11 +8318,10 @@ bool ggml_cuda_can_mul_mat(const struct ggml_tensor * src0, const struct ggml_te
 
     const int64_t ne0 = dst->ne[0];
     const int64_t ne1 = dst->ne[1];
+
+    // TODO: can mulmat if all operands are fully offloaded
     if (dst->src[2] != NULL){
         return false;
-    }
-    else {
-        dst->src[2] = NULL;
     }
 
     // TODO: find the optimal values for these
@@ -8610,13 +8609,6 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
         ggml_cuda_mul_mat_mat_batched_cublas(src0, src1, dst);
     } else if (src0->type == GGML_TYPE_F32) {
         ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_cublas, false);
-    } else if ((ggml_is_quantized(src0->type) || src0->type == GGML_TYPE_F16) && dst->src[2] != NULL) {
-        // If sparse_idx presents, use sparse cublas
-        if (src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0) {
-            ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_vec_sparse_cublas, false);
-        } else {
-            ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_batch_sparse_cublas, false);
-        }
     } else if (ggml_is_quantized(src0->type) || src0->type == GGML_TYPE_F16) {
         if (src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0) {
 #ifdef GGML_CUDA_FORCE_DMMV
@@ -8647,6 +8639,15 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
         }
     } else {
         GGML_ASSERT(false);
+    }
+}
+
+static void ggml_cuda_mul_mat_sparse(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    GGML_ASSERT(dst->src[2] != NULL && "dst->src[2] must be present for sparse matrix multiplication");
+    if (src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0) {
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_vec_sparse_cublas, false);
+    } else {
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_batch_sparse_cublas, false);
     }
 }
 
@@ -9110,6 +9111,12 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
                 return false;
             }
             func = ggml_cuda_mul_mat;
+            break;
+        case GGML_OP_MUL_MAT_SPARSE:
+            if (!any_on_device && !ggml_cuda_can_mul_mat(tensor->src[0], tensor->src[1], tensor)) {
+                return false;
+            }
+            func = ggml_cuda_mul_mat_sparse;
             break;
         case GGML_OP_AXPY:
             func = ggml_cuda_axpy;

@@ -1610,6 +1610,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "GROUP_NORM",
 
     "MUL_MAT",
+    "MUL_MAT_SPARSE",
     "AXPY",
     "OUT_PROD",
 
@@ -4111,7 +4112,7 @@ struct ggml_tensor * ggml_mul_mat_idx_upscale(
     const int64_t ne[4] = { result_ne0, b->ne[1], b->ne[2], b->ne[3] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
-    result->op   = GGML_OP_MUL_MAT;
+    result->op   = GGML_OP_MUL_MAT_SPARSE;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
@@ -4140,7 +4141,7 @@ struct ggml_tensor * ggml_mul_mat_idx(
     const int64_t ne[4] = { a->ne[1], b->ne[1], b->ne[2], b->ne[3] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
-    result->op   = GGML_OP_MUL_MAT;
+    result->op   = GGML_OP_MUL_MAT_SPARSE;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
@@ -15004,6 +15005,7 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_group_norm(params, tensor->src[0], tensor);
             } break;
         case GGML_OP_MUL_MAT:
+        case GGML_OP_MUL_MAT_SPARSE:
             {
                 if (tensor->src[2] != NULL) {
                     int num = tensor->src[2]->ne[0];
@@ -15740,6 +15742,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
         case GGML_OP_MUL_MAT:
+        case GGML_OP_MUL_MAT_SPARSE:
         case GGML_OP_AXPY:
             {
                 // https://cs231n.github.io/optimization-2/#staged
@@ -16793,6 +16796,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 n_tasks = n_threads;
             } break;
         case GGML_OP_MUL_MAT:
+        case GGML_OP_MUL_MAT_SPARSE:
             {
                 n_tasks = n_threads;
 
