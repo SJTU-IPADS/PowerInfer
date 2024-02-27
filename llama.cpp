@@ -4439,36 +4439,32 @@ static struct ggml_tensor * llm_build_ffn_sparse(
           llm_ffn_gate_type   type_gate,
    const llm_build_cb_short & cb_outer) {
 
-    // llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * cur, const char * name) {
-    //     cb_outer(cur, name);
-    //     bool operates_on_gpu = true;
-    //     for (int i = 0; i < std::min(GGML_MAX_SRC, 2); i++) {
-    //         ggml_tensor * src = cur->src[i];
-    //         if (src == NULL) {
-    //             break;
-    //         }
-    //         if (src->backend == GGML_BACKEND_CPU) {
-    //             operates_on_gpu = false;
-    //             break;
-    //         }
-    //     }
-    //     if (operates_on_gpu) {
-    //         ggml_set_backend(cur, GGML_BACKEND_GPU);
-    //         ggml_cuda_assign_buffers_no_alloc(cur);
-    //     }
-    // };
-    llm_build_cb_short cb = cb_outer;
+    llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * cur, const char * name) {
+        cb_outer(cur, name);
+        bool operates_on_gpu = true;
+        for (int i = 0; i < std::min(GGML_MAX_SRC, 2); i++) {
+            ggml_tensor * src = cur->src[i];
+            if (src == NULL) {
+                break;
+            }
+            if (src->backend == GGML_BACKEND_CPU) {
+                operates_on_gpu = false;
+                break;
+            }
+        }
+        if (operates_on_gpu) {
+            ggml_set_backend(cur, GGML_BACKEND_GPU);
+            ggml_cuda_assign_buffers_no_alloc(cur);
+        }
+    };
     ggml_tensor * ffn_input = cur;
 
     // prepare sparse idx
     ggml_tensor * idx = ggml_mul_mat(ctx, pre_w1, pred_inpl);
-    ggml_cuda_assign_buffers_no_alloc(idx);
     cb(idx, "mlp_pre_hidden");
     idx = ggml_relu(ctx, idx);
-    ggml_cuda_assign_buffers_no_alloc(idx);
     cb(idx, "mlp_pre_relu");
     idx = ggml_mul_mat(ctx, pre_w2, idx);
-    // ggml_cuda_assign_buffers_no_alloc(idx);
     cb(idx, "mlp_pre_out");
 
     bool full_gpu = is_gpu_idx_full(ctx, gpu_index);

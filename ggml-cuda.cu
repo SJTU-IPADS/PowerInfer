@@ -6862,6 +6862,17 @@ inline void ggml_cuda_op_mul_mat_q(
     (void) src1_ddf_i;
 }
 
+inline void * ggml_cuda_get_tensor_data(const ggml_tensor * tensor) {
+    if (tensor->backend == GGML_BACKEND_CPU) {
+        return tensor->data;
+    } else if (tensor->backend == GGML_BACKEND_GPU) {
+        ggml_tensor_extra_gpu * extra = (ggml_tensor_extra_gpu *) tensor->extra;
+        return extra->data_device[0];
+    } else {
+        GGML_ASSERT(false);
+    }
+}
+
 inline void ggml_cuda_op_mul_mat_batch_sparse_cublas(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
@@ -6882,12 +6893,11 @@ inline void ggml_cuda_op_mul_mat_batch_sparse_cublas(
     // the main device has a larger memory buffer to hold the results from all GPUs
     // nrows_dst == nrows of the matrix that the dequantize_mul_mat kernel writes into
     const int64_t nrows_dst = dst->backend == GGML_BACKEND_GPU && id == g_main_device ? ne0 : row_diff;
-    GGML_ASSERT(dst->src[2] != NULL && "sparse_idx is required for sparse matrix multiplication");
-    float * sparse_idx = static_cast<float *>(dst->src[2]->data);
+
+    float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
     int * row_lookup = NULL;
     if (dst->src[3] != NULL) {
-        ggml_tensor_extra_gpu * gpu_bucket_extra = static_cast<ggml_tensor_extra_gpu *>(dst->src[3]->extra);
-        row_lookup = static_cast<int *>(gpu_bucket_extra->data_device[0]);
+        static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
     }
 
     switch (src0->type) {
@@ -7114,12 +7124,10 @@ inline void ggml_cuda_op_mul_mat_vec_sparse_cublas(
     const int64_t ne10 = src1->ne[1];
     const int64_t row_diff = row_high - row_low;
 
-    GGML_ASSERT(dst->src[2] != NULL && "sparse_idx is required for sparse matrix multiplication");
-    float * sparse_idx = static_cast<float *>(dst->src[2]->data);
+    float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
     int * row_lookup = NULL;
     if (dst->src[3] != NULL) {
-        ggml_tensor_extra_gpu * gpu_bucket_extra = static_cast<ggml_tensor_extra_gpu *>(dst->src[3]->extra);
-        row_lookup = static_cast<int *>(gpu_bucket_extra->data_device[0]);
+        static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
     }
 
     // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
@@ -7411,13 +7419,11 @@ inline void ggml_cuda_op_dequantize_axpy(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
     const int64_t src1_padded_row_size, const cudaStream_t & stream) {
-    static int *cols = (int *)ggml_cuda_host_malloc(sizeof(int));
 
     const int64_t ne00 = src0->ne[0];
     const int64_t ne11 = src1->ne[1]; // input batch size
     const int64_t ne10 = src1->ne[0]; // input feature size
     const int64_t row_diff = row_high - row_low;
-    const bool full_gpu_compute = dst->op_params[0] > 0;
 
     // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
 #ifdef GGML_CUDA_F16
@@ -7437,14 +7443,10 @@ inline void ggml_cuda_op_dequantize_axpy(
 #else
     const dfloat * src1_dfloat = (const dfloat *) src1_ddf_i; // dfloat == float, no conversion
 #endif // GGML_CUDA_F16
-    float * sparse_idx = NULL;
+    float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
     int * row_lookup = NULL;
-    if (dst->src[2] != NULL) {
-        sparse_idx = static_cast<float *>(dst->src[2]->data);
-    }
     if (dst->src[3] != NULL) {
-        ggml_tensor_extra_gpu * gpu_bucket_extra = static_cast<ggml_tensor_extra_gpu *>(dst->src[3]->extra);
-        row_lookup = static_cast<int *>(gpu_bucket_extra->data_device[0]);
+        row_lookup = static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
     }
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
@@ -8652,6 +8654,7 @@ static void ggml_cuda_mul_mat_sparse(const ggml_tensor * src0, const ggml_tensor
 }
 
 void ggml_cuda_axpy(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    GGML_ASSERT(dst->src[2] != NULL && "dst->src[2] must be present for axpy");
     bool all_on_device = (src0->backend == GGML_BACKEND_GPU || src0->backend == GGML_BACKEND_GPU_SPLIT) &&
         src1->backend == GGML_BACKEND_GPU && dst->backend == GGML_BACKEND_GPU;
     ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_dequantize_axpy, false);
@@ -9171,6 +9174,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         return true;
     }
     func(tensor->src[0], tensor->src[1], tensor);
+    CUDA_CHECK(cudaDeviceSynchronize());
     return true;
 }
 
