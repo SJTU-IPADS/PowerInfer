@@ -4149,6 +4149,9 @@ struct ggml_tensor * ggml_mul_mat_idx(
     result->src[2] = sparse_idx;
     result->src[3] = gpu_idx;
 
+    int32_t params[] = { gpu_idx ? 0 : 1 };
+    ggml_set_op_params(result, params, sizeof(params));
+
     return result;
 }
 
@@ -4180,7 +4183,7 @@ struct ggml_tensor * ggml_axpy(
     result->src[2] = sparse_idx;
     result->src[3] = hybrid_aux;
 
-    int32_t params[] = { hybrid_aux ? 1 : 0 };
+    int32_t params[] = { hybrid_aux ? 0 : 1 };
     ggml_set_op_params(result, params, sizeof(params));
 
     return result;
@@ -16792,7 +16795,6 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 n_tasks = n_threads;
             } break;
         case GGML_OP_MUL_MAT:
-        case GGML_OP_MUL_MAT_SPARSE:
             {
                 n_tasks = n_threads;
 
@@ -16821,10 +16823,28 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 }
 #endif
             } break;
+        case GGML_OP_MUL_MAT_SPARSE:
+            {
+                n_tasks = n_threads;
+
+#if defined(GGML_USE_CUBLAS)
+                if (node->backend == GGML_BACKEND_GPU && node->op_params[0] > 0) {
+                    // Fully offloaded to GPU
+                    n_tasks = 1;
+                }
+#endif
+            } break;
         case GGML_OP_OUT_PROD:
         case GGML_OP_AXPY:
             {
                 n_tasks = n_threads;
+
+#if defined(GGML_USE_CUBLAS)
+                if (node->backend == GGML_BACKEND_GPU && node->op_params[0] > 0) {
+                    // Fully offloaded to GPU
+                    n_tasks = 1;
+                }
+#endif
             } break;
         case GGML_OP_SCALE:
         case GGML_OP_SET:
