@@ -9174,7 +9174,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         return true;
     }
     func(tensor->src[0], tensor->src[1], tensor);
-    CUDA_CHECK(cudaDeviceSynchronize());
+    // CUDA_CHECK(cudaDeviceSynchronize());
     return true;
 }
 
