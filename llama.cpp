@@ -4441,6 +4441,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
 
     llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * cur, const char * name) {
         cb_outer(cur, name);
+#if defined(GGML_USE_CUBLAS)
         bool operates_on_gpu = true;
         for (int i = 0; i < std::min(GGML_MAX_SRC, 2); i++) {
             ggml_tensor * src = cur->src[i];
@@ -4456,6 +4457,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
             ggml_set_backend(cur, GGML_BACKEND_GPU);
             ggml_cuda_assign_buffers_no_alloc(cur);
         }
+#endif
     };
     ggml_tensor * ffn_input = cur;
 
@@ -4980,7 +4982,6 @@ struct llm_build_context {
         if (do_rope_shift) {
             llm_build_k_shift(ctx0, hparams, cparams, kv_self, gf, LLM_ROPE_NEOX, n_ctx, n_embd_head, freq_base, freq_scale, cb);
         }
-        // cb = no_offload_cb;
 
         for (int il = 0; il < n_layer; ++il) {
             struct ggml_tensor * attn_norm;
@@ -4989,7 +4990,7 @@ struct llm_build_context {
                     model.layers[il].attn_norm,
                     model.layers[il].attn_norm_b,
                     LLM_NORM, cb, il);
-            // cb(attn_norm, "attn_norm", il);
+            cb(attn_norm, "attn_norm", il);
 
             // self-attention
             {
@@ -5042,8 +5043,6 @@ struct llm_build_context {
             struct ggml_tensor * ffn_inp = cur;
 
             // feed forward
-            attn_norm->src[3] = ffn_inp;
-            // cur->ne[1] is the input length. we use dense ffn at prompting phase for bettern perf
             if (llama_use_sparse_inference(&model)) {
                 llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
                     std::string name_str = std::string(name) + "-" + std::to_string(il);
@@ -5059,7 +5058,7 @@ struct llm_build_context {
                     model.layers[il].mlp_pre_w2,
                     inpL,
                     model.layers[il].gpu_idx, 
-                    model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu, // TODO: disable gpu offloading as for now
+                    model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
                     LLM_FFN_RELU, LLM_FFN_SEQ, cbs);
             } else {
                 cur = llm_build_ffn(ctx0, attn_norm, // !! use the attn norm, not the result
