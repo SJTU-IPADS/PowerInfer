@@ -1321,10 +1321,10 @@ struct llama_layer {
     struct ggml_tensor * mlp_pre_w1;
     struct ggml_tensor * mlp_pre_w2;
 
-    // gpu double-index
-    // TODO: need to fill this in for all layers
-    struct ggml_tensor * gpu_idx;
-    struct ggml_tensor * gpu_bucket;
+    // ffn split
+    struct ggml_tensor * gpu_idx; // index of ffn neurons on GPU
+    double gpu_offload_ratio; // ratio of ffn split on GPU ([0, 1])
+    struct ggml_tensor * gpu_bucket; // double index from GPU split neuron to original neuron
 };
 
 struct llama_kv_cell {
