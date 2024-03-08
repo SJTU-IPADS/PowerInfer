@@ -2691,6 +2691,38 @@ static void llm_load_print_meta(llama_model_loader & ml, llama_model & model) {
 }
 
 
+static int64_t sum_gpu_index(struct ggml_tensor * gpu_index) {
+    ggml_context * ctx_aux = ggml_init({
+        /* mem_size */ 1 << 10,
+    });
+
+    GGML_ASSERT(ctx_aux);
+
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx_aux, 1, false);
+    ggml_tensor * sum = ggml_sum(ctx_aux, gpu_index);
+
+    ggml_set_name(sum, "gpu_index_sum");
+    ggml_build_forward_expand(gf, sum);
+
+    // TODO: +1 worker for GPU under hybrid inference but no use
+    // ggml_graph_compute_helper(work_buffer, gf, 2);
+    ggml_graph_compute_with_ctx(ctx_aux, gf, 2);
+
+    int32_t sum_val = ggml_get_i32_1d(sum, 0);
+
+    ggml_free(ctx_aux);
+
+    return sum_val;
+}
+
+
+static bool is_gpu_idx_full(
+       struct ggml_context * ctx,
+        struct ggml_tensor * gpu_index) {
+    return sum_gpu_index(gpu_index) == gpu_index->ne[0];
+}
+
+
 struct llama_gpu_split_loader {
     int n_tensors = 0;
     size_t n_bytes = 0; // tensor data bytes
@@ -2730,7 +2762,7 @@ struct llama_gpu_split_loader {
         return vram_budget >= vram_required;
     }
 
-    int apply_tensors_to_base_model(llama_model * model) {
+    int load_gpu_idx_for_model(llama_model * model) {
         int n_layers = model->layers.size();
         // TODO: assert fp is at the end of headers
         if (n_tensors != n_layers * 2) {
@@ -2749,12 +2781,32 @@ struct llama_gpu_split_loader {
                 return 1;
             }
             model_layer.gpu_idx = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
-            model_layer.gpu_bucket = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_GPU);
+            model_layer.gpu_bucket = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_CPU);
         }
         llama_progress_callback cb = [](float progress, void *ctx) {
             LLAMA_LOG_INFO(".");
         };
         idx_loader->load_all_data(ctx_meta, cb, nullptr, nullptr);
+
+        for (int il = 0; il < n_layers; il++) {
+            llama_layer &model_layer = model->layers[il];
+            ggml_tensor * gpu_idx = model_layer.gpu_idx;
+            ggml_tensor * gpu_bucket = model_layer.gpu_bucket;
+            int64_t gpu_neurons = sum_gpu_index(gpu_idx);
+            model_layer.gpu_offload_ratio = (double)gpu_neurons / gpu_idx->ne[0];
+            if (gpu_neurons == 0 || gpu_neurons == gpu_idx->ne[0]) {
+                // no hybrid inference for this layer, unset gpu_bucket
+                model_layer.gpu_bucket = NULL;
+                // TODO: maybe can also unset gpu_idx
+            } else {
+#if defined(GGML_USE_CUBLAS)
+                ggml_set_backend(gpu_bucket, GGML_BACKEND_GPU);
+                ggml_cuda_transform_tensor(gpu_bucket->data, gpu_bucket);
+#else
+                GGML_ASSERT(false && "cublas is not enabled");
+#endif
+            }
+        }
 
         const int64_t t_mlp_us = ggml_time_us() - t_start_mlp_us;
         LLAMA_LOG_INFO(" done (%.2f ms)\n", t_mlp_us / 1000.0);
@@ -2787,12 +2839,16 @@ struct llama_augmentation_model_loader {
         aux_ctx = ggml_init(params);
     }
 
-    ggml_tensor * create_striped_mat_to_gpu(const struct ggml_tensor *src, struct ggml_tensor * gpu_bucket) {
-        if (src == NULL) {
-            return NULL;
-        }
         // allocate and copy selected weights to gpu
+    ggml_tensor * create_striped_mat_to_gpu(struct ggml_tensor *src, struct ggml_tensor * gpu_bucket) {
 #ifdef GGML_USE_CUBLAS
+        if (gpu_bucket == NULL) {
+            // offload the whole tensor to gpu
+            ggml_set_backend(src, GGML_BACKEND_GPU);
+            ggml_cuda_transform_tensor(src->data, src);
+            return src;
+        }
+
         int64_t row_len = src->ne[0];
         int64_t gpu_rows = gpu_bucket->ne[0];
         if (gpu_rows == 0)
@@ -2967,7 +3023,7 @@ struct buffered_tensor_allocator {
 static bool load_gpu_split_from_split_file(llama_model & model, std::string split_path, size_t vram_budget) {
     llama_gpu_split_loader loader(split_path, true);
     return loader.check_vram_allocable(vram_budget) 
-        && loader.apply_tensors_to_base_model(&model) == 0;
+        && loader.load_gpu_idx_for_model(&model) == 0;
 }
 
 static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model & model, size_t vram_allocatable_bytes, bool no_cache) {
@@ -4389,32 +4445,6 @@ static struct ggml_tensor * llm_build_sparse_axpy(
 #endif
 
     return out;
-}
-
-static bool is_gpu_idx_full(
-       struct ggml_context * ctx,
-        struct ggml_tensor * gpu_index) {
-    ggml_context * ctx_aux = ggml_init({
-        /* mem_size */ 1 << 10,
-    });
-
-    GGML_ASSERT(ctx_aux);
-
-    ggml_cgraph * gf = ggml_new_graph_custom(ctx_aux, 1, false);
-    ggml_tensor * sum = ggml_sum(ctx_aux, gpu_index);
-
-    ggml_set_name(sum, "gpu_index_sum");
-    ggml_build_forward_expand(gf, sum);
-
-    // TODO: +1 worker for GPU under hybrid inference but no use
-    // ggml_graph_compute_helper(work_buffer, gf, 2);
-    ggml_graph_compute_with_ctx(ctx, gf, 2);
-
-    int32_t sum_val = ggml_get_i32_1d(sum, 0);
-
-    ggml_free(ctx_aux);
-
-    return sum_val == gpu_index->ne[0];
 }
 
 static struct ggml_tensor * llm_build_ffn_sparse(
