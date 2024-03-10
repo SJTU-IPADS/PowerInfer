@@ -4468,9 +4468,9 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb_outer(cur, name);
 #if defined(GGML_USE_CUBLAS)
         bool operates_on_gpu = cur->src[0]->backend == GGML_BACKEND_GPU;
-        if (cur->src[1]) {
-            operates_on_gpu &= (cur->src[1]->backend == GGML_BACKEND_GPU);
-        }
+        // if (cur->src[1]) {
+        //     operates_on_gpu &= (cur->src[1]->backend == GGML_BACKEND_GPU);
+        // }
         if (operates_on_gpu) {
             ggml_set_backend(cur, GGML_BACKEND_GPU);
             ggml_cuda_assign_buffers_no_alloc(cur);
@@ -4802,7 +4802,7 @@ struct llm_build_context {
                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, cb, il);
-                no_offload_cb(cur, "ffn_norm", il);
+                cb(cur, "ffn_norm", il);
 
                 if (llama_use_sparse_inference(&model)) {
                     llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
