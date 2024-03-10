@@ -8321,11 +8321,6 @@ bool ggml_cuda_can_mul_mat(const struct ggml_tensor * src0, const struct ggml_te
     const int64_t ne0 = dst->ne[0];
     const int64_t ne1 = dst->ne[1];
 
-    // TODO: can mulmat if all operands are fully offloaded
-    if (dst->src[2] != NULL){
-        return false;
-    }
-
     // TODO: find the optimal values for these
     return (src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16 || ggml_is_quantized(src0->type)) &&
             src1->type == GGML_TYPE_F32 &&
@@ -9056,8 +9051,8 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
     if (!g_cublas_loaded) return false;
 
     ggml_cuda_func_t func;
-    const bool any_on_device = tensor->backend == GGML_BACKEND_GPU
-        || (tensor->src[0] != nullptr && (tensor->src[0]->backend == GGML_BACKEND_GPU || tensor->src[0]->backend == GGML_BACKEND_GPU_SPLIT))
+    const bool src0_on_device = tensor->src[0] != nullptr && (tensor->src[0]->backend != GGML_BACKEND_CPU);
+    const bool any_on_device = tensor->backend == GGML_BACKEND_GPU || src0_on_device
         || (tensor->src[1] != nullptr && tensor->src[1]->backend == GGML_BACKEND_GPU);
 
     if (!any_on_device && tensor->op != GGML_OP_MUL_MAT) {
@@ -9116,7 +9111,8 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             func = ggml_cuda_mul_mat;
             break;
         case GGML_OP_MUL_MAT_SPARSE:
-            if (!any_on_device && !ggml_cuda_can_mul_mat(tensor->src[0], tensor->src[1], tensor)) {
+            if (!ggml_cuda_can_mul_mat(tensor->src[0], tensor->src[1], tensor) && !src0_on_device) {
+                // when src0 (weights) is not on device, we compute on CPU with sparsity
                 return false;
             }
             func = ggml_cuda_mul_mat_sparse;
@@ -9175,10 +9171,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
     }
     func(tensor->src[0], tensor->src[1], tensor);
 
-#ifdef GGML_PERF
-    // wait for all operations to finish for precise timing
     CUDA_CHECK(cudaDeviceSynchronize());
-#endif
 
     return true;
 }

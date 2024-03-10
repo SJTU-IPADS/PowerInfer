@@ -2715,14 +2715,6 @@ static int64_t sum_gpu_index(struct ggml_tensor * gpu_index) {
     return sum_val;
 }
 
-
-static bool is_gpu_idx_full(
-       struct ggml_context * ctx,
-        struct ggml_tensor * gpu_index) {
-    return sum_gpu_index(gpu_index) == gpu_index->ne[0];
-}
-
-
 struct llama_gpu_split_loader {
     int n_tensors = 0;
     size_t n_bytes = 0; // tensor data bytes
@@ -4467,21 +4459,17 @@ static struct ggml_tensor * llm_build_ffn_sparse(
          struct ggml_tensor * up_gpu,
             llm_ffn_op_type   type_op,
           llm_ffn_gate_type   type_gate,
+                     double   gpu_offload_ratio,
    const llm_build_cb_short & cb_outer) {
+    bool full_gpu = gpu_offload_ratio >= 1.0;
+    ggml_tensor * ffn_input = cur;
 
     llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * cur, const char * name) {
         cb_outer(cur, name);
 #if defined(GGML_USE_CUBLAS)
-        bool operates_on_gpu = true;
-        for (int i = 0; i < std::min(GGML_MAX_SRC, 2); i++) {
-            ggml_tensor * src = cur->src[i];
-            if (src == NULL) {
-                break;
-            }
-            if (src->backend == GGML_BACKEND_CPU) {
-                operates_on_gpu = false;
-                break;
-            }
+        bool operates_on_gpu = cur->src[0]->backend == GGML_BACKEND_GPU;
+        if (cur->src[1]) {
+            operates_on_gpu &= (cur->src[1]->backend == GGML_BACKEND_GPU);
         }
         if (operates_on_gpu) {
             ggml_set_backend(cur, GGML_BACKEND_GPU);
@@ -4489,7 +4477,6 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         }
 #endif
     };
-    ggml_tensor * ffn_input = cur;
 
     // prepare sparse idx
     ggml_tensor * idx = ggml_mul_mat(ctx, pre_w1, pred_inpl);
@@ -4499,10 +4486,9 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     idx = ggml_mul_mat(ctx, pre_w2, idx);
     cb(idx, "mlp_pre_out");
 
-    bool full_gpu = is_gpu_idx_full(ctx, gpu_index);
 
     // FFN up
-    struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb, "up", full_gpu);
+    struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_outer, "up", full_gpu);
     if (up_b) {
         up_out = ggml_add(ctx, up_out, up_b);
         cb(up_out, "ffn_up_b");
@@ -4511,7 +4497,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     if (gate) {
         // TODO: only support par for now
         GGML_ASSERT(type_gate == LLM_FFN_PAR);
-        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb, "gate", full_gpu);
+        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
         if (gate_b) {
             gate_out = ggml_add(ctx, gate_out, gate_b);
             cb(gate_out, "ffn_gate_b");
@@ -4537,7 +4523,7 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb(cur, "ffn_gate_par");
     }
 
-    cur = llm_build_sparse_axpy(ctx, down_t, cur, idx, down_gpu, gpu_index, gpu_bucket, cb, "down", full_gpu);
+    cur = llm_build_sparse_axpy(ctx, down_t, cur, idx, down_gpu, gpu_index, gpu_bucket, cb_outer, "down", full_gpu);
 
     if (down_b) {
         cur = ggml_add(ctx, cur, down_b);
@@ -4833,7 +4819,7 @@ struct llm_build_context {
                         ffn_inp, // as for now, llama's pred use the same input as the ffn
                         model.layers[il].gpu_idx, 
                         model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
-                        LLM_FFN_RELU, LLM_FFN_PAR, cbs);
+                        LLM_FFN_RELU, LLM_FFN_PAR, model.layers[il].gpu_offload_ratio, cbs);
                 } else {
                     // fallback to dense
                     cur = llm_build_ffn(ctx0, cur,
@@ -5088,8 +5074,9 @@ struct llm_build_context {
                     model.layers[il].mlp_pre_w2,
                     inpL,
                     model.layers[il].gpu_idx, 
-                    model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
-                    LLM_FFN_RELU, LLM_FFN_SEQ, cbs);
+                    model.layers[il].gpu_bucket, 
+                    model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
+                    LLM_FFN_RELU, LLM_FFN_SEQ, model.layers[il].gpu_offload_ratio, cbs);
             } else {
                 cur = llm_build_ffn(ctx0, attn_norm, // !! use the attn norm, not the result
                         model.layers[il].ffn_up,   NULL,
