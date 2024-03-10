@@ -1772,6 +1772,7 @@ static void ggml_setup_op_has_task_pass(void) {
 
         p[GGML_OP_ACC                    ] = true;
         p[GGML_OP_MUL_MAT                ] = true;
+        p[GGML_OP_MUL_MAT_SPARSE         ] = true;
         p[GGML_OP_AXPY                   ] = true;
         p[GGML_OP_OUT_PROD               ] = true;
         p[GGML_OP_SET                    ] = true;
@@ -15005,24 +15006,19 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_group_norm(params, tensor->src[0], tensor);
             } break;
         case GGML_OP_MUL_MAT:
+            {
+                ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
+            } break;
         case GGML_OP_MUL_MAT_SPARSE:
             {
-                if (tensor->src[2] != NULL) {
-                    int num = tensor->src[2]->ne[0];
-                    if (num > 1000) {
+                if (tensor->src[2]->ne[0] > 1000) {
                         ggml_compute_forward_mul_mat_sparse(params, tensor->src[0], tensor->src[1], tensor);
-                        break;
-                    }
-                    else {
+                } else {
                         // if (params->ith == 0)
                         //     printf("name %s num %d\n", ggml_get_name(tensor), num);
                         ggml_compute_forward_mul_mat_sparse_head(params, tensor->src[0], tensor->src[1], tensor);
                         // ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
-                        break;
                     } 
-                }
-                else
-                    ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
             } break;
         case GGML_OP_AXPY:
             {
@@ -17334,6 +17330,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     }
                 } break;
             case GGML_OP_MUL_MAT:
+            case GGML_OP_MUL_MAT_SPARSE:
                 {
                     const enum ggml_type vec_dot_type = type_traits[node->src[0]->type].vec_dot_type;
 
