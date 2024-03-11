@@ -8997,6 +8997,17 @@ void ggml_cuda_copy_to_device(struct ggml_tensor * tensor) {
     CUDA_CHECK(cudaMemcpy(extra->data_device[g_main_device], tensor->data, ggml_nbytes(tensor), cudaMemcpyHostToDevice));
 }
 
+void ggml_cuda_copy_to_host(struct ggml_tensor * tensor) {
+    GGML_ASSERT(tensor->backend != GGML_BACKEND_CPU && "cannot copy to host from CPU tensor");
+    GGML_ASSERT(tensor->backend != GGML_BACKEND_GPU_SPLIT && "not implemented");
+
+    ggml_tensor_extra_gpu * extra = (ggml_tensor_extra_gpu *) tensor->extra;
+    CUDA_CHECK(ggml_cuda_set_device(g_main_device));
+
+    // assumes GPU data is contiguous and CPU buffer is allocated
+    CUDA_CHECK(cudaMemcpy(tensor->data, extra->data_device[g_main_device], ggml_nbytes(tensor), cudaMemcpyDeviceToHost));
+}
+
 void ggml_cuda_assign_buffers(struct ggml_tensor * tensor) {
     if (tensor == NULL)
         return;

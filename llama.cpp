@@ -2996,8 +2996,8 @@ struct buffered_tensor_allocator {
                     return offloaded_layers;
                 }
 
+                printf("offloaded tensor: %s\n", meta_tensor->name);
                 if (level == TENSOR_OFFLOAD_ATTN && tensor_type == LLM_TENSOR_ATTN_OUT) {
-                    // offloaded_layers = i_layer; // update as the previous layer
                     offloaded_layers = i_layer + 1;
                 } else if (level == TENSOR_OFFLOAD_OUTPUT) {
                     offloaded_layers = hparams.n_layer + 1; // indicate all layers + output are offloaded
