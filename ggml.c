@@ -14933,7 +14933,7 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         return;
     }
     // Make sure src[0] (weight for binary ops) is on CPU to avoid any weight transfer
-    GGML_ASSERT(tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU && "weight should be on the CPU to compute on the CPU");
+    GGML_ASSERT((tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU) && "weight should be on the CPU to compute on the CPU");
 #endif // GGML_USE_CUBLAS
 
     switch (tensor->op) {
@@ -15031,10 +15031,14 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_MUL_MAT_SPARSE:
             {
+                GGML_ASSERT(tensor->src[2] != NULL && "sparsity index is required for MUL_MAT_SPARSE");
+
                 // MUL_MAT_SPARSE is the first operation in the FFN block, and
                 // tensor->src[1] is the activation from the previous layer/attention block and can be at GPU.
-                // we copy it back to CPU in advance to make sure tensor->data is valid.
+                // tensor->src[2] is the sparsity index and might also be computed at GPU (depending on predictor offloading condition).
+                // we copy them back to CPU in advance to make sure tensor->data is valid.
                 ggml_ensure_tensor_data_at_memory(tensor->src[1]);
+                ggml_ensure_tensor_data_at_memory(tensor->src[2]);
 
                 if (tensor->src[2]->ne[0] > 1000) {
                     ggml_compute_forward_mul_mat_sparse(params, tensor->src[0], tensor->src[1], tensor);
