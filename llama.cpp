@@ -2938,6 +2938,7 @@ struct buffered_tensor_allocator {
     const llama_hparams & hparams;
     size_t vram_allocated_bytes = 0;
     int offloaded_layers = 0; // mocks the model's n_gpu_layers
+    bool tensor_offload_complete = false;
 
     buffered_tensor_allocator(llama_model_loader &ml, ggml_context *ctx, const llama_hparams &hparams) : ml(ml), ctx(ctx), hparams(hparams) {}
 
@@ -3005,6 +3006,7 @@ struct buffered_tensor_allocator {
             }
         }
         ml.done_getting_tensors();
+        tensor_offload_complete = true;
         return offloaded_layers;
 #else // GGML_USE_CUBLAS
         return 0;
@@ -3270,7 +3272,7 @@ static void llm_load_sparse_model_tensors(
         llama_reserve_model_kv_cache(&model, cparams);
     }
     // Offload FFN segments to GPU if possible
-    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split);
+    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
