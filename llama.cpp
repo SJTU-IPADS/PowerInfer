@@ -2843,9 +2843,8 @@ struct llama_augmentation_model_loader {
 
         int64_t row_len = src->ne[0];
         int64_t gpu_rows = gpu_bucket->ne[0];
-        if (gpu_rows == 0)
-            return NULL;
-        
+        GGML_ASSERT(0 < gpu_rows && gpu_rows <= row_len);
+
         ggml_set_no_alloc(aux_ctx, true);
         ggml_tensor * gpu_dst = ggml_new_tensor_2d(aux_ctx, src->type, row_len, gpu_rows);
         ggml_set_backend(gpu_dst, GGML_BACKEND_GPU);
@@ -2884,19 +2883,20 @@ struct llama_augmentation_model_loader {
         ggml_tensor * gpu_bucket = layer.gpu_bucket;
         size_t offloaded_bytes = 0;
 
+        if (layer.gpu_offload_ratio == 0) {
+            return 0;
+        }
+
+        GGML_ASSERT((layer.gpu_bucket != NULL) == (layer.gpu_offload_ratio < 1.0));
         layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
-        layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
-        layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
+        offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
         
-        if (layer.ffn_gate_gpu) {
-            offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
-        }
-        if (layer.ffn_up_gpu) {
-            offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
-        }
-        if (layer.ffn_down_gpu) {
-            offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
-        }
+        layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
+        offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
+        
+        layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
+        offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
+
         return offloaded_bytes;
     }
 
