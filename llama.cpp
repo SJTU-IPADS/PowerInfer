@@ -2843,7 +2843,7 @@ struct llama_augmentation_model_loader {
 
         int64_t row_len = src->ne[0];
         int64_t gpu_rows = gpu_bucket->ne[0];
-        GGML_ASSERT(0 < gpu_rows && gpu_rows <= row_len);
+        GGML_ASSERT(0 < gpu_rows && gpu_rows <= src->ne[1]);
 
         ggml_set_no_alloc(aux_ctx, true);
         ggml_tensor * gpu_dst = ggml_new_tensor_2d(aux_ctx, src->type, row_len, gpu_rows);
@@ -2883,7 +2883,7 @@ struct llama_augmentation_model_loader {
         ggml_tensor * gpu_bucket = layer.gpu_bucket;
         size_t offloaded_bytes = 0;
 
-        if (layer.gpu_offload_ratio == 0) {
+        if (layer.gpu_offload_ratio == 0.) {
             return 0;
         }
 

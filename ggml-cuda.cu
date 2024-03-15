@@ -9066,15 +9066,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
     const bool any_on_device = tensor->backend == GGML_BACKEND_GPU || src0_on_device
         || (tensor->src[1] != nullptr && tensor->src[1]->backend == GGML_BACKEND_GPU);
 
-    if ((tensor->op == GGML_OP_MUL_MAT_SPARSE || tensor->op == GGML_OP_AXPY)) {
-        const bool src0_on_device = tensor->src[0] != nullptr && (tensor->src[0]->backend == GGML_BACKEND_GPU || tensor->src[0]->backend == GGML_BACKEND_GPU_SPLIT);
-        GGML_ASSERT(src0_on_device == (tensor->backend == GGML_BACKEND_GPU || tensor->backend == GGML_BACKEND_GPU_SPLIT));
-        if (!src0_on_device) {
-            return false;
-        }
-    }
-
-    if (!any_on_device && tensor->op != GGML_OP_MUL_MAT) {
+    // when src0 (weights) is not on device, we compute on CPU with sparsity
+    if (!src0_on_device && (tensor->op == GGML_OP_MUL_MAT_SPARSE || tensor->op == GGML_OP_AXPY)
+        || !any_on_device && tensor->op != GGML_OP_MUL_MAT) {
         return false;
     }
 
@@ -9130,8 +9124,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             func = ggml_cuda_mul_mat;
             break;
         case GGML_OP_MUL_MAT_SPARSE:
-            if (!ggml_cuda_can_mul_mat(tensor->src[0], tensor->src[1], tensor) && !src0_on_device) {
-                // when src0 (weights) is not on device, we compute on CPU with sparsity
+            if (!src0_on_device && !ggml_cuda_can_mul_mat(tensor->src[0], tensor->src[1], tensor)) {
                 return false;
             }
             func = ggml_cuda_mul_mat_sparse;
