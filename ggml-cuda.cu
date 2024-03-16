@@ -6896,14 +6896,13 @@ inline void ggml_cuda_op_mul_mat_batch_sparse_cublas(
 
     float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
     int32_t * row_lookup = dst->src[3] != NULL ? static_cast<int32_t *>(ggml_cuda_get_tensor_data(dst->src[3])) : NULL;
+    cudaMemsetAsync(dst_dd_i, 0, ggml_nbytes(dst), stream);
 
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
-            cudaMemsetAsync(dst_dd_i, 0, ggml_nbytes(dst), stream);
             dequantize_mul_mat_batch_q4_0_cuda_sparse(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, src1_ncols, dst->ne[0], stream, row_lookup, sparse_idx);
             break;
         case GGML_TYPE_F16:
-            cudaMemsetAsync(dst_dd_i, 0, ggml_nbytes(dst), stream);
             convert_mul_mat_batch_f16_cuda_sparse(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, src1_ncols, dst->ne[0], stream, row_lookup, sparse_idx);
             break;
         default:
@@ -7143,13 +7142,12 @@ inline void ggml_cuda_op_mul_mat_vec_sparse_cublas(
     const dfloat * src1_dfloat = (const dfloat *) src1_ddf_i; // dfloat == float, no conversion
 #endif // GGML_CUDA_F16
 
+    cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
-            cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
             dequantize_mul_mat_vec_q4_0_cuda_sparse(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream, row_lookup, sparse_idx);
             break;
         case GGML_TYPE_F16:
-            cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
             convert_mul_mat_vec_f16_cuda_sparse(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream, row_lookup, sparse_idx);
             break;
         default:
@@ -7439,10 +7437,10 @@ inline void ggml_cuda_op_dequantize_axpy(
 #endif // GGML_CUDA_F16
     float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
     int32_t * row_lookup = dst->src[3] != NULL ? static_cast<int32_t *>(ggml_cuda_get_tensor_data(dst->src[3])) : NULL;
+    cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
 
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
-            cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
             if (sparse_idx == NULL) {
                 dequantize_axpy_vec_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             } else if (ne11 == 1) {
@@ -7451,35 +7449,7 @@ inline void ggml_cuda_op_dequantize_axpy(
                 dequantize_axpy_sparse_batch_q4_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, ne10, src1_ncols, stream, row_lookup, sparse_idx);
             }
             break;
-        case GGML_TYPE_Q4_1:
-            dequantize_mul_mat_vec_q4_1_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q5_0:
-            dequantize_mul_mat_vec_q5_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q5_1:
-            dequantize_mul_mat_vec_q5_1_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q8_0:
-            dequantize_mul_mat_vec_q8_0_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q2_K:
-            dequantize_mul_mat_vec_q2_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q3_K:
-            dequantize_mul_mat_vec_q3_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q4_K:
-            dequantize_mul_mat_vec_q4_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q5_K:
-            dequantize_mul_mat_vec_q5_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
-            break;
-        case GGML_TYPE_Q6_K:
-            dequantize_mul_mat_vec_q6_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
-            break;
         case GGML_TYPE_F16:
-            cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
             if (sparse_idx == NULL) {
                 convert_axpy_vec_f16_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             } else if (ne11 == 1) {
@@ -7489,7 +7459,7 @@ inline void ggml_cuda_op_dequantize_axpy(
             }
             break;
         default:
-            GGML_ASSERT(false);
+            GGML_ASSERT(false && "Unsupported type");
             break;
     }
 
