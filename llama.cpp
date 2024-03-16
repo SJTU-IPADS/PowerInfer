@@ -2888,8 +2888,11 @@ struct llama_augmentation_model_loader {
         }
 
         GGML_ASSERT((layer.gpu_bucket != NULL) == (layer.gpu_offload_ratio < 1.0));
-        layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
-        offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
+
+        if (layer.ffn_gate) {
+            layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
+            offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
+        }
         
         layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
         offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
@@ -2997,7 +3000,6 @@ struct buffered_tensor_allocator {
                     return offloaded_layers;
                 }
 
-                printf("offloaded tensor: %s\n", meta_tensor->name);
                 if (level == TENSOR_OFFLOAD_ATTN && tensor_type == LLM_TENSOR_ATTN_OUT) {
                     offloaded_layers = i_layer + 1;
                 } else if (level == TENSOR_OFFLOAD_OUTPUT) {
@@ -4367,7 +4369,6 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
     // Full offloading fast path
     if (full_gpu) {
         GGML_ASSERT(up_gpu && "full_gpu but no up_gpu");
-        // TODO: use full gpu op
         out = ggml_mul_mat_idx(ctx, up_gpu, inp, idx, NULL);
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
@@ -4384,6 +4385,8 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
         cb(out_gpu, (full_name + "_gpu").c_str());
         out = ggml_add(ctx, out, out_gpu);
+        // We don't need to assign buffers here, as the output will be passed into Axpy,
+        // which in this case, is also a hybrid operation.
         cb(out, (full_name + "_merged").c_str());
     }
 #endif
@@ -4416,24 +4419,17 @@ static struct ggml_tensor * llm_build_sparse_axpy(
     }
 #endif
 
-    bool hybrid_split = false;
-#ifdef GGML_USE_CUBLAS
-    hybrid_split = true;
-    ggml_tensor * out_gpu = NULL;
-    if (wt_gpu) {
-        out_gpu = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
-        cb(out_gpu, (full_name + "_gpu").c_str());
-        ggml_cuda_assign_buffers_no_alloc(out_gpu);
-    }
-#endif
-
     // TODO: should pass NULL as hybrid_aux when hybrid_split is false
     out = ggml_axpy(ctx, w_t, x, sparse_idx, gpu_index);
     cb(out, full_name.c_str());
 
 #ifdef GGML_USE_CUBLAS
-    if (out_gpu) {
+    if (wt_gpu) {
+        ggml_tensor * out_gpu = ggml_axpy(ctx, wt_gpu, x, sparse_idx, gpu_bucket);
+        cb(out_gpu, (full_name + "_gpu").c_str());
+        ggml_cuda_assign_buffers_no_alloc(out_gpu);
         out = ggml_add(ctx, out, out_gpu);
+        ggml_cuda_assign_buffers_no_alloc(out_gpu);
         cb(out, (full_name + "_merged").c_str());
     }
 #endif
@@ -4469,12 +4465,9 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * cur, const char * name) {
         cb_outer(cur, name);
 #if defined(GGML_USE_CUBLAS)
+        // Determine offloading based on src[0] (weight for both mul and axpy)
         bool operates_on_gpu = cur->src[0]->backend == GGML_BACKEND_GPU;
-        // if (cur->src[1]) {
-        //     operates_on_gpu &= (cur->src[1]->backend == GGML_BACKEND_GPU);
-        // }
         if (operates_on_gpu) {
-            ggml_set_backend(cur, GGML_BACKEND_GPU);
             ggml_cuda_assign_buffers_no_alloc(cur);
         }
 #endif
