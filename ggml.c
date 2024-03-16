@@ -17536,7 +17536,7 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
     }
 
     const int n_threads = cplan->n_threads;
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_HYBRID_THREADING
     struct ggml_compute_state_shared state_shared = {
         /*.cgraph                  =*/ cgraph,
         /*.cgraph_plan             =*/ cplan,
@@ -17573,7 +17573,7 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
                 .ith = j,
                 .shared = &state_shared,
             };
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_HYBRID_THREADING
             const int rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_thread_hybrid, &workers[j]);
 #else
             const int rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_thread, &workers[j]);
@@ -17591,7 +17591,7 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
 
     // this is a work thread too
 
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_HYBRID_THREADING
     int compute_status = (size_t) ggml_graph_compute_thread_hybrid(&workers[0]);
 #else
     int compute_status = (size_t) ggml_graph_compute_thread(&workers[0]);
