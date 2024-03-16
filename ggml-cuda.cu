@@ -6895,10 +6895,7 @@ inline void ggml_cuda_op_mul_mat_batch_sparse_cublas(
     const int64_t nrows_dst = dst->backend == GGML_BACKEND_GPU && id == g_main_device ? ne0 : row_diff;
 
     float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
-    int * row_lookup = NULL;
-    if (dst->src[3] != NULL) {
-        static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
-    }
+    int32_t * row_lookup = dst->src[3] != NULL ? static_cast<int32_t *>(ggml_cuda_get_tensor_data(dst->src[3])) : NULL;
 
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
@@ -7125,10 +7122,7 @@ inline void ggml_cuda_op_mul_mat_vec_sparse_cublas(
     const int64_t row_diff = row_high - row_low;
 
     float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
-    int * row_lookup = NULL;
-    if (dst->src[3] != NULL) {
-        static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
-    }
+    int32_t * row_lookup = dst->src[3] != NULL ? static_cast<int32_t *>(ggml_cuda_get_tensor_data(dst->src[3])) : NULL;
 
     // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
 #ifdef GGML_CUDA_F16
@@ -7444,10 +7438,8 @@ inline void ggml_cuda_op_dequantize_axpy(
     const dfloat * src1_dfloat = (const dfloat *) src1_ddf_i; // dfloat == float, no conversion
 #endif // GGML_CUDA_F16
     float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
-    int * row_lookup = NULL;
-    if (dst->src[3] != NULL) {
-        row_lookup = static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
-    }
+    int32_t * row_lookup = dst->src[3] != NULL ? static_cast<int32_t *>(ggml_cuda_get_tensor_data(dst->src[3])) : NULL;
+
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
             cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
