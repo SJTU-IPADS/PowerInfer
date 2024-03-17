@@ -16850,17 +16850,6 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
 #endif
             } break;
         case GGML_OP_MUL_MAT_SPARSE:
-            {
-                n_tasks = n_threads;
-
-#if defined(GGML_USE_CUBLAS)
-                if (node->backend == GGML_BACKEND_GPU && node->op_params[0] > 0) {
-                    // Fully offloaded to GPU
-                    n_tasks = 1;
-                }
-#endif
-            } break;
-        case GGML_OP_OUT_PROD:
         case GGML_OP_AXPY:
             {
                 n_tasks = n_threads;
@@ -16869,8 +16858,14 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 if (node->backend == GGML_BACKEND_GPU && node->op_params[0] > 0) {
                     // Fully offloaded to GPU
                     n_tasks = 1;
+                } else {
+                    GGML_ASSERT(n_threads > 1 && "n_threads must be > 1 to enable hybrid CPU/GPU computation");
                 }
 #endif
+            } break;
+        case GGML_OP_OUT_PROD:
+            {
+                n_tasks = n_threads;
             } break;
         case GGML_OP_SCALE:
         case GGML_OP_SET:
