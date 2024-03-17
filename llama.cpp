@@ -4429,7 +4429,7 @@ static struct ggml_tensor * llm_build_sparse_axpy(
         cb(out_gpu, (full_name + "_gpu").c_str());
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
         out = ggml_add(ctx, out, out_gpu);
-        ggml_cuda_assign_buffers_no_alloc(out_gpu);
+        ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name + "_merged").c_str());
     }
 #endif
