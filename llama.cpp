@@ -4479,8 +4479,9 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     idx = ggml_relu(ctx, idx);
     cb(idx, "mlp_pre_relu");
     idx = ggml_mul_mat(ctx, pre_w2, idx);
-    cb(idx, "mlp_pre_out");
-
+    // If the FFN layer is not fully offloaded, we need to transfer the sparsity index
+    // back to the CPU to avoid synchronization issues.
+    (full_gpu ? cb : cb_outer)(idx, "mlp_pre_out");
 
     // FFN up
     struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_outer, "up", full_gpu);
