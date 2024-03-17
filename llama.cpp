@@ -4798,13 +4798,18 @@ struct llm_build_context {
                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, cb, il);
-                cb(cur, "ffn_norm", il);
 
                 if (llama_use_sparse_inference(&model)) {
                     llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
                         std::string name_str = std::string(name) + "-" + std::to_string(il);
                         ggml_set_name(cur, name_str.c_str());
                     };
+                    // We only offload the ffn input to GPU if all neurons are offloaded
+                    if (model.layers[il].gpu_offload_ratio >= 1.) {
+                        cb(cur, "ffn_norm", il);
+                    } else {
+                        cbs(cur, "ffn_norm");
+                    }
                     cur = llm_build_ffn_sparse(ctx0, cur,
                         model.layers[il].ffn_up,   NULL,
                         model.layers[il].ffn_gate, NULL,
@@ -4818,6 +4823,7 @@ struct llm_build_context {
                         LLM_FFN_RELU, LLM_FFN_PAR, model.layers[il].gpu_offload_ratio, cbs);
                 } else {
                     // fallback to dense
+                    cb(cur, "ffn_norm", il);
                     cur = llm_build_ffn(ctx0, cur,
                         model.layers[il].ffn_up,   NULL,
                         model.layers[il].ffn_gate, NULL,
@@ -5002,7 +5008,6 @@ struct llm_build_context {
                     model.layers[il].attn_norm,
                     model.layers[il].attn_norm_b,
                     LLM_NORM, cb, il);
-            cb(attn_norm, "attn_norm", il);
 
             // self-attention
             {
@@ -5060,7 +5065,12 @@ struct llm_build_context {
                     std::string name_str = std::string(name) + "-" + std::to_string(il);
                     ggml_set_name(cur, name_str.c_str());
                 };
-
+                // We only offload the ffn input to GPU if all neurons are offloaded
+                if (model.layers[il].gpu_offload_ratio >= 1.) {
+                    cb(cur, "attn_norm", il);
+                } else {
+                    cbs(cur, "attn_norm");
+                }
                 cur = llm_build_ffn_sparse(ctx0, attn_norm,
                     model.layers[il].ffn_up,   NULL,
                     NULL, NULL,
@@ -5068,12 +5078,13 @@ struct llm_build_context {
                     model.layers[il].ffn_down_t,
                     model.layers[il].mlp_pre_w1,
                     model.layers[il].mlp_pre_w2,
-                    inpL,
+                    inpL, // Falcon uses the layer's input as the pred input
                     model.layers[il].gpu_idx, 
                     model.layers[il].gpu_bucket, 
                     model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
                     LLM_FFN_RELU, LLM_FFN_SEQ, model.layers[il].gpu_offload_ratio, cbs);
             } else {
+                cb(attn_norm, "attn_norm", il);
                 cur = llm_build_ffn(ctx0, attn_norm, // !! use the attn norm, not the result
                         model.layers[il].ffn_up,   NULL,
                         NULL,                      NULL,

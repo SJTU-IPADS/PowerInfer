@@ -14914,6 +14914,7 @@ static void ggml_ensure_tensor_data_at_memory(struct ggml_tensor * tensor) {
         GGML_ASSERT(false && "not implemented: tensor has no buffer or data");
     }
 
+    fprintf(stderr, "WARNING: transfering tensor %s to CPU at inference is safe but slow\n", ggml_get_name(tensor));
     ggml_cuda_copy_to_host(tensor);
 #else
     UNUSED(tensor);
