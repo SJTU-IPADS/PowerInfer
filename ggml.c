@@ -1610,6 +1610,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "GROUP_NORM",
 
     "MUL_MAT",
+    "MUL_MAT_SPARSE",
     "AXPY",
     "OUT_PROD",
 
@@ -1771,6 +1772,7 @@ static void ggml_setup_op_has_task_pass(void) {
 
         p[GGML_OP_ACC                    ] = true;
         p[GGML_OP_MUL_MAT                ] = true;
+        p[GGML_OP_MUL_MAT_SPARSE         ] = true;
         p[GGML_OP_AXPY                   ] = true;
         p[GGML_OP_OUT_PROD               ] = true;
         p[GGML_OP_SET                    ] = true;
@@ -3150,10 +3152,6 @@ static struct ggml_tensor * ggml_add_impl(
         bool inplace) {
     // TODO: support less-strict constraint
     //       GGML_ASSERT(ggml_can_repeat(b, a));
-    if (a == NULL)
-        return b;
-    if (b == NULL)
-        return a;
     GGML_ASSERT(ggml_can_repeat_rows(b, a));
 
     bool is_node = false;
@@ -4098,44 +4096,41 @@ struct ggml_tensor * ggml_mul_mat(
 
     return result;
 }
-// ggml_mul_mat_idx for GPU
-struct ggml_tensor * ggml_mul_mat_special(
+
+struct ggml_tensor * ggml_mul_mat_idx_upscale(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        struct ggml_tensor  * c,
-        struct ggml_tensor  * d,
-        struct ggml_tensor  * ref) {
-    if (a == NULL || b == NULL)
-        return NULL;
-
+        struct ggml_tensor  * sparse_idx,
+        struct ggml_tensor  * gpu_bucket,
+                      int64_t result_ne0) {
     bool is_node = false;
 
     if (a->grad || b->grad) {
         is_node = true;
     }
 
-    const int64_t ne[4] = { ref->ne[1], b->ne[1], b->ne[2], b->ne[3] };
+    const int64_t ne[4] = { result_ne0, b->ne[1], b->ne[2], b->ne[3] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
-    result->op   = GGML_OP_MUL_MAT;
+    result->op   = GGML_OP_MUL_MAT_SPARSE;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = c;
-    result->src[3] = d;
+    result->src[2] = sparse_idx;
+    result->src[3] = gpu_bucket;
 
     return result;
 }
-// ggml_mul_mat_idx for CPU and axpy in GPU
+
 struct ggml_tensor * ggml_mul_mat_idx(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        struct ggml_tensor  * c,
-        struct ggml_tensor  * d) {
-    if (a == NULL || b == NULL)
-        return NULL;
+        struct ggml_tensor  * sparse_idx,
+        // Under hybrid inference, this tensor is to indicate which row are offloaded to GPU;
+        // When using full GPU inference, it is NULL.
+        struct ggml_tensor  * gpu_idx) {
     GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;
@@ -4147,12 +4142,15 @@ struct ggml_tensor * ggml_mul_mat_idx(
     const int64_t ne[4] = { a->ne[1], b->ne[1], b->ne[2], b->ne[3] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
-    result->op   = GGML_OP_MUL_MAT;
+    result->op   = GGML_OP_MUL_MAT_SPARSE;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = c;
-    result->src[3] = d;
+    result->src[2] = sparse_idx;
+    result->src[3] = gpu_idx;
+
+    int32_t params[] = { gpu_idx ? 0 : 1 };
+    ggml_set_op_params(result, params, sizeof(params));
 
     return result;
 }
@@ -4161,10 +4159,13 @@ struct ggml_tensor * ggml_axpy(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        struct ggml_tensor  * c,
-        struct ggml_tensor  * d) {
-    if (a == NULL || b == NULL)
-        return NULL;
+        struct ggml_tensor  * sparse_idx,
+        // Under CPU + GPU hybrid inference:
+        // When using GPU, this tensor is gpu_bucket to map the index back to the original tensor;
+        // When using CPU, this tensor is gpu_index to indicate which row are offloaded to GPU.
+        // Under full GPU/GPU inference, it is NULL.
+        struct ggml_tensor  * hybrid_aux) {
+    GGML_ASSERT(a != NULL && b != NULL);
     GGML_ASSERT(!ggml_is_transposed(a));
     bool is_node = false;
 
@@ -4179,8 +4180,11 @@ struct ggml_tensor * ggml_axpy(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = c;
-    result->src[3] = d;
+    result->src[2] = sparse_idx;
+    result->src[3] = hybrid_aux;
+
+    int32_t params[] = { hybrid_aux ? 0 : 1 };
+    ggml_set_op_params(result, params, sizeof(params));
 
     return result;
 }
@@ -14447,8 +14451,6 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
 #endif
 }
 
-atomic_flag g_axpy_lock = ATOMIC_FLAG_INIT;
-atomic_int g_axpy_control = 0;
 static void ggml_compute_forward_mul_mat_axpy(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -14510,7 +14512,6 @@ static void ggml_compute_forward_mul_mat_axpy(
             }
         }
         atomic_store(params->aic, 0);
-        atomic_store(&g_axpy_control, 0);
 
         return;
     }
@@ -14535,9 +14536,9 @@ static void ggml_compute_forward_mul_mat_axpy(
 
     // src1 rows
     const int64_t nr1 = ne11*ne12*ne13;
-    float *idx = src2->data;
+    float *sparse_idx = src2->data;
     int idx_row_size = src2->nb[1];
-    int *gid = (int *)(dst->src[3]->data);
+    int *gpu_idx = dst->src[3] ? (int *)(dst->src[3]->data) : NULL;
 
 #if defined(_MSC_VER)
     float* vec = (float *)_malloca(ne00 * 4 * sizeof(float));
@@ -14549,7 +14550,7 @@ static void ggml_compute_forward_mul_mat_axpy(
     ggml_fp16_t * src1_ptr = NULL;
     for (int col_idx = 0; col_idx < nr1; col_idx++) {
         src1_ptr = (ggml_fp16_t *)((char *)wdata + col_idx * row_size);
-        idx = (float *)((char *)src2->data + col_idx * idx_row_size);
+        sparse_idx = (float *)((char *)src2->data + col_idx * idx_row_size);
         memset(vy, 0, ne00*4);
         // maybe write a special axpy for batch 1
         // while(true) {
@@ -14560,20 +14561,14 @@ static void ggml_compute_forward_mul_mat_axpy(
                 }
 		        if (src1_ptr[ir1]==0)
 			        continue;
-                if (gid[ir1] == 1) {
+                if (!gpu_idx || gpu_idx[ir1] == 1) {
                     continue;
                 }
-                if (idx[ir1] < threshold)
+                if (sparse_idx[ir1] < threshold)
                     continue;
                 // ggml_axpy_normal_f16(ne00, src0_row+nb01*ir1, vy, vy, wdata[ir1]);
                 ggml_axpy_avx_f16(ne00, (ggml_fp16_t *)(src0_row+nb01*ir1), (ggml_fp16_t *)vy, vy, src1_ptr[ir1]);
             }
-
-            // 获取锁
-            while (atomic_flag_test_and_set(&g_axpy_lock))
-            {
-                // 如果锁已经被占用，则等待
-        }
         
         float *res = (float *)((char *)(dst->data) + col_idx * nb1);
         float *tmp = (float *)vy;
@@ -14601,12 +14596,12 @@ static void ggml_compute_forward_mul_mat_axpy(
             res[i] += tmp[i];
         }
 #endif
-        atomic_flag_clear(&g_axpy_lock);
     }
 #if defined(_MSC_VER)
     _freea(vec);
 #endif
 }
+
 static void ggml_compute_forward_mul_mat_axpy_q4_0(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -14729,12 +14724,6 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
         //         break;
         // }
 
-        // 获取锁
-        while (atomic_flag_test_and_set(&g_axpy_lock))
-        {
-            // 如果锁已经被占用，则等待
-        }
-
         // float *res = (float *)(dst->data);
         float *res = (float *)((char *)(dst->data) + col_idx * nb1);
         float *tmp = (float *)vy;
@@ -14762,7 +14751,6 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
             res[i] += tmp[i];
         }
 #endif
-        atomic_flag_clear(&g_axpy_lock);
     }
 #if defined(_MSC_VER)
     _freea(vec);
@@ -14915,6 +14903,24 @@ static void ggml_compute_forward_mul_mat_axpy_head(
 
 /////////////////////////////////
 
+static void ggml_ensure_tensor_data_at_memory(struct ggml_tensor * tensor) {
+#if defined(GGML_USE_CUBLAS)
+    if (tensor->backend == GGML_BACKEND_CPU) {
+        // in this case, the data is already placed in the memory at compute time
+        return;
+    }
+
+    if (tensor->buffer == NULL || tensor->data == NULL) {
+        GGML_ASSERT(false && "not implemented: tensor has no buffer or data");
+    }
+
+    fprintf(stderr, "WARNING: transfering tensor %s to CPU at inference is safe but slow\n", ggml_get_name(tensor));
+    ggml_cuda_copy_to_host(tensor);
+#else
+    UNUSED(tensor);
+#endif
+}
+
 static void ggml_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor) {
     GGML_ASSERT(params);
 
@@ -14927,8 +14933,8 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
     if (skip_cpu) {
         return;
     }
-    GGML_ASSERT(tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU);
-    GGML_ASSERT(tensor->src[1] == NULL || tensor->src[1]->backend == GGML_BACKEND_CPU);
+    // Make sure src[0] (weight for binary ops) is on CPU to avoid any weight transfer
+    GGML_ASSERT((tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU) && "weight should be on the CPU to compute on the CPU");
 #endif // GGML_USE_CUBLAS
 
     switch (tensor->op) {
@@ -15022,22 +15028,27 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_MUL_MAT:
             {
-                if (tensor->src[2] != NULL) {
-                    int num = tensor->src[2]->ne[0];
-                    if (num > 1000) {
-                        ggml_compute_forward_mul_mat_sparse(params, tensor->src[0], tensor->src[1], tensor);
-                        break;
-                    }
-                    else {
-                        // if (params->ith == 0)
-                        //     printf("name %s num %d\n", ggml_get_name(tensor), num);
-                        ggml_compute_forward_mul_mat_sparse_head(params, tensor->src[0], tensor->src[1], tensor);
-                        // ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
-                        break;
-                    } 
-                }
-                else
-                    ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
+                ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
+            } break;
+        case GGML_OP_MUL_MAT_SPARSE:
+            {
+                GGML_ASSERT(tensor->src[2] != NULL && "sparsity index is required for MUL_MAT_SPARSE");
+
+                // MUL_MAT_SPARSE is the first operation in the FFN block, and
+                // tensor->src[1] is the activation from the previous layer/attention block and can be at GPU.
+                // tensor->src[2] is the sparsity index and might also be computed at GPU (depending on predictor offloading condition).
+                // we copy them back to CPU in advance to make sure tensor->data is valid.
+                ggml_ensure_tensor_data_at_memory(tensor->src[1]);
+                ggml_ensure_tensor_data_at_memory(tensor->src[2]);
+
+                if (tensor->src[2]->ne[0] > 1000) {
+                    ggml_compute_forward_mul_mat_sparse(params, tensor->src[0], tensor->src[1], tensor);
+                } else {
+                    // if (params->ith == 0)
+                    //     printf("name %s num %d\n", ggml_get_name(tensor), num);
+                    ggml_compute_forward_mul_mat_sparse_head(params, tensor->src[0], tensor->src[1], tensor);
+                    // ggml_compute_forward_mul_mat(params, tensor->src[0], tensor->src[1], tensor);
+                } 
             } break;
         case GGML_OP_AXPY:
             {
@@ -15757,6 +15768,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
         case GGML_OP_MUL_MAT:
+        case GGML_OP_MUL_MAT_SPARSE:
         case GGML_OP_AXPY:
             {
                 // https://cs231n.github.io/optimization-2/#staged
@@ -16838,8 +16850,21 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 }
 #endif
             } break;
-        case GGML_OP_OUT_PROD:
+        case GGML_OP_MUL_MAT_SPARSE:
         case GGML_OP_AXPY:
+            {
+                n_tasks = n_threads;
+
+#if defined(GGML_USE_CUBLAS)
+                if (node->backend == GGML_BACKEND_GPU && node->op_params[0] > 0) {
+                    // Fully offloaded to GPU
+                    n_tasks = 1;
+                } else {
+                    GGML_ASSERT(n_threads > 1 && "n_threads must be > 1 to enable hybrid CPU/GPU computation");
+                }
+#endif
+            } break;
+        case GGML_OP_OUT_PROD:
             {
                 n_tasks = n_threads;
             } break;
@@ -17347,6 +17372,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     }
                 } break;
             case GGML_OP_MUL_MAT:
+            case GGML_OP_MUL_MAT_SPARSE:
                 {
                     const enum ggml_type vec_dot_type = type_traits[node->src[0]->type].vec_dot_type;
 
@@ -17506,7 +17532,7 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
     }
 
     const int n_threads = cplan->n_threads;
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_HYBRID_THREADING
     struct ggml_compute_state_shared state_shared = {
         /*.cgraph                  =*/ cgraph,
         /*.cgraph_plan             =*/ cplan,
@@ -17543,7 +17569,7 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
                 .ith = j,
                 .shared = &state_shared,
             };
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_HYBRID_THREADING
             const int rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_thread_hybrid, &workers[j]);
 #else
             const int rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_thread, &workers[j]);
@@ -17561,7 +17587,7 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
 
     // this is a work thread too
 
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_HYBRID_THREADING
     int compute_status = (size_t) ggml_graph_compute_thread_hybrid(&workers[0]);
 #else
     int compute_status = (size_t) ggml_graph_compute_thread(&workers[0]);
