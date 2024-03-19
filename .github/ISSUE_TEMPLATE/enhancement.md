@@ -1,7 +1,8 @@
 ---
 name: Enhancement template
 about: Used to request enhancements for PowerInfer
-labels: ["enhancement"]
+title: ''
+labels: enhancement
 assignees: ''
 
 ---
