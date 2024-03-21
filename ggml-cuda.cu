@@ -7338,6 +7338,14 @@ inline void ggml_cuda_op_mul_mat_transpose_select_gemm(
     (void) src1_padded_row_size;
 }
 
+__global__ void compress_input_matrix(const float * src, float * dst, const int * lst, const int src1_ncols, const int stride_src, const int stride_dst) {
+    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int col_to_read = lst[tid];
+    for (int i = 0; i < src1_ncols; i++) {
+        dst[stride_dst * i + tid] = src[stride_src * i + col_to_read];
+    }
+}
+
 inline void ggml_cuda_op_mul_mat_transpose_gemm(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
@@ -7389,13 +7397,42 @@ inline void ggml_cuda_op_mul_mat_transpose_gemm(
     //                     src1_ddf_i,  ne10,
     //             &beta,  dst_dd_i,   ldc));
     
-    CUBLAS_CHECK(
-        cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
-                ne00, src1_ncols, ne10,
-                &alpha, src0_ddf_i, ne00,
-                        src1_ddf_i,  ne10,
-                &beta,  dst_dd_i,   ldc));
+    // ne00: 4096, src1_ncol: N, ne10: 11008, ne01: < 11008
+    // dst->src[3]->data is gpu_bucket, ne01 is length
+    if (dst->src[3] != NULL) {
+        // compress src1
+        GGML_ASSERT(ne01 % 32 == 0);
+        const int block_nums = ne01 / 32;
+        size_t actual_size;
+        float * compressed_src1 = (float *)ggml_cuda_pool_malloc(ne01 * src1_ncols * sizeof(float), &actual_size);
+        struct ggml_tensor_extra_gpu *bucket_extra_data = (struct ggml_tensor_extra_gpu *)dst->src[3]->extra;
+        
+        compress_input_matrix<<<block_nums, 32, 0, stream>>>(src1_ddf_i, compressed_src1, (int *)bucket_extra_data->data_device[0], src1_ncols, ne10, ne01);
+        cudaDeviceSynchronize();
+        CUDA_CHECK(cudaGetLastError());
+
+        CUBLAS_CHECK(
+            cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
+                    ne00, src1_ncols, ne01,
+                    &alpha, src0_ddf_i, ne00,
+                            compressed_src1,  ne01,
+                    &beta,  dst_dd_i,   ldc));
+
+                    
+        cudaDeviceSynchronize();
+        ggml_cuda_pool_free(compressed_src1, actual_size);
  
+    } else {
+        // full_gpu
+        CUBLAS_CHECK(
+            cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
+                    ne00, src1_ncols, ne10,
+                    &alpha, src0_ddf_i, ne00,
+                            src1_ddf_i,  ne10,
+                    &beta,  dst_dd_i,   ldc));
+ 
+
+    }
 
     if (src0_as > 0) {
         ggml_cuda_pool_free(src0_ddq_as_f32, src0_as);
@@ -8614,8 +8651,11 @@ void ggml_cuda_axpy(const ggml_tensor * src0, const ggml_tensor * src1, ggml_ten
     GGML_ASSERT(dst->src[2] != NULL && "dst->src[2] must be present for axpy");
     bool all_on_device = (src0->backend == GGML_BACKEND_GPU || src0->backend == GGML_BACKEND_GPU_SPLIT) &&
         src1->backend == GGML_BACKEND_GPU && dst->backend == GGML_BACKEND_GPU;
-    ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_dequantize_axpy, false);
-    // ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_transpose_gemm, false); // fallback
+    if (src1->ne[1] > 100) {
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_transpose_gemm, false);
+    } else {
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_dequantize_axpy, false);
+    }
 }
 
 static void ggml_cuda_scale(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
