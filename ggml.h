@@ -207,6 +207,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <assert.h>
 #ifdef __cplusplus
   #include <atomic>
   using std::atomic_int;
@@ -229,7 +230,7 @@
 #define GGML_MAX_DIMS           4
 #define GGML_MAX_PARAMS         1024
 #define GGML_MAX_CONTEXTS       64
-#define GGML_MAX_SRC            6
+#define GGML_MAX_SRC            19
 #define GGML_MAX_NAME           64
 #define GGML_MAX_OP_PARAMS      64
 #define GGML_DEFAULT_N_THREADS  4
@@ -261,6 +262,7 @@
             fflush(stderr); \
             fflush(stdout); \
             ggml_print_backtrace(); \
+            assert(false); \
             exit(1); \
         } \
     } while (0)
@@ -292,6 +294,7 @@
 //    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
 //    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb);
 //
+
 #define GGML_TENSOR_LOCALS_1(type, prefix, pointer, array) \
     const type prefix##0 = (pointer)->array[0]; \
     GGML_UNUSED(prefix##0);
@@ -307,6 +310,20 @@
     GGML_TENSOR_LOCALS_3  (type, prefix, pointer, array) \
     const type prefix##3 = (pointer)->array[3]; \
     GGML_UNUSED(prefix##3);
+
+#define GGML_TENSOR_UNARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
+
+#define GGML_TENSOR_BINARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
 
 #ifdef  __cplusplus
 extern "C" {
@@ -413,6 +430,11 @@ extern "C" {
         GGML_OP_MUL_MAT,
         GGML_OP_MUL_MAT_SPARSE,
         GGML_OP_AXPY,
+
+        // MoE specification
+        GGML_OP_MUL_MAT_ID,
+        GGML_OP_MUL_MAT_ID_AXPY,
+
         GGML_OP_OUT_PROD,
 
         GGML_OP_SCALE,
@@ -439,6 +461,8 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
+
+        GGML_OP_ARGSORT,
 
         GGML_OP_UPSCALE, // nearest interpolate
 
@@ -549,7 +573,7 @@ extern "C" {
 
         void * extra; // extra things e.g. for ggml-cuda.cu
 
-        char padding[12];
+        char padding[8];
     };
 
 
@@ -681,6 +705,7 @@ extern "C" {
     GGML_API int     ggml_blck_size (enum ggml_type type);
     GGML_API size_t  ggml_type_size (enum ggml_type type); // size in bytes for all elements in a block
     GGML_API float   ggml_type_sizef(enum ggml_type type); // ggml_type_size()/ggml_blck_size() as float
+    GGML_API size_t  ggml_row_size  (enum ggml_type type, int64_t ne); // size in bytes for all elements in a row
 
     GGML_API const char * ggml_type_name(enum ggml_type type);
     GGML_API const char * ggml_op_name  (enum ggml_op   op);
@@ -1110,6 +1135,43 @@ extern "C" {
             struct ggml_tensor  * b,
             struct ggml_tensor  * sparse_idx,
             struct ggml_tensor  * hybrid_aux);
+    GGML_API struct ggml_tensor * ggml_mul_mat_id(
+                struct ggml_context * ctx,
+                struct ggml_tensor  * const as[],
+                int                   n_as,
+                struct ggml_tensor  * ids,
+                int                   id,
+                struct ggml_tensor  * b);
+
+    GGML_API struct ggml_tensor * ggml_mul_mat_id_idx(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * const as[],
+        int                   n_as,
+        struct ggml_tensor  * ids,
+        int                   id,
+        struct ggml_tensor  * idx,
+        struct ggml_tensor  * const gpu_idx[],
+        struct ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_mul_mat_id_special(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * const as[],
+        int                   n_as,
+        struct ggml_tensor  * ids,
+        int                   id,
+        struct ggml_tensor  * idx,
+        struct ggml_tensor  * const gpu_idx[],
+        struct ggml_tensor  * const ref[],
+        struct ggml_tensor  * b);
+
+    GGML_API struct ggml_tensor * ggml_mul_mat_id_axpy(
+                struct ggml_context * ctx,
+                struct ggml_tensor  * const as[],
+                int                   n_as,
+                struct ggml_tensor  * ids,
+                int                   id,
+                struct ggml_tensor  * idx,
+                struct ggml_tensor  * const gpu_index[],
+                struct ggml_tensor  * b);
 
     // A: m columns, n rows,
     // B: p columns, n rows,
@@ -1595,6 +1657,23 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             int                   scale_factor);
+
+    // sort rows
+    enum ggml_sort_order {
+        GGML_SORT_ASC,
+        GGML_SORT_DESC,
+    };
+
+    GGML_API struct ggml_tensor * ggml_argsort(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            enum ggml_sort_order  order);
+
+    // top k elements per row
+    GGML_API struct ggml_tensor * ggml_top_k(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   k);
 
     GGML_API struct ggml_tensor * ggml_flash_attn(
             struct ggml_context * ctx,

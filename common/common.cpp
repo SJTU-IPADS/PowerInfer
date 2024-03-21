@@ -583,6 +583,13 @@ bool gpt_params_parse_ex(int argc, char ** argv, gpt_params & params) {
             params.use_mmap = false;
         } else if (arg == "--numa") {
             params.numa = true;
+        } else if (arg == "--sparse-threshold") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            
+            sparse_pred_threshold = std::stof(argv[i]);
         } else if (arg == "--verbose-prompt") {
             params.verbose_prompt = true;
         } else if (arg == "-r" || arg == "--reverse-prompt") {
@@ -848,6 +855,7 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
 #endif
     printf("  --verbose-prompt      print prompt before generation\n");
     printf("  --simple-io           use basic IO for better compatibility in subprocesses and limited consoles\n");
+    printf("  --sparse-threshold THRESHOLD set the sparse threshold specified for PowerInfe (default: %f)\n", sparse_pred_threshold);
     printf("  --lora FNAME          apply LoRA adapter (implies --no-mmap)\n");
     printf("  --lora-scaled FNAME S apply LoRA adapter with user defined scaling S (implies --no-mmap)\n");
     printf("  --lora-base FNAME     optional model to use as a base for the layers modified by the LoRA adapter\n");

@@ -96,6 +96,7 @@
 #endif
 
 #define LLAMA_MAX_NODES 4096
+#define LLAMA_MAX_EXPERTS 8
 
 // 
 // global variables (should be removed after a better design)
@@ -275,6 +276,9 @@ enum llm_kv {
     LLM_KV_USE_PARALLEL_RESIDUAL,
     LLM_KV_TENSOR_DATA_LAYOUT,
 
+    LLM_KV_EXPERT_COUNT,
+    LLM_KV_EXPERT_USED_COUNT,
+
     LLM_KV_ATTENTION_HEAD_COUNT,
     LLM_KV_ATTENTION_HEAD_COUNT_KV,
     LLM_KV_ATTENTION_MAX_ALIBI_BIAS,
@@ -326,6 +330,9 @@ static std::map<llm_kv, std::string> LLM_KV_NAMES = {
     { LLM_KV_FEED_FORWARD_LENGTH,           "%s.feed_forward_length"   },
     { LLM_KV_USE_PARALLEL_RESIDUAL,         "%s.use_parallel_residual" },
     { LLM_KV_TENSOR_DATA_LAYOUT,            "%s.tensor_data_layout"    },
+
+    { LLM_KV_EXPERT_COUNT,                  "%s.expert_count"          },
+    { LLM_KV_EXPERT_USED_COUNT,             "%s.expert_used_count"     },
 
     { LLM_KV_ATTENTION_HEAD_COUNT,          "%s.attention.head_count"             },
     { LLM_KV_ATTENTION_HEAD_COUNT_KV,       "%s.attention.head_count_kv"          },
@@ -394,6 +401,16 @@ enum llm_tensor {
     LLM_TENSOR_MLP_PRED_FC1,
     LLM_TENSOR_MLP_PRED_FC2,
     LLM_TENSOR_FFN_DOWN_T,
+    // MoE
+    LLM_TENSOR_FFN_GATE_INP,
+    LLM_TENSOR_FFN_DOWN_EXP,
+    LLM_TENSOR_FFN_GATE_EXP,
+    LLM_TENSOR_FFN_UP_EXP,
+    LLM_TENSOR_MLP_PRED_FC1_EXP,
+    LLM_TENSOR_MLP_PRED_FC2_EXP,
+    LLM_TENSOR_FFN_DOWN_T_EXP,
+    LLM_TENSOR_FFN_BUNDLE_EXP,
+    LLM_TENSOR_FFN_INDEX_EXP,
 };
 
 static std::map<llm_arch, std::map<llm_tensor, std::string>> LLM_TENSOR_NAMES = {
@@ -417,6 +434,18 @@ static std::map<llm_arch, std::map<llm_tensor, std::string>> LLM_TENSOR_NAMES = 
             { LLM_TENSOR_FFN_DOWN_T,      "blk.%d.ffn_down_t" },
             { LLM_TENSOR_MLP_PRED_FC1,    "blk.%d.fc1" },
             { LLM_TENSOR_MLP_PRED_FC2,    "blk.%d.fc2" },
+
+            { LLM_TENSOR_FFN_GATE_INP,    "blk.%d.ffn_gate_inp" },
+            { LLM_TENSOR_FFN_GATE_EXP,    "blk.%d.ffn_gate.%d" },
+            { LLM_TENSOR_FFN_DOWN_EXP,    "blk.%d.ffn_down.%d" },
+            { LLM_TENSOR_FFN_UP_EXP,      "blk.%d.ffn_up.%d" },
+            { LLM_TENSOR_MLP_PRED_FC1_EXP,"blk.%d.fc1.%d" },
+            { LLM_TENSOR_MLP_PRED_FC2_EXP,"blk.%d.fc2.%d" },
+            { LLM_TENSOR_FFN_DOWN_T_EXP,  "blk.%d.ffn_down_t.%d" },
+
+            // TODO: to remove
+            { LLM_TENSOR_FFN_BUNDLE_EXP,  "blk.%d.ffn_bundle.%d" },
+            { LLM_TENSOR_FFN_INDEX_EXP,   "blk.%d.ffn_index.%d" },
         },
     },
     {
@@ -600,6 +629,7 @@ enum tensor_offloading_levels {
     TENSOR_NO_OFFLOAD,
     TENSOR_OFFLOAD_FFN,
     TENSOR_OFFLOAD_ATTN,
+    TENSOR_OFFLOAD_FFN_IO,
     TENSOR_OFFLOAD_MLP_PRED,
     TENSOR_OFFLOAD_OUTPUT,
     TENSOR_OFFLOAD_KV_CACHE,
@@ -608,7 +638,7 @@ enum tensor_offloading_levels {
 tensor_offloading_levels get_offloading_level(llm_tensor tensor) {
     switch (tensor) {
         case LLM_TENSOR_TOKEN_EMBD: case LLM_TENSOR_TOKEN_EMBD_NORM: case LLM_TENSOR_POS_EMBD: 
-        case LLM_TENSOR_ROPE_FREQS:
+        case LLM_TENSOR_ROPE_FREQS: case LLM_TENSOR_FFN_INDEX_EXP:
             return TENSOR_NO_OFFLOAD;
         case LLM_TENSOR_OUTPUT: case LLM_TENSOR_OUTPUT_NORM:
             return TENSOR_OFFLOAD_OUTPUT;
@@ -617,10 +647,15 @@ tensor_offloading_levels get_offloading_level(llm_tensor tensor) {
         case LLM_TENSOR_ATTN_NORM_2: case LLM_TENSOR_ATTN_ROT_EMBD:
         case LLM_TENSOR_ATTN_Q_NORM: case LLM_TENSOR_ATTN_K_NORM:
             return TENSOR_OFFLOAD_ATTN;
-        case LLM_TENSOR_FFN_GATE: case LLM_TENSOR_FFN_DOWN: case LLM_TENSOR_FFN_UP:
-        case LLM_TENSOR_FFN_NORM: case LLM_TENSOR_FFN_DOWN_T: 
+        case LLM_TENSOR_FFN_GATE_INP: case LLM_TENSOR_FFN_NORM:
+            return TENSOR_OFFLOAD_FFN_IO;
+        case LLM_TENSOR_FFN_GATE: case LLM_TENSOR_FFN_DOWN: case LLM_TENSOR_FFN_UP: 
+        case LLM_TENSOR_FFN_DOWN_T:
+         case LLM_TENSOR_FFN_UP_EXP: case LLM_TENSOR_FFN_GATE_EXP:
+        case LLM_TENSOR_FFN_DOWN_EXP: case LLM_TENSOR_FFN_DOWN_T_EXP:
             return TENSOR_OFFLOAD_FFN;
         case LLM_TENSOR_MLP_PRED_FC1: case LLM_TENSOR_MLP_PRED_FC2:
+        case LLM_TENSOR_MLP_PRED_FC1_EXP: case LLM_TENSOR_MLP_PRED_FC2_EXP:
             return TENSOR_OFFLOAD_MLP_PRED;
         default:
             throw std::runtime_error("unknown tensor category");
@@ -656,6 +691,10 @@ struct LLM_TN {
 
     std::pair<std::string, llm_tensor> operator()(llm_tensor tensor, const std::string & suffix, int bid) const {
         return std::make_pair(::format(LLM_TENSOR_NAMES[arch].at(tensor).c_str(), bid) + "." + suffix, tensor);
+    }
+
+    std::pair<std::string, llm_tensor> operator()(llm_tensor tensor, const std::string & suffix, int bid, int xid) const {
+        return std::make_pair(::format(LLM_TENSOR_NAMES[arch].at(tensor).c_str(), bid, xid) + "." + suffix, tensor);
     }
 };
 
@@ -1204,6 +1243,8 @@ struct llama_hparams {
     uint32_t n_layer;
     uint32_t n_rot;
     uint32_t n_ff;
+    uint32_t n_expert = 0;
+    uint32_t n_expert_used = 0;
 
     float f_norm_eps;
     float f_norm_rms_eps;
@@ -1217,9 +1258,6 @@ struct llama_hparams {
     float f_clamp_kqv;
     float f_max_alibi_bias;
     
-    // sparse predictor threshold if sparse inference is enabled
-    float sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD") ? getenv("LLAMA_SPARSE_PRED_THRESHOLD") : "0.0");
-
     bool operator!=(const llama_hparams & other) const {
         if (this->vocab_only  != other.vocab_only)  return true;
         if (this->n_vocab     != other.n_vocab)     return true;
@@ -1232,6 +1270,8 @@ struct llama_hparams {
         if (this->n_ff        != other.n_ff)        return true;
         if (this->rope_finetuned  != other.rope_finetuned)  return true;
         if (this->n_yarn_orig_ctx != other.n_yarn_orig_ctx) return true;
+        if (this->n_expert      != other.n_expert)      return true;
+        if (this->n_expert_used != other.n_expert_used) return true;
 
         const float EPSILON = 1e-9;
 
@@ -1325,6 +1365,24 @@ struct llama_layer {
     struct ggml_tensor * gpu_idx; // index of ffn neurons on GPU
     double gpu_offload_ratio; // ratio of ffn split on GPU ([0, 1])
     struct ggml_tensor * gpu_bucket; // double index from GPU split neuron to original neuron
+
+    // MoE
+    struct ggml_tensor * ffn_gate_inp;
+    struct ggml_tensor * ffn_gate_exp[LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * ffn_down_exp[LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * ffn_up_exp  [LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * ffn_down_t_exp[LLAMA_MAX_EXPERTS];
+
+    struct ggml_tensor * ffn_gate_inp_gpu;
+    struct ggml_tensor * ffn_gate_exp_gpu[LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * ffn_down_exp_gpu[LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * ffn_up_exp_gpu  [LLAMA_MAX_EXPERTS];
+
+    struct ggml_tensor * mlp_pre_w1_exp[LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * mlp_pre_w2_exp[LLAMA_MAX_EXPERTS];
+
+    struct ggml_tensor * gpu_idx_exp[LLAMA_MAX_EXPERTS];
+    struct ggml_tensor * gpu_bucket_exp[LLAMA_MAX_EXPERTS];
 };
 
 struct llama_kv_cell {
@@ -2246,6 +2304,16 @@ static void llm_load_hparams(
     GGUF_GET_KEY(ctx, hparams.n_ff,           gguf_get_val_u32, GGUF_TYPE_UINT32, true, kv(LLM_KV_FEED_FORWARD_LENGTH));
     GGUF_GET_KEY(ctx, hparams.n_head,         gguf_get_val_u32, GGUF_TYPE_UINT32, true, kv(LLM_KV_ATTENTION_HEAD_COUNT));
     GGUF_GET_KEY(ctx, hparams.n_layer,        gguf_get_val_u32, GGUF_TYPE_UINT32, true, kv(LLM_KV_BLOCK_COUNT));
+    GGUF_GET_KEY(ctx, hparams.n_expert,       gguf_get_val_u32, GGUF_TYPE_UINT32, false,kv(LLM_KV_EXPERT_COUNT));
+    GGUF_GET_KEY(ctx, hparams.n_expert_used,  gguf_get_val_u32, GGUF_TYPE_UINT32, false,kv(LLM_KV_EXPERT_USED_COUNT));
+
+    GGML_ASSERT(hparams.n_expert <= LLAMA_MAX_EXPERTS);
+    GGML_ASSERT(hparams.n_expert_used <= hparams.n_expert);
+    if (hparams.n_expert > 0) {
+        GGML_ASSERT(hparams.n_expert_used > 0);
+    } else {
+        GGML_ASSERT(hparams.n_expert_used == 0);
+    }
 
     // n_head_kv is optional, default to n_head
     hparams.n_head_kv = hparams.n_head;
@@ -2289,13 +2357,6 @@ static void llm_load_hparams(
         }
         // gpt-neox n_rot = rotary_pct * (n_embd / n_head)
         // gpt-j n_rot = rotary_dim
-    }
-
-    if (gguf_get_sparse_deriv(ctx)) {
-        // read sparse threshold override if sparse deriv is enabled
-        GGUF_GET_KEY(ctx, hparams.sparse_pred_threshold, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_SPARSE_THRESHOLD));
-        if (getenv("LLAMA_SPARSE_PRED_THRESHOLD"))
-            hparams.sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
     }
 
     // arch-specific KVs
@@ -2661,6 +2722,8 @@ static void llm_load_print_meta(llama_model_loader & ml, llama_model & model) {
     LLAMA_LOG_INFO("%s: f_clamp_kqv      = %.1e\n",   __func__, hparams.f_clamp_kqv);
     LLAMA_LOG_INFO("%s: f_max_alibi_bias = %.1e\n",   __func__, hparams.f_max_alibi_bias);
     LLAMA_LOG_INFO("%s: n_ff             = %u\n",     __func__, hparams.n_ff);
+    LLAMA_LOG_INFO("%s: n_expert         = %u\n",     __func__, hparams.n_expert);
+    LLAMA_LOG_INFO("%s: n_expert_used    = %u\n",     __func__, hparams.n_expert_used);
     LLAMA_LOG_INFO("%s: rope scaling     = %s\n",     __func__, rope_scaling_type.c_str());
     LLAMA_LOG_INFO("%s: freq_base_train  = %.1f\n",   __func__, hparams.rope_freq_base_train);
     LLAMA_LOG_INFO("%s: freq_scale_train = %g\n",     __func__, hparams.rope_freq_scale_train);
@@ -2687,7 +2750,7 @@ static void llm_load_print_meta(llama_model_loader & ml, llama_model & model) {
     if (vocab.linefeed_id    != -1) { LLAMA_LOG_INFO( "%s: LF token  = %d '%s'\n", __func__, vocab.linefeed_id,    vocab.id_to_token[vocab.linefeed_id].text.c_str() );    }
 
     // sparse inference
-    LLAMA_LOG_INFO("%s: sparse_pred_threshold = %.2f\n", __func__, hparams.sparse_pred_threshold);
+    LLAMA_LOG_INFO("%s: sparse_pred_threshold = %.2f\n", __func__, sparse_pred_threshold);
 }
 
 
@@ -2756,8 +2819,10 @@ struct llama_gpu_split_loader {
 
     int load_gpu_idx_for_model(llama_model * model) {
         int n_layers = model->layers.size();
+        const int n_experts = model->hparams.n_expert;
         // TODO: assert fp is at the end of headers
-        if (n_tensors != n_layers * 2) {
+        const int expected_n_tensors = (n_experts > 0) ? (n_layers * 2 * n_experts) : n_layers * 2;
+        if (n_tensors != expected_n_tensors) {
            LLAMA_LOG_ERROR("%s: error: the number of gpu splits does not match the layer of model\n", __func__);
             return 1;
         }
@@ -2766,14 +2831,28 @@ struct llama_gpu_split_loader {
 
         for (int il = 0; il < n_layers; il++) {
             llama_layer &model_layer = model->layers[il];
-            ggml_tensor * gpu_idx = idx_loader->get_tensor_meta(il*2);
-            ggml_tensor * gpu_bucket = idx_loader->get_tensor_meta(il*2+1);
-            if (gpu_idx == nullptr || gpu_bucket == nullptr) {
-                LLAMA_LOG_ERROR("%s: error: failed to load gpu index or bucket\n", __func__);
-                return 1;
+
+            if (n_experts <= 0) {
+                ggml_tensor * gpu_idx = idx_loader->get_tensor_meta(il*2);
+                ggml_tensor * gpu_bucket = idx_loader->get_tensor_meta(il*2+1);
+                if (gpu_idx == nullptr || gpu_bucket == nullptr) {
+                    LLAMA_LOG_ERROR("%s: error: failed to load gpu index or bucket\n", __func__);
+                    return 1;
+                }
+                model_layer.gpu_idx = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
+                model_layer.gpu_bucket = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_CPU);                
+            } else {
+                for (int ie = 0; ie < n_experts; ++ie) {
+                    ggml_tensor * gpu_idx    = idx_loader->get_tensor_meta((il * n_experts + ie) * 2);
+                    ggml_tensor * gpu_bucket = idx_loader->get_tensor_meta((il * n_experts + ie) * 2 + 1);
+                    if (gpu_idx == nullptr || gpu_bucket == nullptr) {
+                        LLAMA_LOG_ERROR("%s: error: failed to load gpu index or bucket\n", __func__);
+                        return 1;
+                    }
+                    model_layer.gpu_idx_exp[ie]    = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
+                    model_layer.gpu_bucket_exp[ie] = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_GPU);
+                }
             }
-            model_layer.gpu_idx = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
-            model_layer.gpu_bucket = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_CPU);
         }
         llama_progress_callback cb = [](float progress, void *ctx) {
             LLAMA_LOG_INFO(".");
@@ -2781,22 +2860,44 @@ struct llama_gpu_split_loader {
         idx_loader->load_all_data(ctx_meta, cb, nullptr, nullptr);
 
         for (int il = 0; il < n_layers; il++) {
-            llama_layer &model_layer = model->layers[il];
-            ggml_tensor * gpu_idx = model_layer.gpu_idx;
-            ggml_tensor * gpu_bucket = model_layer.gpu_bucket;
-            int64_t gpu_neurons = sum_gpu_index(gpu_idx);
-            model_layer.gpu_offload_ratio = (double)gpu_neurons / gpu_idx->ne[0];
-            if (gpu_neurons == 0 || gpu_neurons == gpu_idx->ne[0]) {
-                // no hybrid inference for this layer, unset gpu_bucket
-                model_layer.gpu_bucket = NULL;
-                // TODO: maybe can also unset gpu_idx
+            if (n_experts <= 0) {
+                llama_layer &model_layer = model->layers[il];
+                ggml_tensor * gpu_idx = model_layer.gpu_idx;
+                ggml_tensor * gpu_bucket = model_layer.gpu_bucket;
+                int64_t gpu_neurons = sum_gpu_index(gpu_idx);
+                model_layer.gpu_offload_ratio = (double)gpu_neurons / gpu_idx->ne[0];
+                if (gpu_neurons == 0 || gpu_neurons == gpu_idx->ne[0]) {
+                    // no hybrid inference for this layer, unset gpu_bucket
+                    model_layer.gpu_bucket = NULL;
+                    // TODO: maybe can also unset gpu_idx
+                } else {
+    #if defined(GGML_USE_CUBLAS)
+                    ggml_set_backend(gpu_bucket, GGML_BACKEND_GPU);
+                    ggml_cuda_transform_tensor(gpu_bucket->data, gpu_bucket);
+    #else
+                    GGML_ASSERT(false && "cublas is not enabled");
+    #endif
+                }
             } else {
-#if defined(GGML_USE_CUBLAS)
-                ggml_set_backend(gpu_bucket, GGML_BACKEND_GPU);
-                ggml_cuda_transform_tensor(gpu_bucket->data, gpu_bucket);
-#else
-                GGML_ASSERT(false && "cublas is not enabled");
-#endif
+                for (int e = 0; e < n_experts; ++e) {
+                    llama_layer &model_layer = model->layers[il];
+                    ggml_tensor * gpu_idx = model_layer.gpu_idx_exp[e];
+                    ggml_tensor * gpu_bucket = model_layer.gpu_bucket_exp[e];
+                    int64_t gpu_neurons = sum_gpu_index(gpu_idx);
+                    model_layer.gpu_offload_ratio = (double)gpu_neurons / gpu_idx->ne[0];
+                    if (gpu_neurons == 0 || gpu_neurons == gpu_idx->ne[0]) {
+                        // no hybrid inference for this layer, unset gpu_bucket
+                        model_layer.gpu_bucket = NULL;
+                        // TODO: maybe can also unset gpu_idx
+                    } else {
+        #if defined(GGML_USE_CUBLAS)
+                        ggml_set_backend(gpu_bucket, GGML_BACKEND_GPU);
+                        ggml_cuda_transform_tensor(gpu_bucket->data, gpu_bucket);
+        #else
+                        GGML_ASSERT(false && "cublas is not enabled");
+        #endif
+                    }
+                }
             }
         }
 
@@ -2820,8 +2921,8 @@ struct llama_augmentation_model_loader {
         // 3. transformed ffn_down;
         // const int64_t ggml_aux_tensor_size = 4 * (100 * 100 + 5120*40*4 * ggml_tensor_overhead() + (int64_t)13824*5120*40*4);
         int model_layer = model->layers.size();
-        int ffn_dim = model->layers[0].ffn_up->ne[1];
-        const size_t ggml_aux_tensor_size = 4 * (model_layer*ffn_dim*sizeof(float)*2+ model_layer*ffn_dim*sizeof(float) * ggml_tensor_overhead() );
+        int ffn_dim = model->hparams.n_ff;
+        const size_t ggml_aux_tensor_size = 4 * 8 * (model_layer*ffn_dim*sizeof(float)*2+ model_layer*ffn_dim*sizeof(float) * ggml_tensor_overhead() );
 
         struct ggml_init_params params = {
             /*.mem_size   =*/ ggml_aux_tensor_size,
@@ -2877,28 +2978,41 @@ struct llama_augmentation_model_loader {
 #endif
     }
 
-    size_t slice_ffn_mat_to_gpu(llama_layer & layer) {
+    size_t slice_ffn_mat_to_gpu(llama_layer & layer, int num_expert) {
         std::vector<uint8_t> work_buffer;
-        ggml_tensor * gpu_idx = layer.gpu_idx;
         ggml_tensor * gpu_bucket = layer.gpu_bucket;
         size_t offloaded_bytes = 0;
 
-        if (layer.gpu_offload_ratio == 0.) {
-            return 0;
-        }
+        if (layer.gpu_offload_ratio == 0.) { return 0; }
 
-        GGML_ASSERT((layer.gpu_bucket != NULL) == (layer.gpu_offload_ratio < 1.0));
+        if (num_expert <= 0) {
+            layer.ffn_gate_gpu  = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
+            layer.ffn_up_gpu    = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
+            layer.ffn_down_gpu  = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
 
-        if (layer.ffn_gate) {
-            layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
-            offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
+            if (layer.ffn_gate_gpu) {
+                offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
+            }
+            if (layer.ffn_up_gpu) {
+                offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
+            }
+            if (layer.ffn_down_gpu) {
+                offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
+            }            
+        } else {
+            GGML_ASSERT(LLAMA_MAX_EXPERTS >= num_expert);
+            for (int i = 0; i < num_expert; ++i) {
+                ggml_tensor *gpu_bucket_exp = layer.gpu_bucket_exp[i];
+
+                layer.ffn_gate_exp_gpu[i] = create_striped_mat_to_gpu(layer.ffn_gate_exp[i], gpu_bucket_exp);
+                layer.ffn_down_exp_gpu[i] = create_striped_mat_to_gpu(layer.ffn_down_t_exp[i], gpu_bucket_exp);
+                layer.ffn_up_exp_gpu[i]   = create_striped_mat_to_gpu(layer.ffn_up_exp[i], gpu_bucket_exp);
+
+                if (layer.ffn_gate_exp_gpu[i]) { offloaded_bytes += ggml_nbytes(layer.ffn_gate_exp_gpu[i]); }
+                if (layer.ffn_down_exp_gpu[i]) { offloaded_bytes += ggml_nbytes(layer.ffn_down_exp_gpu[i]); }
+                if (layer.ffn_up_exp_gpu[i])   { offloaded_bytes += ggml_nbytes(layer.ffn_up_exp_gpu[i]);   }
+            }                
         }
-        
-        layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
-        offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
-        
-        layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
-        offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
 
         return offloaded_bytes;
     }
@@ -2909,23 +3023,34 @@ struct llama_augmentation_model_loader {
         std::vector<uint8_t> work_buffer;
 
         // Set sparsity threshold via global virables
-        sparse_pred_threshold = model->hparams.sparse_pred_threshold;
 #if defined (GGML_USE_CUBLAS)
-        ggml_cuda_set_device_constants(model->hparams.sparse_pred_threshold);
+        ggml_cuda_set_device_constants(sparse_pred_threshold);
 #endif
 
         // load gpu_idx and slice mat to gpu
+        const int num_expert = model->hparams.n_expert;
         size_t offloaded_bytes = 0;
         for (llama_layer &model_layer : model -> layers) {
             // gpu_idx load
-            if (model_layer.gpu_idx == NULL && model_layer.gpu_bucket == NULL) {
-                ggml_tensor * gpu_idx = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, model_layer.mlp_pre_w2 -> ne[1]);
+            if (num_expert <= 0 && model_layer.gpu_idx == NULL && model_layer.gpu_bucket == NULL) {
+                ggml_tensor * gpu_idx = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, model->hparams.n_ff);
                 ggml_set_zero(gpu_idx);
                 model_layer.gpu_idx = gpu_idx;
                 ggml_tensor * gpu_bucket = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, 0);
                 model_layer.gpu_bucket = gpu_bucket;
+            } else if (num_expert > 0) {
+                for (int i = 0; i < LLAMA_MAX_EXPERTS; ++i) {
+                    if (model_layer.gpu_idx_exp[i] != nullptr || model_layer.gpu_bucket_exp[i] != nullptr) { continue; }
+
+                    ggml_tensor * gpu_idx = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, model->hparams.n_ff);
+                    ggml_set_zero(gpu_idx);
+                    model_layer.gpu_idx_exp[i] = gpu_idx;
+                    ggml_tensor * gpu_bucket = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, 0);
+                    model_layer.gpu_bucket_exp[i] = gpu_bucket;
+                }
             }
-            offloaded_bytes += slice_ffn_mat_to_gpu(model_layer);
+            
+            offloaded_bytes += slice_ffn_mat_to_gpu(model_layer, num_expert);
             LLAMA_LOG_INFO(".");
         }
 
@@ -3049,6 +3174,12 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     // Calculate solver parameters
     ggml_tensor * ffn_up = model.layers[0].ffn_up;
     ggml_tensor * ffn_gate = model.layers[0].ffn_gate;
+    if (model.hparams.n_expert > 0) {
+        ggml_tensor ** ffn_up_experts   = model.layers[0].ffn_up_exp;
+        ggml_tensor ** ffn_gate_experts = model.layers[0].ffn_gate_exp;   
+        ffn_up   = ffn_up_experts[0];
+        ffn_gate = ffn_gate_experts[0];
+    }
     int slice_size = ffn_up->ne[1] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
     // For model arch with FFN gate, the gate is also sliced, otherwise only the up and down matrices are sliced
     int vram_bytes_per_slice = slice_size * (ffn_gate ? 4.5 : 2); // TODO: why 4.5, not 3?
@@ -3064,6 +3195,7 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
 #endif
                << " --activation " << activation_path
                << " --layer " << model.hparams.n_layer
+               << " --expert " << model.hparams.n_expert
                << " --neuron " << ffn_up->ne[1]
                << " --capacity " << neuron_cap
                << " --vram-capacity " << vram_allocatable_bytes
@@ -3194,11 +3326,26 @@ static void llm_load_sparse_model_tensors(
 
                         layer.ffn_norm = create_tensor(tn(LLM_TENSOR_FFN_NORM, "weight", i), {n_embd});
 
-                        layer.ffn_gate = create_tensor(tn(LLM_TENSOR_FFN_GATE, "weight", i), {n_embd,   n_ff});
-                        layer.ffn_down_t = create_tensor(tn(LLM_TENSOR_FFN_DOWN_T, "weight", i), {n_embd, n_ff});
-                        layer.mlp_pre_w1 = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC1, "weight", i), {n_embd, GGML_NE_WILDCARD});
-                        layer.mlp_pre_w2 = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC2, "weight", i), {GGML_NE_WILDCARD, n_ff});
-                        layer.ffn_up   = create_tensor(tn(LLM_TENSOR_FFN_UP,   "weight", i), {n_embd,   n_ff});
+                        
+                        if (hparams.n_expert > 0) {
+                            GGML_ASSERT(hparams.n_expert_used > 0);
+
+                            layer.ffn_gate_inp = create_tensor(tn(LLM_TENSOR_FFN_GATE_INP, "weight", i), {n_embd});
+                            for (uint32_t x = 0; x < hparams.n_expert; ++x) {
+                                layer.mlp_pre_w1_exp[x] = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC1_EXP, "weight", i, x), {n_embd, GGML_NE_WILDCARD});
+                                layer.mlp_pre_w2_exp[x] = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC2_EXP, "weight", i, x), {GGML_NE_WILDCARD, n_ff});
+
+                                layer.ffn_up_exp[x]   = create_tensor(tn(LLM_TENSOR_FFN_UP_EXP,   "weight", i, x), {n_embd,   n_ff});
+                                layer.ffn_gate_exp[x] = create_tensor(tn(LLM_TENSOR_FFN_GATE_EXP, "weight", i, x), {n_embd,   n_ff});
+                                layer.ffn_down_t_exp[x] = create_tensor(tn(LLM_TENSOR_FFN_DOWN_T_EXP, "weight", i, x), {  n_embd, n_ff});
+                            }
+                        } else {
+                            layer.ffn_gate = create_tensor(tn(LLM_TENSOR_FFN_GATE, "weight", i), {n_embd,   n_ff});
+                            layer.ffn_down_t = create_tensor(tn(LLM_TENSOR_FFN_DOWN_T, "weight", i), {n_embd, n_ff});
+                            layer.mlp_pre_w1 = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC1, "weight", i), {n_embd, GGML_NE_WILDCARD});
+                            layer.mlp_pre_w2 = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC2, "weight", i), {GGML_NE_WILDCARD, n_ff});
+                            layer.ffn_up   = create_tensor(tn(LLM_TENSOR_FFN_UP,   "weight", i), {n_embd,   n_ff});
+                        }
                     }
                 } break;
             case LLM_ARCH_FALCON:
@@ -4641,6 +4788,9 @@ struct llm_build_context {
     const int64_t n_embd_head;
     const int64_t n_embd_gqa;
 
+    const int64_t n_expert;
+    const int64_t n_expert_used;
+
     const float freq_base;
     const float freq_scale;
     const float ext_factor;
@@ -4681,6 +4831,8 @@ struct llm_build_context {
         n_head_kv     (hparams.n_head_kv),
         n_embd_head   (hparams.n_embd_head()),
         n_embd_gqa    (hparams.n_embd_gqa()),
+        n_expert      (hparams.n_expert),
+        n_expert_used (hparams.n_expert_used),
         freq_base     (cparams.rope_freq_base),
         freq_scale    (cparams.rope_freq_scale),
         ext_factor    (cparams.yarn_ext_factor),
@@ -4719,6 +4871,145 @@ struct llm_build_context {
         }
     }
 
+    ggml_tensor *build_llama_moe_layer(
+        ggml_tensor *cur,
+        ggml_tensor *ffn_inp,
+        int il
+    ) {
+        ggml_tensor *gpu_norm = llm_build_norm(ctx0, ffn_inp, hparams,
+                model.layers[il].ffn_norm, NULL,
+                LLM_NORM_RMS, cb, il);
+        cb(gpu_norm, "ffn_norm", il);
+        ggml_tensor *cpu_norm = ggml_dup(ctx0, gpu_norm);
+
+        ggml_tensor * logits = ggml_mul_mat(ctx0, model.layers[il].ffn_gate_inp, gpu_norm); // [n_tokens, num_experts]
+        cb(logits, "ffn_moe_logits", il);
+
+        ggml_tensor * probs = ggml_soft_max(ctx0, logits); // [n_tokens, num_experts]
+        cb(probs, "ffn_moe_probs", il);
+
+        // select experts
+        ggml_tensor * selected_experts = ggml_top_k(ctx0, probs, n_expert_used); // [n_tokens, num_experts_per_tok]
+        cb(selected_experts->src[0], "ffn_moe_argsort", il);
+
+        ggml_tensor * weights = ggml_get_rows(ctx0,
+                ggml_reshape_3d(ctx0, probs, 1, n_expert, n_tokens), selected_experts);
+        cb(weights, "ffn_moe_weights", il);
+
+        weights = ggml_reshape_2d(ctx0, weights, n_expert_used, n_tokens); // [n_tokens, num_experts_per_tok]
+
+        ggml_tensor * weights_sum = ggml_sum_rows(ctx0, weights);
+        cb(weights_sum, "ffn_moe_weights_sum", il);
+
+        weights = ggml_div(ctx0, weights, weights_sum); // [n_tokens, num_experts_per_tok]
+        cb(weights, "ffn_moe_weights_norm", il);
+
+        // compute expert outputs
+
+        ggml_tensor *gpu_ids = selected_experts;
+        ggml_tensor *cpu_ids = ggml_dup(ctx0, gpu_ids);
+
+        ggml_tensor *moe_out = nullptr;
+        for (int i = 0; i < n_expert_used; ++i) {
+
+            ggml_tensor *gpu_idx = nullptr;
+            ggml_tensor *cpu_idx = nullptr;
+
+            {
+                ggml_tensor *moe_pred_w1 = ggml_mul_mat_id(ctx0, model.layers[il].mlp_pre_w1_exp, n_expert, cpu_ids, i, gpu_norm);
+                cb(moe_pred_w1, "ffn_moe_pred_w1", il);
+
+                ggml_tensor *moe_pred_w1_relu = ggml_relu(ctx0, moe_pred_w1);
+                cb(moe_pred_w1_relu, "ffn_moe_pred_w1_relu", il);
+
+                ggml_tensor *moe_pred_w2 = ggml_mul_mat_id(ctx0, model.layers[il].mlp_pre_w2_exp, n_expert, cpu_ids, i, moe_pred_w1_relu);
+                cb(moe_pred_w2, "ffn_moe_pred_w2", il);                   
+
+                gpu_idx = moe_pred_w2;
+                cpu_idx = ggml_dup(ctx0, gpu_idx);
+            }
+
+            ggml_tensor * cur_up = ggml_mul_mat_id_idx(ctx0, model.layers[il].ffn_up_exp, n_expert, cpu_ids, i, cpu_idx, model.layers[il].gpu_idx_exp, cpu_norm);
+            no_offload_cb(cur_up, "ffn_moe_up_sparse", il);
+
+            cur_up = ggml_relu(ctx0, cur_up);
+            no_offload_cb(cur_up, "ffn_moe_up_relu", il);
+
+            ggml_tensor * cur_gate = ggml_mul_mat_id_idx(ctx0, model.layers[il].ffn_gate_exp, n_expert, cpu_ids, i, cpu_idx, model.layers[il].gpu_idx_exp, cpu_norm);
+            no_offload_cb(cur_gate, "ffn_moe_gate_sparse", il);
+
+            cur_gate = ggml_relu(ctx0, cur_gate);
+            no_offload_cb(cur_gate, "ffn_moe_gate_relu", il);
+
+            ggml_tensor * cur_expert = ggml_mul(ctx0, cur_up, cur_gate); // [n_tokens, n_embd]
+            no_offload_cb(cur_expert, "ffn_moe_gate_par", il);
+
+            struct ggml_tensor * cur_down = ggml_mul_mat_id_axpy(ctx0, model.layers[il].ffn_down_t_exp, n_expert, cpu_ids, i, cpu_idx, model.layers[il].gpu_idx_exp, cur_expert); // [n_tokens, n_embd]
+            no_offload_cb(cur_down, "ffn_moe_down_sparse", il);
+
+#ifdef GGML_USE_CUBLAS
+            struct ggml_tensor * cur_up_2 = ggml_mul_mat_id_special(ctx0, model.layers[il].ffn_up_exp_gpu, n_expert, cpu_ids, i, gpu_idx, model.layers[il].gpu_bucket_exp, model.layers[il].ffn_up_exp, gpu_norm);
+            if (cur_up_2 != NULL) {
+                ggml_cuda_assign_buffers_no_alloc(cur_up_2);
+                no_offload_cb(cur_up_2, "ffn_moe_up_sparse_gpu", il);
+            }
+
+            cur_up_2 = ggml_relu(ctx0, cur_up_2);
+            if (cur_up_2 != nullptr) {
+                ggml_cuda_assign_buffers_no_alloc(cur_up_2);
+                no_offload_cb(cur_up_2, "ffn_moe_up_relu_gpu", il);                    
+            }
+
+            struct ggml_tensor * cur_gate_2 = ggml_mul_mat_id_special(ctx0, model.layers[il].ffn_gate_exp_gpu, n_expert, cpu_ids, i, gpu_idx, model.layers[il].gpu_bucket_exp, model.layers[il].ffn_gate_exp, gpu_norm);
+            if (cur_gate_2 != nullptr) {
+                ggml_cuda_assign_buffers_no_alloc(cur_gate_2);
+                no_offload_cb(cur_gate_2, "ffn_moe_gate_sparse_gpu", il);
+            }
+
+            cur_gate_2 = ggml_relu(ctx0, cur_gate_2);
+            if (cur_gate_2 != nullptr) {
+                ggml_cuda_assign_buffers_no_alloc(cur_gate_2);
+                no_offload_cb(cur_gate_2, "ffn_moe_gate_relu_gpu", il);                    
+            }
+
+            ggml_tensor * cur_expert_2 = ggml_mul(ctx0, cur_up_2, cur_gate_2); // [n_tokens, n_embd]
+            if (cur_expert_2 != nullptr) {
+                ggml_cuda_assign_buffers_no_alloc(cur_expert_2);
+                no_offload_cb(cur_expert_2, "ffn_moe_gate_par_gpu", il);                    
+            }
+
+            struct ggml_tensor * cur_down_2 = ggml_mul_mat_id_axpy(ctx0, model.layers[il].ffn_down_exp_gpu, n_expert, cpu_ids, i, gpu_idx, model.layers[il].gpu_bucket_exp, cur_expert_2);
+            if (cur_down_2 != nullptr) {
+                ggml_cuda_assign_buffers_no_alloc(cur_down_2);
+                no_offload_cb(cur_down_2, "ffn_moe_down_sparse_gpu", il);
+            }
+
+            cur_down = ggml_add_inplace(ctx0, cur_down, cur_down_2);
+            if (cur_down != nullptr) {
+                ggml_cuda_assign_buffers_no_alloc(cur_down);
+                no_offload_cb(cur_down, "ffn_moe_down_sparse_sum", il);                    
+            }
+#endif
+
+            cur_expert = ggml_mul(ctx0, cur_down,
+                    ggml_view_2d(ctx0, weights, 1, n_tokens, weights->nb[1], i * weights->nb[0]));
+            cb(cur_expert, "ffn_moe_weighted", il);
+
+            if (i == 0) {
+                moe_out = cur_expert;
+            } else {
+                moe_out = ggml_add_inplace(ctx0, moe_out, cur_expert);
+                cb(moe_out, "ffn_moe_out", il);
+            }
+        }
+        cur = moe_out;
+
+        cur = ggml_add_inplace(ctx0, cur, ffn_inp);
+        cb(cur, "l_out", il);
+
+        return cur;
+    }
+
     struct ggml_cgraph * build_llama() {
         struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, LLAMA_MAX_NODES, false);
 
@@ -4755,7 +5046,6 @@ struct llm_build_context {
                     model.layers[il].attn_norm, NULL,
                     LLM_NORM_RMS, cb, il);
             cb(cur, "attn_norm", il);
-
             // self-attention
             {
                 // compute Q and K and RoPE them
@@ -4793,8 +5083,10 @@ struct llm_build_context {
             struct ggml_tensor * ffn_inp = ggml_add(ctx0, cur, inpSA);
             cb(ffn_inp, "ffn_inp", il);
 
-            // feed-forward network
-            {
+            if (model.layers[il].ffn_gate_inp) {
+                inpL = build_llama_moe_layer(cur, ffn_inp, il);
+            } else {
+                // feed-forward network
                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, cb, il);
@@ -4830,13 +5122,13 @@ struct llm_build_context {
                         model.layers[il].ffn_down_t, NULL,
                         LLM_FFN_RELU, LLM_FFN_PAR, cb, il);
                 }
+
+                cur = ggml_add(ctx0, cur, ffn_inp);
+                cb(cur, "l_out", il);
+
+                // input for next layer
+                inpL = cur;
             }
-
-            cur = ggml_add(ctx0, cur, ffn_inp);
-            cb(cur, "l_out", il);
-
-            // input for next layer
-            inpL = cur;
         }
 
         cur = inpL;
@@ -6054,6 +6346,36 @@ static const std::unordered_map<const char *, llm_offload_func_e> k_offload_map 
 
     { "result_norm",                OFFLOAD_FUNC_EMB },
     { "result_output",              OFFLOAD_FUNC_OUT },
+
+
+    { "ffn_moe_pred_w1",            OFFLOAD_FUNC     },
+    { "ffn_moe_pred_w1_relu",       OFFLOAD_FUNC     },
+    { "ffn_moe_pred_w2",            OFFLOAD_FUNC     },
+
+    { "ffn_moe_logits",             OFFLOAD_FUNC     },
+    { "ffn_moe_probs",              OFFLOAD_FUNC     },
+    { "ffn_moe_argsort",            OFFLOAD_FUNC     },
+    { "ffn_moe_weights",            OFFLOAD_FUNC     },
+    { "ffn_moe_weights_sum",        OFFLOAD_FUNC     },
+    { "ffn_moe_weights_norm",       OFFLOAD_FUNC     },
+    { "ffn_moe_weighted",           OFFLOAD_FUNC     },
+    { "ffn_moe_up",                 OFFLOAD_FUNC     },
+    { "ffn_moe_up_sparse_gpu",      OFFLOAD_FUNC     },
+    { "ffn_moe_up_sparse_sum",      OFFLOAD_FUNC     },
+    { "ffn_moe_up_relu",            OFFLOAD_FUNC     },
+    { "ffn_moe_up_relu_gpu",        OFFLOAD_FUNC     },
+    { "ffn_moe_gate",               OFFLOAD_FUNC     },
+    { "ffn_moe_gate_sparse_gpu",    OFFLOAD_FUNC     },
+    { "ffn_moe_gate_sparse_sum",    OFFLOAD_FUNC     },
+    { "ffn_moe_silu",               OFFLOAD_FUNC     },
+    { "ffn_moe_gate_relu",          OFFLOAD_FUNC     },
+    { "ffn_moe_gate_relu_gpu",      OFFLOAD_FUNC     },
+    { "ffn_moe_gate_par",           OFFLOAD_FUNC     },
+    { "ffn_moe_gate_par_gpu",       OFFLOAD_FUNC     },
+    { "ffn_moe_down",               OFFLOAD_FUNC     },
+    { "ffn_moe_down_sparse_gpu",    OFFLOAD_FUNC     },
+    { "ffn_moe_down_sparse_sum",    OFFLOAD_FUNC     },
+    { "ffn_moe_out",                OFFLOAD_FUNC     },
 };
 
 static llm_offload_trie k_offload_func_trie(k_offload_map);
@@ -8587,8 +8909,10 @@ struct quantize_state_internal {
     const llama_model_quantize_params * params;
 
     int n_attention_wv    = 0;
+    int n_ffn_down        = 0;
     int n_feed_forward_w2 = 0;
     int i_attention_wv    = 0;
+    int i_ffn_down        = 0;
     int i_feed_forward_w2 = 0;
 
     int n_k_quantized     = 0;
@@ -8671,6 +8995,24 @@ static ggml_type get_k_quant_type(
         return i_layer < num_layers/8 || i_layer >= 7*num_layers/8 || (i_layer - num_layers/8)%3 == 2;
     };
 
+    const int n_expert = std::max(1, (int)qs.model.hparams.n_expert);
+    auto layer_info = [n_expert] (int i_layer, int n_layer, const char * name) {
+        if (n_expert > 1) {
+            // Believe it or not, "experts" in the FFN of Mixtral-8x7B are not consecutive, but iccasionally randomly
+            // sprinkled in the model. Hence, simply dividing i_ffn_down by n_expert does not work
+            // for getting the current layer as I initially thought, and we need to resort to parsing the
+            // tensor name.
+            n_layer /= n_expert;
+            if (sscanf(name, "blk.%d.", &i_layer) != 1) {
+                throw std::runtime_error(format("Failed to determine layer for tensor %s", name));
+            }
+            if (i_layer < 0 || i_layer >= n_layer) {
+                throw std::runtime_error(format("Bad layer %d for tensor %s. Must be in [0, %d)", i_layer, name, n_layer));
+            }
+        }
+        return std::make_pair(i_layer, n_layer);
+    };
+
     if (name == tn(LLM_TENSOR_OUTPUT, "weight").first) {
         int nx = tensor->ne[0];
         if (arch == LLM_ARCH_FALCON || nx % QK_K != 0) {
@@ -8696,7 +9038,46 @@ static ggml_type get_k_quant_type(
             // nearly negligible increase in model size by quantizing this tensor with more bits:
             if (new_type == GGML_TYPE_Q3_K || new_type == GGML_TYPE_Q4_K) new_type = GGML_TYPE_Q5_K;
         }
+        if (qs.model.hparams.n_expert == 8) {
+            // for the 8-expert model, bumping this to Q8_0 trades just ~128MB
+            // TODO: explore better strategies
+            new_type = GGML_TYPE_Q8_0;
+        }
         ++qs.i_attention_wv;
+    } else if (name.find("attn_k.weight") != std::string::npos) {
+        if (qs.model.hparams.n_expert == 8) {
+            // for the 8-expert model, bumping this to Q8_0 trades just ~128MB
+            // TODO: explore better strategies
+            new_type = GGML_TYPE_Q8_0;
+        } 
+    } else if (name.find("ffn_down") != std::string::npos) {
+        auto info = layer_info(qs.i_ffn_down, qs.n_ffn_down, name.c_str());
+        int i_layer = info.first, n_layer = info.second;
+        if      (ftype == LLAMA_FTYPE_MOSTLY_Q2_K) new_type = GGML_TYPE_Q3_K;
+        //else if (ftype == LLAMA_FTYPE_MOSTLY_IQ3_XXS) {
+        //    if (i_layer < n_layer/8) new_type = GGML_TYPE_Q5_K;
+        //}
+        else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_M) {
+            new_type = i_layer < n_layer/16 ? GGML_TYPE_Q5_K
+                     : arch != LLM_ARCH_FALCON || use_more_bits(i_layer, n_layer) ? GGML_TYPE_Q4_K
+                     : GGML_TYPE_Q3_K;
+        }
+        else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_L) {
+            new_type = arch == LLM_ARCH_FALCON ? GGML_TYPE_Q4_K : GGML_TYPE_Q5_K;
+        }
+        else if (ftype == LLAMA_FTYPE_MOSTLY_Q4_K_M) {
+            if (arch == LLM_ARCH_FALCON) {
+                new_type = i_layer < n_layer/16 ? GGML_TYPE_Q6_K :
+                           use_more_bits(i_layer, n_layer) ? GGML_TYPE_Q5_K : GGML_TYPE_Q4_K;
+            } else {
+                if (use_more_bits(i_layer, n_layer)) new_type = GGML_TYPE_Q6_K;
+            }
+        }
+        else if (ftype == LLAMA_FTYPE_MOSTLY_Q5_K_M && use_more_bits(i_layer, n_layer)) new_type = GGML_TYPE_Q6_K;
+        else if (ftype == LLAMA_FTYPE_MOSTLY_Q4_K_S && arch != LLM_ARCH_FALCON && i_layer < n_layer/8) {
+            new_type = GGML_TYPE_Q5_K;
+        }
+        ++qs.i_ffn_down;
     } else if (name.find("ffn_down.weight") != std::string::npos) {
         if      (ftype == LLAMA_FTYPE_MOSTLY_Q2_K) new_type = GGML_TYPE_Q3_K;
         else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_M) {
@@ -8722,9 +9103,17 @@ static ggml_type get_k_quant_type(
         ++qs.i_feed_forward_w2;
     } else if (name.find("attn_output.weight") != std::string::npos) {
         if (arch != LLM_ARCH_FALCON) {
-            if      (ftype == LLAMA_FTYPE_MOSTLY_Q2_K  ) new_type = GGML_TYPE_Q3_K;
-            else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_M) new_type = GGML_TYPE_Q4_K;
-            else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_L) new_type = GGML_TYPE_Q5_K;
+            if (qs.model.hparams.n_expert == 8) {
+                if (ftype == LLAMA_FTYPE_MOSTLY_Q2_K ||
+                    ftype == LLAMA_FTYPE_MOSTLY_Q3_K_S || ftype == LLAMA_FTYPE_MOSTLY_Q3_K_M ||
+                    ftype == LLAMA_FTYPE_MOSTLY_Q4_K_S || ftype == LLAMA_FTYPE_MOSTLY_Q4_K_M) {
+                    new_type = GGML_TYPE_Q5_K;
+                }
+            } else {
+                if      (ftype == LLAMA_FTYPE_MOSTLY_Q2_K  ) new_type = GGML_TYPE_Q3_K;
+                else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_M) new_type = GGML_TYPE_Q4_K;
+                else if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_L) new_type = GGML_TYPE_Q5_K;
+            }
         } else {
             if (ftype == LLAMA_FTYPE_MOSTLY_Q3_K_L) new_type = GGML_TYPE_Q4_K;
         }
@@ -8846,6 +9235,9 @@ static void llama_model_quantize_internal(const std::string & fname_inp, const s
         // TODO: avoid hardcoded tensor names - use the TN_* constants
         if (name.find("attn_v.weight") != std::string::npos || name.find("attn_qkv.weight") != std::string::npos) {
             ++qs.n_attention_wv;
+        }
+        else if (name.find("ffn_down") != std::string::npos) {
+            ++qs.n_ffn_down;
         }
         else if (name.find("ffn_down.weight") != std::string::npos) {
             ++qs.n_feed_forward_w2;
