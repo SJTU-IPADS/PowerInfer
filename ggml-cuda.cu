@@ -7338,7 +7338,7 @@ inline void ggml_cuda_op_mul_mat_transpose_select_gemm(
     (void) src1_padded_row_size;
 }
 
-__global__ void compress_input_matrix(const float * src, float * dst, const int * lst, const int src1_ncols, const int stride_src, const int stride_dst) {
+__global__ void matrix_row_select_cont(const float * src, float * dst, const int * lst, const int src1_ncols, const int stride_src, const int stride_dst) {
     const int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int col_to_read = lst[tid];
     for (int i = 0; i < src1_ncols; i++) {
@@ -7383,45 +7383,27 @@ inline void ggml_cuda_op_mul_mat_transpose_gemm(
     // ldc == nrows of the matrix that cuBLAS writes into
     int ldc = dst->backend == GGML_BACKEND_GPU && id == g_main_device ? ne0 : row_diff;
     ldc = ne0;
-    // size_t src0_as_t = 0;
-    // float *transpose = (float *) ggml_cuda_pool_malloc(row_diff*ne00 * sizeof(float), &src0_as_t); // NOLINT
-    // int blockSize = 32;
-    // int numBlocks = ne00;
-    // transpose_cont<<< numBlocks, blockSize, 0, stream>>>((float *)src0_ddf_i, transpose, ne00, ne01, 1, ne00, ne01,NULL);
 
     CUBLAS_CHECK(cublasSetStream(g_cublas_handles[id], stream));
-    // CUBLAS_CHECK(
-    //     cublasSgemm(g_cublas_handles[id], CUBLAS_OP_T, CUBLAS_OP_N,
-    //             ne00, src1_ncols, ne10,
-    //             &alpha, transpose, ne01,
-    //                     src1_ddf_i,  ne10,
-    //             &beta,  dst_dd_i,   ldc));
-    
-    // ne00: 4096, src1_ncol: N, ne10: 11008, ne01: < 11008
+
     // dst->src[3]->data is gpu_bucket, ne01 is length
     if (dst->src[3] != NULL) {
         // compress src1
         GGML_ASSERT(ne01 % 32 == 0);
         const int block_nums = ne01 / 32;
         size_t actual_size;
-        float * compressed_src1 = (float *)ggml_cuda_pool_malloc(ne01 * src1_ncols * sizeof(float), &actual_size);
-        struct ggml_tensor_extra_gpu *bucket_extra_data = (struct ggml_tensor_extra_gpu *)dst->src[3]->extra;
-        
-        compress_input_matrix<<<block_nums, 32, 0, stream>>>(src1_ddf_i, compressed_src1, (int *)bucket_extra_data->data_device[0], src1_ncols, ne10, ne01);
-        cudaDeviceSynchronize();
-        CUDA_CHECK(cudaGetLastError());
+        float * src1_cont = (float *)ggml_cuda_pool_malloc(ne01 * src1_ncols * sizeof(float), &actual_size);
+        int * row_lookup = static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
+        matrix_row_select_cont<<<block_nums, 32, 0, stream>>>(src1_ddf_i, src1_cont, row_lookup, src1_ncols, ne10, ne01);
 
         CUBLAS_CHECK(
             cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
                     ne00, src1_ncols, ne01,
                     &alpha, src0_ddf_i, ne00,
-                            compressed_src1,  ne01,
+                    src1_cont,  ne01,
                     &beta,  dst_dd_i,   ldc));
 
-                    
-        cudaDeviceSynchronize();
-        ggml_cuda_pool_free(compressed_src1, actual_size);
- 
+        ggml_cuda_pool_free(src1_cont, actual_size);
     } else {
         // full_gpu
         CUBLAS_CHECK(
@@ -7430,8 +7412,6 @@ inline void ggml_cuda_op_mul_mat_transpose_gemm(
                     &alpha, src0_ddf_i, ne00,
                             src1_ddf_i,  ne10,
                     &beta,  dst_dd_i,   ldc));
- 
-
     }
 
     if (src0_as > 0) {
