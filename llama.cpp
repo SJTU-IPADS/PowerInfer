@@ -236,6 +236,7 @@ enum llm_arch {
     LLM_ARCH_REFACT,
     LLM_ARCH_BLOOM,
     LLM_ARCH_STABLELM,
+    LLM_ARCH_OURS,
     LLM_ARCH_UNKNOWN,
 };
 
@@ -252,6 +253,7 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
     { LLM_ARCH_REFACT,          "refact"    },
     { LLM_ARCH_BLOOM,           "bloom"     },
     { LLM_ARCH_STABLELM,        "stablelm"  },
+    { LLM_ARCH_OURS,            "ours"      },
 
     { LLM_ARCH_UNKNOWN,         "unknown"   },
 };
@@ -3169,6 +3171,7 @@ static void llm_load_sparse_model_tensors(
         const auto tn = LLM_TN(model.arch);
         switch (model.arch) {
             case LLM_ARCH_LLAMA:
+            case LLM_ARCH_OURS:
             case LLM_ARCH_REFACT:
                 {
                     model.tok_embd = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab});
@@ -3386,6 +3389,7 @@ static void llm_load_tensors(
         switch (model.arch) {
             case LLM_ARCH_LLAMA:
             case LLM_ARCH_REFACT:
+            case LLM_ARCH_OURS:
                 {
                     model.tok_embd = ml.create_tensor(ctx, tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab}, GGML_BACKEND_CPU);
 
@@ -4109,6 +4113,7 @@ enum llm_ffn_op_type {
 enum llm_ffn_gate_type {
     LLM_FFN_SEQ,
     LLM_FFN_PAR, // ffn_gate is parallel to ffn_up
+    LLM_FFN_SYM, // ffn_gate is parallel to ffn_up and should pass through an activation function
 };
 
 enum llm_norm_type {
@@ -4444,9 +4449,8 @@ static struct ggml_tensor * llm_build_ffn_sparse(
          struct ggml_tensor * up_b,
          struct ggml_tensor * gate,
          struct ggml_tensor * gate_b,
-         struct ggml_tensor * down,
-         struct ggml_tensor * down_b,
          struct ggml_tensor * down_t,
+         struct ggml_tensor * down_b,
          struct ggml_tensor * pre_w1,
          struct ggml_tensor * pre_w2,
          struct ggml_tensor * pred_inpl,
@@ -4462,13 +4466,13 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     bool full_gpu = gpu_offload_ratio >= 1.0;
     ggml_tensor * ffn_input = cur;
 
-    llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * cur, const char * name) {
-        cb_outer(cur, name);
+    llm_build_cb_short cb = [&cb_outer](struct ggml_tensor * tensor, const char * name) {
+        cb_outer(tensor, name);
 #if defined(GGML_USE_CUBLAS)
         // Determine offloading based on src[0] (weight for both mul and axpy)
-        bool operates_on_gpu = cur->src[0]->backend == GGML_BACKEND_GPU;
+        bool operates_on_gpu = tensor->src[0]->backend == GGML_BACKEND_GPU;
         if (operates_on_gpu) {
-            ggml_cuda_assign_buffers_no_alloc(cur);
+            ggml_cuda_assign_buffers_no_alloc(tensor);
         }
 #endif
     };
@@ -4483,6 +4487,19 @@ static struct ggml_tensor * llm_build_ffn_sparse(
     // back to the CPU to avoid synchronization issues.
     (full_gpu ? cb : cb_outer)(idx, "mlp_pre_out");
 
+    auto act_fn = [&](ggml_tensor * tensor, const char * name) {
+        switch (type_op) {
+            case LLM_FFN_RELU:
+                {
+                    tensor = ggml_relu(ctx, tensor);
+                    cb(tensor, name);
+                } break;
+            default:
+                GGML_ASSERT(false && "unsupported activation function");
+        }
+        return tensor;
+    };
+
     // FFN up
     struct ggml_tensor * up_out = llm_build_sparse_mul_mat(ctx, up, ffn_input, idx, up_gpu, gpu_index, gpu_bucket, cb_outer, "up", full_gpu);
     if (up_b) {
@@ -4490,33 +4507,35 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb(up_out, "ffn_up_b");
     }
 
+    struct ggml_tensor * gate_out = nullptr;
     if (gate) {
-        // TODO: only support par for now
-        GGML_ASSERT(type_gate == LLM_FFN_PAR);
-        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
+        // Only support par for now
+        GGML_ASSERT(type_gate == LLM_FFN_PAR || type_gate == LLM_FFN_SYM);
+        gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
         if (gate_b) {
             gate_out = ggml_add(ctx, gate_out, gate_b);
             cb(gate_out, "ffn_gate_b");
         }
-        cur = gate_out;
-    } else {
-        cur = up_out;
     }
 
-    switch (type_op) {
-        case LLM_FFN_RELU:
+    switch (type_gate) {
+        case LLM_FFN_PAR:
             {
-                cur = ggml_relu(ctx, cur);
-                cb(cur, "ffn_relu");
+                GGML_ASSERT(gate_out != nullptr);
+                ggml_tensor * act_gate = act_fn(gate_out, "ffn_gate_act");
+                cur = ggml_mul(ctx, act_gate, up_out);
+                cb(cur, "ffn_gate_par");
+            } break;
+        case LLM_FFN_SYM:
+            {
+                GGML_ASSERT(gate_out != nullptr);
+                ggml_tensor * act_gate = act_fn(gate_out, "ffn_gate_act");
+                ggml_tensor * act_up = act_fn(up_out, "ffn_up_act");
+                cur = ggml_mul(ctx, act_gate, act_up);
+                cb(cur, "ffn_gate_sym");
             } break;
         default:
-            // only support relu for now
-            GGML_ASSERT(type_op == LLM_FFN_RELU);
-    }
-
-    if (type_gate == LLM_FFN_PAR) {
-        cur = ggml_mul(ctx, cur, up_out);
-        cb(cur, "ffn_gate_par");
+            GGML_ASSERT(false && "unsupported gate type");
     }
 
     cur = llm_build_sparse_axpy(ctx, down_t, cur, idx, down_gpu, gpu_index, gpu_bucket, cb_outer, "down", full_gpu);
@@ -4719,7 +4738,7 @@ struct llm_build_context {
         }
     }
 
-    struct ggml_cgraph * build_llama() {
+    struct ggml_cgraph * build_llama_variants() {
         struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, LLAMA_MAX_NODES, false);
 
         GGML_ASSERT(n_embd_head == hparams.n_rot);
@@ -4798,6 +4817,7 @@ struct llm_build_context {
                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, cb, il);
+                llm_ffn_gate_type gate_type = model.arch == LLM_ARCH_OURS ? LLM_FFN_SYM : LLM_FFN_PAR;
 
                 if (llama_use_sparse_inference(&model)) {
                     llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
@@ -4813,14 +4833,13 @@ struct llm_build_context {
                     cur = llm_build_ffn_sparse(ctx0, cur,
                         model.layers[il].ffn_up,   NULL,
                         model.layers[il].ffn_gate, NULL,
-                        model.layers[il].ffn_down, NULL,
-                        model.layers[il].ffn_down_t,
+                        model.layers[il].ffn_down_t, NULL,
                         model.layers[il].mlp_pre_w1,
                         model.layers[il].mlp_pre_w2,
                         ffn_inp, // as for now, llama's pred use the same input as the ffn
                         model.layers[il].gpu_idx, 
                         model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
-                        LLM_FFN_RELU, LLM_FFN_PAR, model.layers[il].gpu_offload_ratio, cbs);
+                        LLM_FFN_RELU, gate_type, model.layers[il].gpu_offload_ratio, cbs);
                 } else {
                     // fallback to dense
                     cb(cur, "ffn_norm", il);
@@ -4828,7 +4847,7 @@ struct llm_build_context {
                         model.layers[il].ffn_up,   NULL,
                         model.layers[il].ffn_gate, NULL,
                         model.layers[il].ffn_down_t, NULL,
-                        LLM_FFN_RELU, LLM_FFN_PAR, cb, il);
+                        LLM_FFN_RELU, gate_type, cb, il);
                 }
             }
 
@@ -5074,8 +5093,7 @@ struct llm_build_context {
                 cur = llm_build_ffn_sparse(ctx0, attn_norm,
                     model.layers[il].ffn_up,   NULL,
                     NULL, NULL,
-                    model.layers[il].ffn_down, NULL,
-                    model.layers[il].ffn_down_t,
+                    model.layers[il].ffn_down_t, NULL,
                     model.layers[il].mlp_pre_w1,
                     model.layers[il].mlp_pre_w2,
                     inpL, // Falcon uses the layer's input as the pred input
@@ -6332,8 +6350,9 @@ static struct ggml_cgraph * llama_build_graph(
 
     switch (model.arch) {
         case LLM_ARCH_LLAMA:
+        case LLM_ARCH_OURS:
             {
-                result = llm.build_llama();
+                result = llm.build_llama_variants();
             } break;
         case LLM_ARCH_BAICHUAN:
             {
