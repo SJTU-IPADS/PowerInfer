@@ -236,7 +236,7 @@ enum llm_arch {
     LLM_ARCH_REFACT,
     LLM_ARCH_BLOOM,
     LLM_ARCH_STABLELM,
-    LLM_ARCH_OURS,
+    LLM_ARCH_BAMBOO,
     LLM_ARCH_UNKNOWN,
 };
 
@@ -253,7 +253,7 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
     { LLM_ARCH_REFACT,          "refact"    },
     { LLM_ARCH_BLOOM,           "bloom"     },
     { LLM_ARCH_STABLELM,        "stablelm"  },
-    { LLM_ARCH_OURS,            "ours"      },
+    { LLM_ARCH_BAMBOO,          "bamboo"    },
 
     { LLM_ARCH_UNKNOWN,         "unknown"   },
 };
@@ -580,7 +580,7 @@ static std::map<llm_arch, std::map<llm_tensor, std::string>> LLM_TENSOR_NAMES = 
         },
     },
     {
-        LLM_ARCH_OURS,
+        LLM_ARCH_BAMBOO,
         {
             { LLM_TENSOR_TOKEN_EMBD,      "token_embd" },
             { LLM_TENSOR_OUTPUT_NORM,     "output_norm" },
@@ -2324,7 +2324,7 @@ static void llm_load_hparams(
     // arch-specific KVs
     switch (model.arch) {
         case LLM_ARCH_LLAMA:
-        case LLM_ARCH_OURS:
+        case LLM_ARCH_BAMBOO:
             {
                 GGUF_GET_KEY(ctx, hparams.f_norm_rms_eps, gguf_get_val_f32, GGUF_TYPE_FLOAT32, true, kv(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS));
 
@@ -3194,7 +3194,7 @@ static void llm_load_sparse_model_tensors(
         switch (model.arch) {
             case LLM_ARCH_LLAMA:
             case LLM_ARCH_REFACT:
-            case LLM_ARCH_OURS:
+            case LLM_ARCH_BAMBOO:
                 {
                     model.tok_embd = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab});
 
@@ -3411,7 +3411,7 @@ static void llm_load_tensors(
         switch (model.arch) {
             case LLM_ARCH_LLAMA:
             case LLM_ARCH_REFACT:
-            case LLM_ARCH_OURS:
+            case LLM_ARCH_BAMBOO:
                 {
                     model.tok_embd = ml.create_tensor(ctx, tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab}, GGML_BACKEND_CPU);
 
@@ -4839,7 +4839,7 @@ struct llm_build_context {
                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, cb, il);
-                llm_ffn_gate_type gate_type = model.arch == LLM_ARCH_OURS ? LLM_FFN_SYM : LLM_FFN_PAR;
+                llm_ffn_gate_type gate_type = model.arch == LLM_ARCH_BAMBOO ? LLM_FFN_SYM : LLM_FFN_PAR;
 
                 if (llama_use_sparse_inference(&model)) {
                     llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
@@ -6372,7 +6372,7 @@ static struct ggml_cgraph * llama_build_graph(
 
     switch (model.arch) {
         case LLM_ARCH_LLAMA:
-        case LLM_ARCH_OURS:
+        case LLM_ARCH_BAMBOO:
             {
                 result = llm.build_llama_variants();
             } break;
@@ -6585,7 +6585,7 @@ static int llama_decode_internal(
         model.arch == LLM_ARCH_MPT        ||
         model.arch == LLM_ARCH_STARCODER  ||
         model.arch == LLM_ARCH_STABLELM   ||
-        model.arch == LLM_ARCH_OURS;
+        model.arch == LLM_ARCH_BAMBOO;
 
     // const bool fully_offloaded = model.n_gpu_layers >= (int) hparams.n_layer + 3;
     // if (ggml_cpu_has_cublas() && full_offload_supported && fully_offloaded) {

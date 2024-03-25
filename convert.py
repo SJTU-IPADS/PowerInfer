@@ -265,7 +265,7 @@ class Params:
         )
 
         if config.get("model_type", None) == "mistral":
-            params.arch = gguf.MODEL_ARCH.OURS
+            params.arch = gguf.MODEL_ARCH.BAMBOO
 
         return params
 
