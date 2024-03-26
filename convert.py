@@ -1212,7 +1212,7 @@ def main(args_in: list[str] | None = None) -> None:
     try:
         with open(args.model / "config.json", "r", encoding="utf-8") as f:
             hf_config = json.load(f)
-        if model_type := hf_config.get("model_type") not in ("llama", "mistral"):
+        if model_type := hf_config.get("model_type") not in ("llama", "bamboo"):
             # invoke another script to convert other models
             print(f"Model architecture {model_type} is not supported by this `convert.py`. Trying with `convert-hf-to-powerinfer-gguf.py`...")
             script_path = Path(__file__).resolve().parent / "convert-hf-to-powerinfer-gguf.py"
