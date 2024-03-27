@@ -264,7 +264,7 @@ class Params:
             rope_finetuned    = rope_finetuned,
         )
 
-        if config.get("model_type", None) == "mistral":
+        if config.get("model_type", None) == "bamboo":
             params.arch = gguf.MODEL_ARCH.BAMBOO
 
         return params
@@ -845,7 +845,7 @@ class OutputFile:
         if params.n_ctx == 4096:
             name = "LLaMA v2"
         elif params.path_model is not None:
-            name = str(params.path_model.parent).split('/')[-1]
+            name = str(params.path_model).split('/')[-1]
 
         self.gguf.add_name                (name)
         self.gguf.add_context_length      (params.n_ctx)
@@ -1114,8 +1114,8 @@ def load_some_model(path: Path) -> ModelPlus:
     model_plus = merge_multifile_models(models_plus)
     return model_plus
 
-def load_mlp_model(path: Path) -> ModelPlus:
-    '''Load MLP models for sparse attention from directory.'''
+def load_predictor_model(path: Path) -> ModelPlus:
+    '''Load MLP models for sparse FFN inference from directory.'''
     assert path.is_dir(), f"MLP model path {path} is not a directory"
     
     first_model_path = path / "model_0.pt"
@@ -1205,7 +1205,7 @@ def main(args_in: list[str] | None = None) -> None:
     parser.add_argument("--bigendian",   action="store_true",    help="model is executed on big endian machine")
     parser.add_argument("--vocabtype",   choices=["spm", "bpe"], help="vocab format (default: spm)", default="spm")
     parser.add_argument("model",         type=Path,              help="directory containing model file, or model file itself (*.pth, *.pt, *.bin, *.safetensors)")
-    parser.add_argument("mlp_model",     type=Path,              help="MLP model for sparse attention")
+    parser.add_argument("sparse_predictor",     type=Path,              help="predictors for sparse FFN inference")
 
     args = parser.parse_args(args_in)
 
@@ -1230,7 +1230,7 @@ def main(args_in: list[str] | None = None) -> None:
     if not args.vocab_only:
         model_plus = load_some_model(args.model)
         params = Params.load(model_plus)
-        mlp_predictor_plus = load_mlp_model(args.mlp_model)
+        mlp_predictor_plus = load_predictor_model(args.sparse_predictor)
         params.predictor_params = PredictorParams.load(mlp_predictor_plus)
         model_plus = merge_multifile_models([model_plus, mlp_predictor_plus])
     else:

@@ -4840,6 +4840,7 @@ struct llm_build_context {
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, cb, il);
                 llm_ffn_gate_type gate_type = model.arch == LLM_ARCH_BAMBOO ? LLM_FFN_SYM : LLM_FFN_PAR;
+                printf("model.arch = %d, gate_type = %d\n", model.arch, gate_type);
 
                 if (llama_use_sparse_inference(&model)) {
                     llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
