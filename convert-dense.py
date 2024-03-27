@@ -1,9 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Georgi Gerganov
+# Based on code from https://github.com/ggerganov/llama.cpp/tree/6bb4908a17150b49373b5f977685b2e180a04f6f
+
 #!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import dataclasses
 import enum
 import faulthandler
 import functools
@@ -15,7 +18,6 @@ import pickle
 import re
 import signal
 import struct
-import subprocess
 import sys
 import time
 import zipfile
@@ -139,28 +141,6 @@ GGML_FILE_TYPE_TO_DATA_TYPE: dict[GGMLFileType, DataType] = {
 #
 
 @dataclass
-class PredictorParams:
-    sparse_threshold: float | None = None
-
-    @staticmethod
-    def loadPredictorJson(model: LazyModel, config_path: Path) -> PredictorParams:
-        config = json.load(open(config_path))
-        return PredictorParams(
-            sparse_threshold = config.get("sparse_threshold"),
-        )
-
-    @staticmethod
-    def load(model_plus: ModelPlus) -> PredictorParams:
-        config_path   = model_plus.paths[0].parent / "config.json"
-
-        if config_path.exists():
-            params = PredictorParams.loadPredictorJson(model_plus.model, config_path)
-        else:
-            params = PredictorParams()
-
-        return params
-
-@dataclass
 class Params:
     n_vocab:    int
     n_embd:     int
@@ -172,6 +152,7 @@ class Params:
     f_norm_eps: float
 
     arch:       gguf.MODEL_ARCH = gguf.MODEL_ARCH.LLAMA
+
     rope_scaling_type: gguf.RopeScalingType | None = None
     f_rope_freq_base: float | None = None
     f_rope_scale: float | None = None
@@ -182,9 +163,6 @@ class Params:
 
     # path to the directory containing the model files
     path_model: Path | None = None
-
-    # MLP predictor parameters
-    predictor_params: PredictorParams = dataclasses.field(default_factory=PredictorParams)
 
     @staticmethod
     def guessed(model: LazyModel) -> Params:
@@ -268,6 +246,7 @@ class Params:
             params.arch = gguf.MODEL_ARCH.BAMBOO
 
         return params
+
 
     # LLaMA v2 70B params.json
     # {"dim": 8192, "multiple_of": 4096, "ffn_dim_multiplier": 1.3, "n_heads": 64, "n_kv_heads": 8, "n_layers": 80, "norm_eps": 1e-05, "vocab_size": -1}
@@ -540,14 +519,6 @@ class LazyTensor:
         def load() -> Tensor:
             return self.load().astype(data_type)
         return LazyTensor(load, self.shape, data_type, f'convert({data_type}) {self.description}')
-    
-    def transposed(self) -> LazyTensor:
-        def load() -> Tensor:
-            loaded = self.load()
-            assert isinstance(loaded, UnquantizedTensor), f'Cannot transpose {loaded}'
-            loaded.ndarray = loaded.ndarray.T
-            return loaded
-        return LazyTensor(load, self.shape[::-1], self.data_type, f'transpose {self.description}')
 
     def validate_conversion_to(self, data_type: DataType) -> None:
         if data_type != self.data_type and data_type.name not in self.data_type.valid_conversions:
@@ -601,7 +572,7 @@ def merge_sharded(models: list[LazyModel]) -> LazyModel:
 
 def merge_multifile_models(models_plus: list[ModelPlus]) -> ModelPlus:
     formats = set(mp.format for mp in models_plus)
-    # assert len(formats) == 1, "different formats?"
+    assert len(formats) == 1, "different formats?"
     format = formats.pop()
     paths = [path for mp in models_plus for path in mp.paths]
     # Use the first non-None vocab, if any.
@@ -610,8 +581,7 @@ def merge_multifile_models(models_plus: list[ModelPlus]) -> ModelPlus:
     except StopIteration:
         vocab = None
 
-    if any("model.embed_tokens.weight" in mp.model for mp in models_plus) or \
-       any("model.layers.0.fc1.weight" in mp.model for mp in models_plus):
+    if any("model.embed_tokens.weight" in mp.model for mp in models_plus):
         # Transformers models put different tensors in different files, but
         # don't split indivdual tensors between files.
         model: LazyModel = {}
@@ -874,9 +844,6 @@ class OutputFile:
         if params.ftype is not None:
             self.gguf.add_file_type(params.ftype)
 
-        if params.predictor_params.sparse_threshold is not None:
-            self.gguf.add_sparse_threshold(params.predictor_params.sparse_threshold)
-
     def add_meta_vocab(self, vocab: Vocab) -> None:
         tokens = []
         scores = []
@@ -1035,18 +1002,6 @@ def convert_model_names(model: LazyModel, params: Params) -> LazyModel:
 
     return out
 
-def postprocess_transpose(model: LazyModel) -> LazyModel:
-    """Transpose ffn_down matrices for Axpy ops."""
-    out: LazyModel = {}
-    
-    for name, lazy_tensor in model.items():
-        if name.endswith(".ffn_down.weight"):
-            out[name.replace("ffn_down", "ffn_down_t")] = lazy_tensor.transposed()
-        else:
-            out[name] = lazy_tensor
-    
-    return out
-
 def nth_multifile_path(path: Path, n: int) -> Path | None:
     '''Given any path belonging to a multi-file model (e.g. foo.bin.1), return
     the nth path in the model.
@@ -1058,9 +1013,7 @@ def nth_multifile_path(path: Path, n: int) -> Path | None:
         # - x-00001-of-00002.bin, x-00002-of-00002.bin, etc.
         (r'-[0-9]{5}-of-(.*)$', fr'-{n:05}-of-\1'),
         # x.bin, x.bin.1, etc.
-        (r'(\.[0-9]+)?$', r'\1' if n == 0 else fr'\1.{n}'),
-        # x_0.pt, x_1.pt, etc.
-        (r'(_[0-9]+)?\.pt$', fr'_{n}.pt'),
+        (r'(\.[0-9]+)?$', r'\1' if n == 0 else fr'\1.{n}')
     ]
     for regex, replacement in patterns:
         if re.search(regex, path.name):
@@ -1113,25 +1066,6 @@ def load_some_model(path: Path) -> ModelPlus:
 
     model_plus = merge_multifile_models(models_plus)
     return model_plus
-
-def load_predictor_model(path: Path) -> ModelPlus:
-    '''Load MLP models for sparse FFN inference from directory.'''
-    assert path.is_dir(), f"MLP model path {path} is not a directory"
-    
-    first_model_path = path / "model_0.pt"
-    assert first_model_path.resolve(), f"MLP model path {path} does not contain model_0.pt"
-
-    model_paths = find_multifile_paths(first_model_path)
-    models_plus: list[ModelPlus] = []
-    for model_path in model_paths:
-        # find number in model_path
-        model_layer = int(re.search(r'model_(\d+).pt', str(model_path)).group(1))
-        print(f"Loading MLP model file {model_path}")
-        mlp_model = lazy_load_file(model_path)
-        mlp_model.model = {f"model.layers.{model_layer}.{name}": tensor for name, tensor in mlp_model.model.items()}
-        models_plus.append(mlp_model)
-
-    return merge_multifile_models(models_plus)
 
 
 def load_vocab(path: Path, vocabtype: str | None) -> Vocab:
@@ -1197,31 +1131,17 @@ def main(args_in: list[str] | None = None) -> None:
     parser.add_argument("--dump",        action="store_true",    help="don't convert, just show what's in the model")
     parser.add_argument("--dump-single", action="store_true",    help="don't convert, just show what's in a single model file")
     parser.add_argument("--vocab-only",  action="store_true",    help="extract only the vocab")
-    parser.add_argument("--outtype",     choices=output_choices, help="output format - note: q8_0 may be very slow (default: f16 or f32 based on input)", default="f16")
+    parser.add_argument("--outtype",     choices=output_choices, help="output format - note: q8_0 may be very slow (default: f16 or f32 based on input)")
     parser.add_argument("--vocab-dir",   type=Path,              help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile",     type=Path,              help="path to write to; default: based on input")
+    parser.add_argument("model",         type=Path,              help="directory containing model file, or model file itself (*.pth, *.pt, *.bin, *.safetensors)")
+    parser.add_argument("--vocabtype",   choices=["spm", "bpe"], help="vocab format (default: spm)", default="spm")
     parser.add_argument("--ctx",         type=int,               help="model training context (default: based on input)")
     parser.add_argument("--concurrency", type=int,               help=f"concurrency used for conversion (default: {DEFAULT_CONCURRENCY})", default = DEFAULT_CONCURRENCY)
     parser.add_argument("--bigendian",   action="store_true",    help="model is executed on big endian machine")
-    parser.add_argument("--vocabtype",   choices=["spm", "bpe"], help="vocab format (default: spm)", default="spm")
-    parser.add_argument("model",         type=Path,              help="directory containing model file, or model file itself (*.pth, *.pt, *.bin, *.safetensors)")
-    parser.add_argument("sparse_predictor",     type=Path,              help="predictors for sparse FFN inference")
 
     args = parser.parse_args(args_in)
-
-    try:
-        with open(args.model / "config.json", "r", encoding="utf-8") as f:
-            hf_config = json.load(f)
-        if model_type := hf_config.get("model_type") not in ("llama", "bamboo"):
-            # invoke another script to convert other models
-            print(f"Model architecture {model_type} is not supported by this `convert.py`. Trying with `convert-hf-to-powerinfer-gguf.py`...")
-            script_path = Path(__file__).resolve().parent / "convert-hf-to-powerinfer-gguf.py"
-            subprocess.run(["python3", str(script_path.absolute())] + sys.argv[1:])
-            return
-    except FileNotFoundError:
-        print("Could not find config.json under the original model directory. ", file=sys.stderr)
-        sys.exit(1)
-
+    
     if args.dump_single:
         model_plus = lazy_load_file(args.model)
         do_dump_model(model_plus)
@@ -1229,13 +1149,8 @@ def main(args_in: list[str] | None = None) -> None:
 
     if not args.vocab_only:
         model_plus = load_some_model(args.model)
-        params = Params.load(model_plus)
-        mlp_predictor_plus = load_predictor_model(args.sparse_predictor)
-        params.predictor_params = PredictorParams.load(mlp_predictor_plus)
-        model_plus = merge_multifile_models([model_plus, mlp_predictor_plus])
     else:
         model_plus = ModelPlus(model = {}, paths = [args.model / 'dummy'], format = 'none', vocab = None)
-        params = Params.load(model_plus)
 
     if args.dump:
         do_dump_model(model_plus)
@@ -1244,6 +1159,7 @@ def main(args_in: list[str] | None = None) -> None:
     if args.bigendian:
         endianess = gguf.GGUFEndian.BIG
 
+    params = Params.load(model_plus)
     if params.n_ctx == -1:
         if args.ctx is None:
             raise Exception("The model doesn't have a context size, and you didn't specify one with --ctx\n"
@@ -1287,7 +1203,6 @@ def main(args_in: list[str] | None = None) -> None:
 
     model   = model_plus.model
     model   = convert_model_names(model, params)
-    model   = postprocess_transpose(model)
     ftype   = pick_output_type(model, args.outtype)
     model   = convert_to_output_type(model, ftype)
     outfile = args.outfile or default_outfile(model_plus.paths, ftype)
@@ -1297,11 +1212,6 @@ def main(args_in: list[str] | None = None) -> None:
 
     OutputFile.write_all(outfile, ftype, params, model, vocab, special_vocab, concurrency = args.concurrency, endianess=endianess)
     print(f"Wrote {outfile}")
-
-    # post-process: write another unique file header to distinguish from the origianl GGUF file
-    with open(outfile, "r+b") as fout:
-        POWERINFER_MAGIC = int.from_bytes(b"PWRI", "little")
-        fout.write(struct.pack("<I", POWERINFER_MAGIC))
 
 
 if __name__ == '__main__':
