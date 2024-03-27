@@ -4320,6 +4320,7 @@ static struct ggml_tensor * llm_build_ffn(
                     cb(cur, "ffn_gate", il);
                 } break;
             case LLM_FFN_PAR:
+            case LLM_FFN_SYM:
                 {
                     cur = ggml_mul_mat(ctx, gate, cur);
                     cb(cur, "ffn_gate", il);
@@ -4334,42 +4335,48 @@ static struct ggml_tensor * llm_build_ffn(
         cur = tmp;
     }
 
-    switch (type_op) {
-        case LLM_FFN_SILU:
-            {
-                cur = ggml_silu(ctx, cur);
-                cb(cur, "ffn_silu", il);
-            } break;
-        case LLM_FFN_GELU:
-            {
-                cur = ggml_gelu(ctx, cur);
-                cb(cur, "ffn_gelu", il);
-            } break;
-        case LLM_FFN_RELU:
-            {
-                cur = ggml_relu(ctx, cur);
-                cb(cur, "ffn_relu", il);
-            } break;
-        case LLM_FFN_RELU_SQR:
-            {
-                cur = ggml_relu(ctx, cur);
-                cb(cur, "ffn_relu", il);
+    auto act_fn = [&] (ggml_tensor * cur) {
+        switch (type_op) {
+            case LLM_FFN_SILU:
+                {
+                    cur = ggml_silu(ctx, cur);
+                    cb(cur, "ffn_silu", il);
+                } break;
+            case LLM_FFN_GELU:
+                {
+                    cur = ggml_gelu(ctx, cur);
+                    cb(cur, "ffn_gelu", il);
+                } break;
+            case LLM_FFN_RELU:
+                {
+                    cur = ggml_relu(ctx, cur);
+                    cb(cur, "ffn_relu", il);
+                } break;
+            case LLM_FFN_RELU_SQR:
+                {
+                    cur = ggml_relu(ctx, cur);
+                    cb(cur, "ffn_relu", il);
 
-                cur = ggml_sqr(ctx, cur);
-                cb(cur, "ffn_sqr(relu)", il);
-            } break;
+                    cur = ggml_sqr(ctx, cur);
+                    cb(cur, "ffn_sqr(relu)", il);
+                } break;
+        }
+
+        return cur;
+    };
+
+    cur = act_fn(cur);
+    if (type_gate == LLM_FFN_SYM) {
+        // In this case, the output of up is also activated
+        tmp = act_fn(tmp);
     }
 
-    if (type_gate == LLM_FFN_PAR) {
+    if (type_gate == LLM_FFN_PAR || type_gate == LLM_FFN_SYM) {
         cur = ggml_mul(ctx, cur, tmp);
         cb(cur, "ffn_gate_par", il);
     }
 
-    // cur = ggml_mul_mat(ctx, down, cur);
-    cur = ggml_axpy(ctx, down, cur, NULL, NULL);
-    if (down_b) {
-        cb(cur, "ffn_down", il);
-    }
+    cur = ggml_mul_mat(ctx, down, cur);
 
     if (down_b) {
         cur = ggml_add(ctx, cur, down_b);
@@ -4865,11 +4872,12 @@ struct llm_build_context {
                 } else {
                     // fallback to dense
                     cb(cur, "ffn_norm", il);
+                    llm_ffn_op_type   act_type = model.arch == LLM_ARCH_BAMBOO ? LLM_FFN_RELU : LLM_FFN_SILU;
                     cur = llm_build_ffn(ctx0, cur,
                         model.layers[il].ffn_up,   NULL,
                         model.layers[il].ffn_gate, NULL,
-                        model.layers[il].ffn_down_t, NULL,
-                        LLM_FFN_RELU, gate_type, cb, il);
+                        model.layers[il].ffn_down, NULL,
+                        act_type, gate_type, cb, il);
                 }
             }
 
