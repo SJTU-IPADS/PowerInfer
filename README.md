@@ -64,6 +64,8 @@ You can use these models with PowerInfer today:
 
 - Falcon-40B
 - Llama2 family
+- ProSparse Llama2 family
+- Bamboo-7B
 
 We have tested PowerInfer on the following platforms:
 
@@ -73,7 +75,6 @@ We have tested PowerInfer on the following platforms:
 
 And new features coming soon:
 
-- Mistral-7B model
 - Metal backend for sparse inference on macOS
 
 Please kindly refer to our [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2) for our current focus of development.
@@ -270,10 +271,10 @@ Please refer to our [paper](https://ipads.se.sjtu.edu.cn/_media/publications/pow
 We will release the code and data in the following order, please stay tuned!
 
 - [x] Release core code of PowerInfer, supporting Llama-2, Falcon-40B.
-- [ ] Support Mistral-7B
+- [x] Support ~~Mistral-7B~~ (Bamboo-7B)
 - [x] Support Windows
 - [ ] Support text-generation-webui
-- [ ] Release perplexity evaluation code
+- [x] Release perplexity evaluation code
 - [ ] Support Metal for Mac
 - [ ] Release code for OPT models
 - [ ] Release predictor training code
