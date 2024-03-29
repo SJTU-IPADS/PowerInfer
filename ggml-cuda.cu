@@ -5584,6 +5584,55 @@ static void mul_mat_vec_q4_0_q8_1_cuda(const void * vx, const void * vy, float *
         <<<block_nums, block_dims, 0, stream>>>(vx, vy, dst, ncols, nrows);
 }
 
+template <int qk, int qi, typename block_q_t, int vdr, vec_dot_q_cuda_t vec_dot_q_cuda>
+static __global__ void mul_mat_vec_q(const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst, const int ncols, const int nrows,
+        const int *lst, const float *idx) {
+    const int gpu_row = blockIdx.x * blockDim.y + threadIdx.y;
+    const int row = lst ? lst[gpu_row] : gpu_row;
+
+    if (idx[row] < dev_sparse_threshold) {
+        if (threadIdx.x == 0) { dst[gpu_row] = 0; } // Assign 0 in case of extra memset
+        return; 
+    }
+
+    const int blocks_per_row    = ncols / qk; // 4096 / 32
+    const int blocks_per_warp   = vdr * WARP_SIZE / qi; // 2 * 32 / 4
+
+    // partial sum for each thread
+    float tmp = 0.0f;
+
+    const block_q_t  * x = (const block_q_t  *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    for (int i = 0; i < blocks_per_row; i += blocks_per_warp) {
+        const int ibx = gpu_row*blocks_per_row + i + threadIdx.x / (qi/vdr); // x block index
+
+        const int iby = (i + threadIdx.x / (qi/vdr)) * (qk/QK8_1); // y block index that aligns with ibx
+
+        const int iqs  = vdr * (threadIdx.x % (qi/vdr)); // x block quant index when casting the quants to int
+
+        tmp += vec_dot_q_cuda(&x[ibx], &y[iby], iqs);
+    }
+
+    // sum up partial sums and write back result
+#pragma unroll
+    for (int mask = 16; mask > 0; mask >>= 1) {
+        tmp += __shfl_xor_sync(0xffffffff, tmp, mask, 32);
+    }
+
+    if (threadIdx.x == 0) { dst[row] = tmp; } // Output result
+}
+
+static void mul_mat_vec_q4_0_q8_1_cuda(const void * vx, const void * vy, float * dst, const int ncols, const int nrows, cudaStream_t stream, const int *lst, const float *idx) {
+    GGML_ASSERT(ncols % QK4_0 == 0);
+    const int block_num_y = (nrows + GGML_CUDA_MMV_Y - 1) / GGML_CUDA_MMV_Y;
+    const dim3 block_nums(block_num_y, 1, 1);
+    const dim3 block_dims(WARP_SIZE, GGML_CUDA_MMV_Y, 1);
+    mul_mat_vec_q<QK4_0, QI4_0, block_q4_0, VDR_Q4_0_Q8_1_MMVQ, vec_dot_q4_0_q8_1>
+        <<<block_nums, block_dims, 0, stream>>>(vx, vy, dst, ncols, nrows, lst, idx);
+}
+
+
 static void mul_mat_vec_q4_1_q8_1_cuda(const void * vx, const void * vy, float * dst, const int ncols, const int nrows, cudaStream_t stream) {
     GGML_ASSERT(ncols % QK4_1 == 0);
     const int block_num_y = (nrows + GGML_CUDA_MMV_Y - 1) / GGML_CUDA_MMV_Y;
@@ -7076,7 +7125,7 @@ inline void * ggml_cuda_get_tensor_data(const ggml_tensor * tensor) {
     }
 }
 
-inline void ggml_cuda_op_mul_mat_batch_sparse_cublas(
+inline void ggml_cuda_op_mul_mat_batch_sparse(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
     const int64_t src1_padded_row_size, const cudaStream_t & stream) {
@@ -7314,7 +7363,7 @@ inline void ggml_cuda_op_dequantize_mul_mat_vec(
     (void) src1_padded_row_size;
 }
 
-inline void ggml_cuda_op_mul_mat_vec_sparse_cublas(
+inline void ggml_cuda_op_mul_mat_vec_sparse_q(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
     const int64_t src1_padded_row_size, const cudaStream_t & stream) {
@@ -7348,8 +7397,56 @@ inline void ggml_cuda_op_mul_mat_vec_sparse_cublas(
     cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
-            dequantize_mul_mat_vec_q4_0_cuda_sparse(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream, row_lookup, sparse_idx);
+             mul_mat_vec_q4_0_q8_1_cuda(
+                src0_dd_i, src1_ddq_i, dst_dd_i, ne00, row_diff, stream,
+                row_lookup, sparse_idx
+            );
             break;
+        default:
+            GGML_ASSERT(false && "Unsupported type");
+            break;
+    }
+
+    (void) src1;
+    (void) dst;
+    (void) src1_ddf_i;
+    (void) src1_ncols;
+    (void) src1_padded_row_size;
+}
+
+inline void ggml_cuda_op_mul_mat_vec_sparse_dequantized(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
+    const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
+    const int64_t src1_padded_row_size, const cudaStream_t & stream) {
+
+    const int64_t ne00 = src0->ne[0];
+    const int64_t ne10 = src1->ne[1];
+    const int64_t row_diff = row_high - row_low;
+
+    float * sparse_idx = static_cast<float *>(ggml_cuda_get_tensor_data(dst->src[2]));
+    int32_t * row_lookup = dst->src[3] != NULL ? static_cast<int32_t *>(ggml_cuda_get_tensor_data(dst->src[3])) : NULL;
+
+    // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
+#ifdef GGML_CUDA_F16
+    size_t ash;
+    dfloat * src1_dfloat = nullptr; // dfloat == half
+
+    bool src1_convert_f16 = src0->type == GGML_TYPE_Q4_0 || src0->type == GGML_TYPE_Q4_1 ||
+        src0->type == GGML_TYPE_Q5_0 || src0->type == GGML_TYPE_Q5_1 ||
+        src0->type == GGML_TYPE_Q8_0 || src0->type == GGML_TYPE_F16;
+
+    if (src1_convert_f16) {
+        src1_dfloat = (half *) ggml_cuda_pool_malloc(ne00*sizeof(half), &ash);
+        ggml_cpy_f32_f16_cuda((const char *) src1_ddf_i, (char *) src1_dfloat, ne00,
+                                ne00, 1, sizeof(float), 0, 0,
+                                ne00, 1, sizeof(half),  0, 0, stream);
+    }
+#else
+    const dfloat * src1_dfloat = (const dfloat *) src1_ddf_i; // dfloat == float, no conversion
+#endif // GGML_CUDA_F16
+
+    cudaMemsetAsync((void *)dst_dd_i, 0, ggml_nbytes(dst), stream);
+    switch (src0->type) {
         case GGML_TYPE_F16:
             convert_mul_mat_vec_f16_cuda_sparse(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream, row_lookup, sparse_idx);
             break;
@@ -7541,6 +7638,14 @@ inline void ggml_cuda_op_mul_mat_transpose_select_gemm(
     (void) src1_padded_row_size;
 }
 
+__global__ void matrix_row_select_cont(const float * src, float * dst, const int * lst, const int src1_ncols, const int stride_src, const int stride_dst) {
+    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int col_to_read = lst[tid];
+    for (int i = 0; i < src1_ncols; i++) {
+        dst[stride_dst * i + tid] = src[stride_src * i + col_to_read];
+    }
+}
+
 inline void ggml_cuda_op_mul_mat_transpose_gemm(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
     const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low, const int64_t row_high, const int64_t src1_ncols,
@@ -7578,27 +7683,36 @@ inline void ggml_cuda_op_mul_mat_transpose_gemm(
     // ldc == nrows of the matrix that cuBLAS writes into
     int ldc = dst->backend == GGML_BACKEND_GPU && id == g_main_device ? ne0 : row_diff;
     ldc = ne0;
-    // size_t src0_as_t = 0;
-    // float *transpose = (float *) ggml_cuda_pool_malloc(row_diff*ne00 * sizeof(float), &src0_as_t); // NOLINT
-    // int blockSize = 32;
-    // int numBlocks = ne00;
-    // transpose_cont<<< numBlocks, blockSize, 0, stream>>>((float *)src0_ddf_i, transpose, ne00, ne01, 1, ne00, ne01,NULL);
 
     CUBLAS_CHECK(cublasSetStream(g_cublas_handles[id], stream));
-    // CUBLAS_CHECK(
-    //     cublasSgemm(g_cublas_handles[id], CUBLAS_OP_T, CUBLAS_OP_N,
-    //             ne00, src1_ncols, ne10,
-    //             &alpha, transpose, ne01,
-    //                     src1_ddf_i,  ne10,
-    //             &beta,  dst_dd_i,   ldc));
-    
-    CUBLAS_CHECK(
-        cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
-                ne00, src1_ncols, ne10,
-                &alpha, src0_ddf_i, ne00,
-                        src1_ddf_i,  ne10,
-                &beta,  dst_dd_i,   ldc));
- 
+
+    // dst->src[3]->data is gpu_bucket, ne01 is length
+    if (dst->src[3] != NULL) {
+        // compress src1
+        GGML_ASSERT(ne01 % 32 == 0);
+        const int block_nums = ne01 / 32;
+        size_t actual_size;
+        float * src1_cont = (float *)ggml_cuda_pool_malloc(ne01 * src1_ncols * sizeof(float), &actual_size);
+        int * row_lookup = static_cast<int *>(ggml_cuda_get_tensor_data(dst->src[3]));
+        matrix_row_select_cont<<<block_nums, 32, 0, stream>>>(src1_ddf_i, src1_cont, row_lookup, src1_ncols, ne10, ne01);
+
+        CUBLAS_CHECK(
+            cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
+                    ne00, src1_ncols, ne01,
+                    &alpha, src0_ddf_i, ne00,
+                    src1_cont,  ne01,
+                    &beta,  dst_dd_i,   ldc));
+
+        ggml_cuda_pool_free(src1_cont, actual_size);
+    } else {
+        // full_gpu
+        CUBLAS_CHECK(
+            cublasSgemm(g_cublas_handles[id], CUBLAS_OP_N, CUBLAS_OP_N,
+                    ne00, src1_ncols, ne10,
+                    &alpha, src0_ddf_i, ne00,
+                            src1_ddf_i,  ne10,
+                    &beta,  dst_dd_i,   ldc));
+    }
 
     if (src0_as > 0) {
         ggml_cuda_pool_free(src0_ddq_as_f32, src0_as);
@@ -8846,9 +8960,18 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
 static void ggml_cuda_mul_mat_sparse(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[2] != NULL && "dst->src[2] must be present for sparse matrix multiplication");
     if (src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0) {
-        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_vec_sparse_cublas, false);
+        switch(src0->type) {
+            case GGML_TYPE_F16:
+                ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_vec_sparse_dequantized, false);
+                break;
+            case GGML_TYPE_Q4_0:
+                ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_vec_sparse_q, true);
+                break;
+            default:
+                GGML_ASSERT(false && "unsupported type for sparse matrix multiplication");
+        }
     } else {
-        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_batch_sparse_cublas, false);
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_batch_sparse, false);
     }
 }
 
@@ -8856,8 +8979,11 @@ void ggml_cuda_axpy(const ggml_tensor * src0, const ggml_tensor * src1, ggml_ten
     GGML_ASSERT(dst->src[2] != NULL && "dst->src[2] must be present for axpy");
     bool all_on_device = (src0->backend == GGML_BACKEND_GPU || src0->backend == GGML_BACKEND_GPU_SPLIT) &&
         src1->backend == GGML_BACKEND_GPU && dst->backend == GGML_BACKEND_GPU;
-    ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_dequantize_axpy, false);
-    // ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_transpose_gemm, false); // fallback
+    if (src1->ne[1] > 100) {
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_transpose_gemm, false);
+    } else {
+        ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_dequantize_axpy, false);
+    }
 }
 
 static void ggml_cuda_scale(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
