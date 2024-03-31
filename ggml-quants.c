@@ -2590,68 +2590,6 @@ void ggml_axpy_q5_0_q8_0(const int n, const void * restrict vx, const void * res
     assert(nb % 2 == 0);
 
     const block_q5_0 * restrict x = vx;
-#if defined(__AVX22__)
-    // Initialize accumulator with zeros
-    __m256 acc = _mm256_setzero_ps();
-
-    __m256i alpha_v = _mm256_set1_epi16((short)alpha);
-    // Main loop
-    for (int i = 0; i < nb; ++i) {
-        /* Compute combined scale for the block */
-        const __m256 d = _mm256_set1_ps( GGML_FP16_TO_FP32(x[i].d) * GGML_FP16_TO_FP32(scale) );
-        __m256i bx = bytes_from_nibbles_32(x[i].qs);
-
-        // Now we have a vector with bytes in [ 0 .. 15 ] interval. Offset them into [ -8 .. +7 ] interval.
-        const __m256i off = _mm256_set1_epi8( 8 );
-        bx = _mm256_sub_epi8( bx, off );
-        //16个数计算
-        __m128i m_a = _mm256_extracti128_si256(bx, 0);
-        __m256i m_x = _mm256_cvtepi8_epi16(m_a); //16 elements
-        m_x = _mm256_mullo_epi16(m_x, alpha_v);
-        __m128i x_0 = _mm256_extracti128_si256(m_x, 0);
-        __m256i x0_32 = _mm256_cvtepi16_epi32(x_0);
-        __m256 fx0 = _mm256_cvtepi32_ps(x0_32);
-        fx0 = _mm256_mul_ps(fx0, d);
-
-
-        __m256 by = _mm256_loadu_ps((const __m256 *)((char *)vy+i*128));
-
-        by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)((char*)vz + i*128), by);
-        //second phase
-
-        x_0 = _mm256_extracti128_si256(m_x, 1);
-        x0_32 = _mm256_cvtepi16_epi32(x_0);
-        fx0 = _mm256_cvtepi32_ps(x0_32);
-        fx0 = _mm256_mul_ps(fx0, d);
-        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+32));
-        by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)((char*)vz + i*128+32), by);
-
-        //third phase
-        m_a = _mm256_extracti128_si256(bx, 1);
-        m_x = _mm256_cvtepi8_epi16(m_a);
-        m_x = _mm256_mullo_epi16(m_x, alpha_v);
-        x_0 = _mm256_extracti128_si256(m_x, 0);
-        x0_32 = _mm256_cvtepi16_epi32(x_0);
-        fx0 = _mm256_cvtepi32_ps(x0_32);
-        fx0 = _mm256_mul_ps(fx0, d);
-        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+64));
-
-        by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)((char*)vz + i*128+64), by);
-
-        //fourth phase
-        x_0 = _mm256_extracti128_si256(m_x, 1);
-        x0_32 = _mm256_cvtepi16_epi32(x_0);
-        fx0 = _mm256_cvtepi32_ps(x0_32);
-        fx0 = _mm256_mul_ps(fx0, d);
-        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+96));
-        by = _mm256_add_ps(by, fx0);
-        _mm256_storeu_ps((__m256*)((char*)vz + i*128+96), by);
-
-    }
-#else
     float *res = (float *)vz;
     float scale_fp32 = GGML_FP16_TO_FP32(scale);
     for (int i = 0; i < nb; i++) {
@@ -2672,7 +2610,6 @@ void ggml_axpy_q5_0_q8_0(const int n, const void * restrict vx, const void * res
             res[offset + j + qk/2] = res[offset + j + qk/2] + ((float)(v1 * (int)alpha) * result_scale);
         }
     }
-#endif
 }
 void ggml_axpy_q4_1_q8_1(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
     // TODO AVX2
