@@ -14293,13 +14293,13 @@ static void ggml_axpy_avx_f16(const int n, const ggml_fp16_t * restrict vx, cons
 #if defined(__AVX2__) 
     float *result = (float *)vz;
     float alpha_f32 = GGML_FP16_TO_FP32(alpha);  
-    __m256 scale = _mm256_set1_ps(alpha_f32);  // 创建scale向量
+    __m256 scale = _mm256_set1_ps(alpha_f32);  // create scale 
     for (int i = 0; i < n; i += 8) {
         __m128i vx_low = _mm_loadu_si128((__m128i const*)(&vx[i]));  
-        __m256 vx_f32 = _mm256_cvtph_ps(vx_low);  // 转换vx为fp32
-        __m256 vy_f32 = _mm256_loadu_ps((float const*)(result+ i));  // 加载vy
-        __m256 res = _mm256_fmadd_ps(vx_f32, scale, vy_f32);  // 执行向量加法和乘法操作
-        _mm256_storeu_ps((float*)(&result[i]), res);  // 存储结果
+        __m256 vx_f32 = _mm256_cvtph_ps(vx_low);  //  conver vx to fp32
+        __m256 vy_f32 = _mm256_loadu_ps((float const*)(result+ i));  // load vy
+        __m256 res = _mm256_fmadd_ps(vx_f32, scale, vy_f32);  
+        _mm256_storeu_ps((float*)(&result[i]), res);  // store the result
     }
 #else
     float *res = (float *)vz;
