@@ -14414,9 +14414,9 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
             break;
     }
     
-    // 获取锁
+  
     while (atomic_flag_test_and_set(&g_axpy_dense_lock)) {
-        // 如果锁已经被占用，则等待
+       
     }
     
     float *res = (float *)(dst->data);
@@ -14424,19 +14424,19 @@ static void ggml_compute_forward_mul_mat_axpy_dense(
     int i;
  
 
-    // 计算剩余的元素个数
+   
     int remainder = ne00 % 8;
 
 #if defined(__AVX2__)
-    // 使用AVX指令进行向量化计算
+    
     for (i = 0; i < ne00 - remainder; i += 8) {
-        __m256 res_vec = _mm256_loadu_ps(res + i);  // 加载res中的8个浮点数
-        __m256 tmp_vec = _mm256_loadu_ps(tmp + i);  // 加载tmp中的8个浮点数
-        __m256 result = _mm256_add_ps(res_vec, tmp_vec);  // 执行加法运算
-        _mm256_storeu_ps(res + i, result);  // 存储结果到res中
+        __m256 res_vec = _mm256_loadu_ps(res + i);  
+        __m256 tmp_vec = _mm256_loadu_ps(tmp + i);  
+        __m256 result = _mm256_add_ps(res_vec, tmp_vec);  
+        _mm256_storeu_ps(res + i, result);  
     }
 
-    // 处理剩余的元素
+    
     for (i = ne00 - remainder; i < ne00; i++) {
         res[i] += tmp[i];
     }
@@ -14581,10 +14581,10 @@ static void ggml_compute_forward_mul_mat_axpy(
 #if defined(__AVX2__)
         // 使用AVX指令进行向量化计算
         for (i = 0; i < ne00 - remainder; i += 8) {
-            __m256 res_vec = _mm256_loadu_ps(res + i);  // 加载res中的8个浮点数
-            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);  // 加载tmp中的8个浮点数
-            __m256 result = _mm256_add_ps(res_vec, tmp_vec);  // 执行加法运算
-            _mm256_storeu_ps(res + i, result);  // 存储结果到res中
+            __m256 res_vec = _mm256_loadu_ps(res + i); 
+            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);  
+            __m256 result = _mm256_add_ps(res_vec, tmp_vec);  
+            _mm256_storeu_ps(res + i, result);  
         }
 
         // 处理剩余的元素
@@ -14728,19 +14728,19 @@ static void ggml_compute_forward_mul_mat_axpy_q8_0(
         float *tmp = (float *)vy;
         int i;
 
-        // 计算剩余的元素个数
+       
         int remainder = ne00 % 8;
 #if defined(__AVX2__)
-        // 使用AVX指令进行向量化计算
+        
         for (i = 0; i < ne00 - remainder; i += 8)
         {
-            __m256 res_vec = _mm256_loadu_ps(res + i);       // 加载res中的8个浮点数
-            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       // 加载tmp中的8个浮点数
-            __m256 result = _mm256_add_ps(res_vec, tmp_vec); // 执行加法运算
-            _mm256_storeu_ps(res + i, result);               // 存储结果到res中
+            __m256 res_vec = _mm256_loadu_ps(res + i);      
+            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       
+            __m256 result = _mm256_add_ps(res_vec, tmp_vec); 
+            _mm256_storeu_ps(res + i, result);               
         }
 
-        // 处理剩余的元素
+        
         for (i = ne00 - remainder; i < ne00; i++)
         {
             res[i] += tmp[i];
@@ -14884,19 +14884,19 @@ static void ggml_compute_forward_mul_mat_axpy_q4_1(
         float *tmp = (float *)vy;
         int i;
 
-        // 计算剩余的元素个数
+
         int remainder = ne00 % 8;
 #if defined(__AVX2__)
-        // 使用AVX指令进行向量化计算
+
         for (i = 0; i < ne00 - remainder; i += 8)
         {
-            __m256 res_vec = _mm256_loadu_ps(res + i);       // 加载res中的8个浮点数
-            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       // 加载tmp中的8个浮点数
-            __m256 result = _mm256_add_ps(res_vec, tmp_vec); // 执行加法运算
-            _mm256_storeu_ps(res + i, result);               // 存储结果到res中
+            __m256 res_vec = _mm256_loadu_ps(res + i);       
+            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       
+            __m256 result = _mm256_add_ps(res_vec, tmp_vec); 
+            _mm256_storeu_ps(res + i, result);               
         }
 
-        // 处理剩余的元素
+    
         for (i = ne00 - remainder; i < ne00; i++)
         {
             res[i] += tmp[i];
@@ -15040,19 +15040,19 @@ static void ggml_compute_forward_mul_mat_axpy_q5_1(
         float *tmp = (float *)vy;
         int i;
 
-        // 计算剩余的元素个数
+
         int remainder = ne00 % 8;
 #if defined(__AVX2__)
-        // 使用AVX指令进行向量化计算
+
         for (i = 0; i < ne00 - remainder; i += 8)
         {
-            __m256 res_vec = _mm256_loadu_ps(res + i);       // 加载res中的8个浮点数
-            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       // 加载tmp中的8个浮点数
-            __m256 result = _mm256_add_ps(res_vec, tmp_vec); // 执行加法运算
-            _mm256_storeu_ps(res + i, result);               // 存储结果到res中
+            __m256 res_vec = _mm256_loadu_ps(res + i);      
+            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       
+            __m256 result = _mm256_add_ps(res_vec, tmp_vec); 
+            _mm256_storeu_ps(res + i, result);              
         }
 
-        // 处理剩余的元素
+
         for (i = ne00 - remainder; i < ne00; i++)
         {
             res[i] += tmp[i];
@@ -15194,19 +15194,19 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
         float *tmp = (float *)vy;
         int i;
 
-        // 计算剩余的元素个数
+
         int remainder = ne00 % 8;
 #if defined(__AVX2__)
-        // 使用AVX指令进行向量化计算
+
         for (i = 0; i < ne00 - remainder; i += 8)
         {
-            __m256 res_vec = _mm256_loadu_ps(res + i);       // 加载res中的8个浮点数
-            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       // 加载tmp中的8个浮点数
-            __m256 result = _mm256_add_ps(res_vec, tmp_vec); // 执行加法运算
-            _mm256_storeu_ps(res + i, result);               // 存储结果到res中
+            __m256 res_vec = _mm256_loadu_ps(res + i);       
+            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);      
+            __m256 result = _mm256_add_ps(res_vec, tmp_vec); 
+            _mm256_storeu_ps(res + i, result);               
         }
 
-        // 处理剩余的元素
+        
         for (i = ne00 - remainder; i < ne00; i++)
         {
             res[i] += tmp[i];
@@ -15343,19 +15343,19 @@ static void ggml_compute_forward_mul_mat_axpy_q5_0(
         float *tmp = (float *)vy;
         int i;
 
-        // 计算剩余的元素个数
+
         int remainder = ne00 % 8;
 #if defined(__AVX2__)
-        // 使用AVX指令进行向量化计算
+       
         for (i = 0; i < ne00 - remainder; i += 8)
         {
-            __m256 res_vec = _mm256_loadu_ps(res + i);       // 加载res中的8个浮点数
-            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       // 加载tmp中的8个浮点数
-            __m256 result = _mm256_add_ps(res_vec, tmp_vec); // 执行加法运算
-            _mm256_storeu_ps(res + i, result);               // 存储结果到res中
+            __m256 res_vec = _mm256_loadu_ps(res + i);       
+            __m256 tmp_vec = _mm256_loadu_ps(tmp + i);       
+            __m256 result = _mm256_add_ps(res_vec, tmp_vec); 
+            _mm256_storeu_ps(res + i, result);               
         }
 
-        // 处理剩余的元素
+        
         for (i = ne00 - remainder; i < ne00; i++)
         {
             res[i] += tmp[i];
@@ -15479,28 +15479,28 @@ static void ggml_compute_forward_mul_mat_axpy_head(
             break;
     }
     
-    // 获取锁
+    /
     while (atomic_flag_test_and_set(&g_axpy_head_lock)) {
-        // 如果锁已经被占用，则等待
+        
     }
     float *res = (float *)(dst->data);
     float *tmp = (float *)vy;
     int i;
  
 
-    // 计算剩余的元素个数
+    
     int remainder = ne00 % 8;
 
 #if defined(__AVX2__)
-    // 使用AVX指令进行向量化计算
+    
     for (i = 0; i < ne00 - remainder; i += 8) {
-        __m256 res_vec = _mm256_loadu_ps(res + i);  // 加载res中的8个浮点数
-        __m256 tmp_vec = _mm256_loadu_ps(tmp + i);  // 加载tmp中的8个浮点数
-        __m256 result = _mm256_add_ps(res_vec, tmp_vec);  // 执行加法运算
-        _mm256_storeu_ps(res + i, result);  // 存储结果到res中
+        __m256 res_vec = _mm256_loadu_ps(res + i); 
+        __m256 tmp_vec = _mm256_loadu_ps(tmp + i);  
+        __m256 result = _mm256_add_ps(res_vec, tmp_vec);  
+        _mm256_storeu_ps(res + i, result);  
     }
 
-    // 处理剩余的元素
+   
     for (i = ne00 - remainder; i < ne00; i++) {
         res[i] += tmp[i];
     }
