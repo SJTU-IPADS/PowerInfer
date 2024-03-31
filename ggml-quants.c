@@ -5,7 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include <float.h>
-
+#include <stdio.h>
 #ifdef __ARM_NEON
 
 // if YCM cannot find <arm_neon.h>, make a symbolic link to it, for example:
@@ -2422,6 +2422,82 @@ static inline __m128i get_scale_shuffle(int i) {
     return _mm_loadu_si128((const __m128i*)k_shuffle + i);
 }
 #endif
+void ggml_axpy_q8_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    const int qk = QK8_0;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q8_0 * restrict x = vx;
+#if defined(__AVX2__)
+    // Initialize accumulator with zeros
+    __m256 acc = _mm256_setzero_ps();
+
+    __m256i alpha_v = _mm256_set1_epi16((short)alpha);
+    // Main loop
+    for (int i = 0; i < nb; ++i) {
+        const __m256 d = _mm256_set1_ps( GGML_FP16_TO_FP32(x[i].d) * GGML_FP16_TO_FP32(scale) );
+        __m256i bx = _mm256_loadu_si256((void const*)((char *)&x[i].qs[0]));
+        //16个数计算
+        __m128i m_a = _mm256_extracti128_si256(bx, 0);
+        __m256i m_x = _mm256_cvtepi8_epi16(m_a); //16 elements
+        m_x = _mm256_mullo_epi16(m_x, alpha_v);
+        __m128i x_0 = _mm256_extracti128_si256(m_x, 0);
+        __m256i x0_32 = _mm256_cvtepi16_epi32(x_0);
+        __m256 fx0 = _mm256_cvtepi32_ps(x0_32);
+        fx0 = _mm256_mul_ps(fx0, d);
+
+
+        __m256 by = _mm256_loadu_ps((const __m256 *)((char *)vy+i*128));
+
+        by = _mm256_add_ps(by, fx0);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128), by);
+        //second phase
+
+        x_0 = _mm256_extracti128_si256(m_x, 1);
+        x0_32 = _mm256_cvtepi16_epi32(x_0);
+        fx0 = _mm256_cvtepi32_ps(x0_32);
+        fx0 = _mm256_mul_ps(fx0, d);
+        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+32));
+        by = _mm256_add_ps(by, fx0);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128+32), by);
+
+        //third phase
+        m_a = _mm256_extracti128_si256(bx, 1);
+        m_x = _mm256_cvtepi8_epi16(m_a);
+        m_x = _mm256_mullo_epi16(m_x, alpha_v);
+        x_0 = _mm256_extracti128_si256(m_x, 0);
+        x0_32 = _mm256_cvtepi16_epi32(x_0);
+        fx0 = _mm256_cvtepi32_ps(x0_32);
+        fx0 = _mm256_mul_ps(fx0, d);
+        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+64));
+
+        by = _mm256_add_ps(by, fx0);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128+64), by);
+
+        //fourth phase
+        x_0 = _mm256_extracti128_si256(m_x, 1);
+        x0_32 = _mm256_cvtepi16_epi32(x_0);
+        fx0 = _mm256_cvtepi32_ps(x0_32);
+        fx0 = _mm256_mul_ps(fx0, d);
+        by = _mm256_loadu_ps((const __m256 *)((char*)vy+i*128+96));
+        by = _mm256_add_ps(by, fx0);
+        _mm256_storeu_ps((__m256*)((char*)vz + i*128+96), by);
+    }
+#else
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK8_0;
+
+        for (int j = 0; j < qk; ++j) {
+            const int v0 = (x[i].qs[j]);
+            res[offset + j] = res[offset + j] + ((float)(v0 * (int)alpha) * result_scale);
+        }
+    }
+#endif
+}
 
 void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
     const int qk = QK8_0;
@@ -2506,6 +2582,90 @@ void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * res
         }
     }
 #endif
+}
+void ggml_axpy_q5_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    const int qk = QK8_0;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q5_0 * restrict x = vx;
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK5_0;
+        uint32_t qh;
+        memcpy(&qh, x[i].qh, sizeof(qh));
+
+        for (int j = 0; j < qk/2; ++j) {
+            // const int v0 = (x[i].qs[j] & 0x0F) - 8;
+            // const int v1 = (x[i].qs[j] >>   4) - 8;
+            const uint8_t xh_0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
+            const uint8_t xh_1 = ((qh & (1u << (j + 16))) >> (j + 12));
+
+            const int32_t v0 = ((x[i].qs[j] & 0x0F) | xh_0) - 16;
+            const int32_t v1 = ((x[i].qs[j] >>   4) | xh_1) - 16;
+            res[offset + j] = res[offset + j] + ((float)(v0 * (int)alpha) * result_scale);
+            res[offset + j + qk/2] = res[offset + j + qk/2] + ((float)(v1 * (int)alpha) * result_scale);
+        }
+    }
+}
+void ggml_axpy_q5_1_q8_1(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    const int qk = QK8_1;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q5_1 * restrict x = vx;
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK5_1;
+        uint32_t qh;
+        memcpy(&qh, x[i].qh, sizeof(qh));
+        float m = GGML_FP16_TO_FP32(x[i].m);
+        float y0 = scale_fp32 * alpha;
+        float tmp = m * y0;
+
+        for (int j = 0; j < qk/2; ++j) {
+            // const int v0 = (x[i].qs[j] & 0x0F) - 8;
+            // const int v1 = (x[i].qs[j] >>   4) - 8;
+            const uint8_t xh_0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
+            const uint8_t xh_1 = ((qh & (1u << (j + 16))) >> (j + 12));
+
+            const int32_t v0 = ((x[i].qs[j] & 0x0F) | xh_0);
+            const int32_t v1 = ((x[i].qs[j] >>   4) | xh_1);
+            res[offset + j] = res[offset + j] + ((float)(v0 * (int)alpha) * result_scale) + tmp;
+            res[offset + j + qk/2] = res[offset + j + qk/2] + ((float)(v1 * (int)alpha) * result_scale) + tmp;
+        }
+    }
+}
+void ggml_axpy_q4_1_q8_1(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    // TODO AVX2
+    const int qk = QK8_1;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q4_1 * restrict x = vx;
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK4_1;
+        float m = GGML_FP16_TO_FP32(x[i].m);
+        float y0 = scale_fp32 * alpha;
+        float tmp = m * y0;
+
+        for (int j = 0; j < qk/2; ++j) {
+            const int v0 = (x[i].qs[j] & 0x0F);
+            const int v1 = (x[i].qs[j] >>   4);
+            res[offset + j] = res[offset + j] + ((int)v0*(int)alpha)*result_scale+ tmp;
+            res[offset + j + qk/2] = res[offset + j + qk/2] + ((int)v1*(int)alpha)*result_scale+ tmp;
+        }
+    }
 }
 
 
