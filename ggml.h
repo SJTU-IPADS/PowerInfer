@@ -292,7 +292,6 @@
 //    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
 //    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb);
 //
-
 #define GGML_TENSOR_LOCALS_1(type, prefix, pointer, array) \
     const type prefix##0 = (pointer)->array[0]; \
     GGML_UNUSED(prefix##0);
@@ -459,9 +458,7 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
-
         GGML_OP_ARGSORT,
-
         GGML_OP_UPSCALE, // nearest interpolate
 
         GGML_OP_FLASH_ATTN,

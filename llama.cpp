@@ -96,7 +96,7 @@
 #endif
 
 #define LLAMA_MAX_NODES 4096
-#define LLAMA_MAX_EXPERTS 8
+#define LLAMA_MAX_EXPERTS 64
 
 // 
 // global variables (should be removed after a better design)
@@ -1266,8 +1266,8 @@ struct llama_hparams {
     uint32_t n_layer;
     uint32_t n_rot;
     uint32_t n_ff;
-    uint32_t n_expert = 0;
-    uint32_t n_expert_used = 0;
+    uint32_t n_expert;
+    uint32_t n_expert_used;
 
     float f_norm_eps;
     float f_norm_rms_eps;
@@ -2330,13 +2330,8 @@ static void llm_load_hparams(
     GGUF_GET_KEY(ctx, hparams.n_expert,       gguf_get_val_u32, GGUF_TYPE_UINT32, false,kv(LLM_KV_EXPERT_COUNT));
     GGUF_GET_KEY(ctx, hparams.n_expert_used,  gguf_get_val_u32, GGUF_TYPE_UINT32, false,kv(LLM_KV_EXPERT_USED_COUNT));
 
-    GGML_ASSERT(hparams.n_expert <= LLAMA_MAX_EXPERTS);
-    GGML_ASSERT(hparams.n_expert_used <= hparams.n_expert);
-    if (hparams.n_expert > 0) {
-        GGML_ASSERT(hparams.n_expert_used > 0);
-    } else {
-        GGML_ASSERT(hparams.n_expert_used == 0);
-    }
+    GGML_ASSERT(hparams.n_expert == 0 && hparams.n_expert_used == hparams.n_expert
+                || 0 < hparams.n_expert_used && hparams.n_expert_used <= hparams.n_expert && hparams.n_expert <= LLAMA_MAX_EXPERTS);
 
     // n_head_kv is optional, default to n_head
     hparams.n_head_kv = hparams.n_head;
@@ -2380,6 +2375,13 @@ static void llm_load_hparams(
         }
         // gpt-neox n_rot = rotary_pct * (n_embd / n_head)
         // gpt-j n_rot = rotary_dim
+    }
+
+    if (gguf_get_sparse_deriv(ctx)) {
+        // read sparse threshold override if sparse deriv is enabled
+        GGUF_GET_KEY(ctx, hparams.sparse_pred_threshold, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_SPARSE_THRESHOLD));
+        if (getenv("LLAMA_SPARSE_PRED_THRESHOLD"))
+            hparams.sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
     }
 
     // arch-specific KVs
@@ -5104,6 +5106,7 @@ struct llm_build_context {
                     model.layers[il].attn_norm, NULL,
                     LLM_NORM_RMS, cb, il);
             cb(cur, "attn_norm", il);
+
             // self-attention
             {
                 // compute Q and K and RoPE them

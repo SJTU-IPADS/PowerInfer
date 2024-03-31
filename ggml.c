@@ -1640,9 +1640,8 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CONV_TRANSPOSE_2D",
     "POOL_1D",
     "POOL_2D",
-        "ARGSORT",
+    "ARGSORT",
     "UPSCALE",
-
 
     "FLASH_ATTN",
     "FLASH_FF",
@@ -4236,7 +4235,7 @@ struct ggml_tensor * ggml_mul_mat_id(
     for (int i = 0; i < n_as; i++) {
         struct ggml_tensor * a = as[i];
 
-        // fail when using mlp predictor
+        // TODO: fail when using mlp predictor
         // GGML_ASSERT(ggml_are_same_shape(as[0], a));
         // GGML_ASSERT(ggml_can_mul_mat(a, b));
 
@@ -5783,7 +5782,6 @@ struct ggml_tensor * ggml_upscale(
 }
 
 // ggml_argsort
-
 struct ggml_tensor * ggml_argsort(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
@@ -7996,7 +7994,6 @@ static void ggml_compute_forward_mul_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
         struct ggml_tensor * dst) {
-
     GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
@@ -8101,7 +8098,6 @@ static void ggml_compute_forward_div_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
         struct ggml_tensor * dst) {
-
     GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
@@ -14593,7 +14589,6 @@ static void ggml_compute_forward_mul_mat_sparse(
     //     printf("predictor %d predictor_cpu %d\n", predictor, predictor_cpu);
 }
 
-
 static void ggml_compute_forward_mul_mat_id(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -16726,9 +16721,6 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
     bool skip_cpu = ggml_cuda_compute_forward(params, tensor);
     if (skip_cpu) {
         return;
-    }
-    if (tensor->src[0] != NULL && tensor->src[0]->backend == GGML_BACKEND_GPU) {
-        ggml_cuda_compute_forward(params, tensor);
     }
     // Make sure src[0] (weight for binary ops) is on CPU to avoid any weight transfer
     GGML_ASSERT((tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU) && "weight should be on the CPU to compute on the CPU");
