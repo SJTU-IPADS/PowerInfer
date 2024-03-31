@@ -1130,42 +1130,13 @@ extern "C" {
             struct ggml_tensor  * b,
             struct ggml_tensor  * sparse_idx,
             struct ggml_tensor  * hybrid_aux);
+
     GGML_API struct ggml_tensor * ggml_mul_mat_id(
                 struct ggml_context * ctx,
                 struct ggml_tensor  * const as[],
                 int                   n_as,
                 struct ggml_tensor  * ids,
                 int                   id,
-                struct ggml_tensor  * b);
-
-    GGML_API struct ggml_tensor * ggml_mul_mat_id_idx(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * const as[],
-        int                   n_as,
-        struct ggml_tensor  * ids,
-        int                   id,
-        struct ggml_tensor  * idx,
-        struct ggml_tensor  * const gpu_idx[],
-        struct ggml_tensor  * b);
-    GGML_API struct ggml_tensor * ggml_mul_mat_id_special(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * const as[],
-        int                   n_as,
-        struct ggml_tensor  * ids,
-        int                   id,
-        struct ggml_tensor  * idx,
-        struct ggml_tensor  * const gpu_idx[],
-        struct ggml_tensor  * const ref[],
-        struct ggml_tensor  * b);
-
-    GGML_API struct ggml_tensor * ggml_axpy_id(
-                struct ggml_context * ctx,
-                struct ggml_tensor  * const as[],
-                int                   n_as,
-                struct ggml_tensor  * ids,
-                int                   id,
-                struct ggml_tensor  * idx,
-                struct ggml_tensor  * const gpu_index[],
                 struct ggml_tensor  * b);
 
     // A: m columns, n rows,

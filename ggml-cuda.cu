@@ -9092,17 +9092,12 @@ struct cuda_pool_alloc {
 
 static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     const struct ggml_tensor * ids          = src0;
-    const struct ggml_tensor * sparse_id    = dst->src[10];
-    struct ggml_tensor * const * gpu_bucket = &dst->src[11];
-
-   if (sparse_id != nullptr) { GGML_ASSERT(ggml_is_contiguous(sparse_id)); }
 
     const int32_t id    = ((int32_t *) dst->op_params)[0];
     const int32_t n_as  = ((int32_t *) dst->op_params)[1];
 
     const size_t nb11 = src1->nb[1];
     const size_t nb1  =  dst->nb[1];
-    const size_t nbs1 = (sparse_id == nullptr) ? 0 : sparse_id->nb[1];
 
     cudaStream_t stream = g_cudaStreams[g_main_device][0];
 
@@ -9126,29 +9121,20 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
     ggml_tensor dst_row;
     memcpy(&dst_row, dst, sizeof(ggml_tensor));
     for (int i = 2; i < GGML_MAX_SRC; ++i) { dst_row.src[i] = nullptr; }
-    ggml_tensor sparse_id_row;
-    if (sparse_id != nullptr) { memcpy(&sparse_id_row, sparse_id, sizeof(ggml_tensor)); }
 
     src1_row.extra = &src1_row_extra;
     dst_row.extra  = &dst_row_extra;
-    if (sparse_id != nullptr) { sparse_id_row.extra = &sparse_id_row_extra; }
 
     char * src1_original = src1->backend == GGML_BACKEND_CPU ?
         (char *) src1->data : (char *) src1_extra->data_device[g_main_device];
     char * dst_original  =  dst->backend == GGML_BACKEND_CPU ?
         (char *)  dst->data : (char *)  dst_extra->data_device[g_main_device];
-    char *sid_original = nullptr;
-    if (sparse_id != nullptr) {
-        sid_original = (sparse_id->backend == GGML_BACKEND_CPU) ?
-            (char *)sparse_id->data : (char *)((ggml_tensor_extra_gpu *)sparse_id->extra)->data_device[g_main_device];
-    }
 
     if (ids->backend == GGML_BACKEND_GPU) {
         CUDA_CHECK(cudaStreamSynchronize(stream)); // synchronize ids copy
     }
 
     if (src1->ne[1] == 1) {
-
         for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
 
             const int32_t row_id = *(const int32_t *) (ids_host + i01*ids->nb[1] + id*ids->nb[0]);
@@ -9156,7 +9142,6 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
             GGML_ASSERT(row_id >= 0 && row_id < n_as);
 
             const ggml_tensor * src0_row        = dst->src[row_id + 2];
-            const ggml_tensor * gpu_bucket_row  = gpu_bucket[row_id];
 
             src1_row_extra.data_device[g_main_device] = src1_original + i01*src1->nb[1];
             src1_row.data = (char *) src1->data + i01*src1->nb[1]; // TODO why is this set?
@@ -9164,24 +9149,12 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
             dst_row_extra.data_device[g_main_device] = dst_original + i01*dst->nb[1];
             dst_row.data = (char *) dst->data + i01*dst->nb[1]; // TODO why is this set?
 
-            if (sparse_id != nullptr) {
-                sparse_id_row_extra.data_device[g_main_device] = sid_original + i01 * nbs1;
-                sparse_id_row.data = (char *) sparse_id->data + i01 * nbs1;
-            }
-
             dst_row.src[0] = const_cast<ggml_tensor *>(src0_row);
             dst_row.src[1] = &src1_row;
-            dst_row.src[2] = (sparse_id == nullptr) ? nullptr : &sparse_id_row; // idx
-            dst_row.src[3] = const_cast<ggml_tensor *>(gpu_bucket_row); // gpu_idx
 
-            if (sparse_id == nullptr) {
-                ggml_cuda_mul_mat(src0_row, &src1_row, &dst_row);
-            } else {
-                ggml_cuda_mul_mat_sparse(src0_row, &src1_row, &dst_row);
-            }
-            
+            ggml_cuda_mul_mat(src0_row, &src1_row, &dst_row);
         }
-    } else if (sparse_id == nullptr) {
+    } {
         src1_row.backend = GGML_BACKEND_GPU;
         dst_row.backend  = GGML_BACKEND_GPU;
 
@@ -9198,7 +9171,6 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
 
         for (int32_t row_id = 0; row_id < n_as; ++row_id) {
             const ggml_tensor * src0_row        = dst->src[row_id + 2];
-            const ggml_tensor * gpu_bucket_row  = gpu_bucket[row_id];
 
             int64_t num_src1_rows = 0;
             for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
@@ -9231,7 +9203,6 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
             dst_row.src[0] = const_cast<ggml_tensor *>(src0_row);
             dst_row.src[1] = &src1_row;
             dst_row.src[2] = nullptr; // idx
-            dst_row.src[3] = const_cast<ggml_tensor *>(gpu_bucket_row); // gpu_idx
 
             ggml_cuda_mul_mat(src0_row, &src1_row, &dst_row);
 
@@ -9244,318 +9215,6 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
                 CUDA_CHECK(cudaMemcpyAsync(dst_original + i01*nb1, dst_contiguous.get() + num_src1_rows*nb1,
                                         nb1, dst_kind, stream));
                 num_src1_rows++;
-            }
-        }
-    } else {
-        src1_row.backend      = GGML_BACKEND_GPU;
-        dst_row.backend       = GGML_BACKEND_GPU;
-        sparse_id_row.backend = GGML_BACKEND_GPU;
-
-        cuda_pool_alloc<char> src1_contiguous(sizeof(float)*ggml_nelements(src1));
-        cuda_pool_alloc<char>  dst_contiguous(sizeof(float)*ggml_nelements(dst));
-        cuda_pool_alloc<char>  sid_contiguous(sizeof(float)*ggml_nelements(sparse_id));
-
-        src1_row_extra.data_device[g_main_device]      = src1_contiguous.get();
-        dst_row_extra.data_device[g_main_device]       =  dst_contiguous.get();
-        sparse_id_row_extra.data_device[g_main_device] = sid_contiguous.get();
-
-        const cudaMemcpyKind src1_kind = src1->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-        const cudaMemcpyKind dst_kind  =  dst->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-        const cudaMemcpyKind sid_kind  = sparse_id->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-
-        for (int32_t row_id = 0; row_id < n_as; ++row_id) {
-            const ggml_tensor * src0_row        = dst->src[row_id + 2];
-            const ggml_tensor * gpu_bucket_row  = gpu_bucket[row_id];
-
-            int64_t num_src1_rows = 0;
-            for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-                const int32_t row_id_i = *(const int32_t *) (ids_host + i01 * ids->nb[1] + id * ids->nb[0]);
-
-                if (row_id_i != row_id) { continue; }
-
-                GGML_ASSERT(row_id >= 0 && row_id < n_as);
-
-                CUDA_CHECK(cudaMemcpyAsync(src1_contiguous.get() + num_src1_rows * nb11, src1_original + i01 * nb11,
-                                        nb11, src1_kind, stream));
-                CUDA_CHECK(cudaMemcpyAsync(sid_contiguous.get() + num_src1_rows * nbs1, sid_original + i01 * nbs1,
-                                        nbs1, sid_kind, stream));
-                num_src1_rows++;
-            }
-
-            if (num_src1_rows == 0) {
-                continue;
-            }
-
-            src1_row.ne[1]      = num_src1_rows;
-            dst_row.ne[1]       = num_src1_rows;
-            sparse_id_row.ne[1] = num_src1_rows;
-
-            src1_row.nb[1] = nb11;
-            src1_row.nb[2] = num_src1_rows*nb11;
-            src1_row.nb[3] = num_src1_rows*nb11;
-
-            dst_row.nb[1] = nb1;
-            dst_row.nb[2] = num_src1_rows*nb1;
-            dst_row.nb[3] = num_src1_rows*nb1;
-
-            sparse_id_row.nb[1] = nbs1;
-            sparse_id_row.nb[2] = num_src1_rows * nbs1;
-            sparse_id_row.nb[3] = num_src1_rows * nbs1;
-
-            dst_row.src[0] = const_cast<ggml_tensor *>(src0_row);
-            dst_row.src[1] = &src1_row;
-            dst_row.src[2] = &sparse_id_row; // idx
-            dst_row.src[3] = const_cast<ggml_tensor *>(gpu_bucket_row); // gpu_idx
-
-            ggml_cuda_mul_mat_sparse(src0_row, &src1_row, &dst_row);
-
-            num_src1_rows = 0;
-            for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-                const int32_t row_id_i = *(const int32_t *) (ids_host + i01 * ids->nb[1] + id * ids->nb[0]);
-
-                if (row_id_i != row_id) { continue; }
-
-                CUDA_CHECK(cudaMemcpyAsync(dst_original + i01*nb1, dst_contiguous.get() + num_src1_rows*nb1,
-                                        nb1, dst_kind, stream));
-                ++num_src1_rows;
-            }
-        }
-    }
-
-    if (ids->backend == GGML_BACKEND_GPU) {
-        ggml_cuda_host_free(ids_host);
-    }
-    if (dst->backend == GGML_BACKEND_CPU) {
-        CUDA_CHECK(cudaStreamSynchronize(stream));
-    }
-}
-
-static void ggml_cuda_axpy_id(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    const struct ggml_tensor * ids          = src0;
-    const struct ggml_tensor * sparse_id    = dst->src[10];
-    struct ggml_tensor * const * gpu_bucket = &dst->src[11];
-
-    if (sparse_id != nullptr) { GGML_ASSERT(ggml_is_contiguous(sparse_id)); }
-
-    const int32_t id    = ((int32_t *) dst->op_params)[0];
-    const int32_t n_as  = ((int32_t *) dst->op_params)[1];
-
-    const size_t nb11 = src1->nb[1];
-    const size_t nb1  =  dst->nb[1];
-    const size_t nbs1 = (sparse_id == nullptr) ? 0 : sparse_id->nb[1];
-
-    cudaStream_t stream = g_cudaStreams[g_main_device][0];
-
-    char *ids_host = (char *)ids->data; 
-    if (ids->backend == GGML_BACKEND_GPU) {
-        const size_t ids_bytes = ggml_nbytes(ids);
-        ids_host               = (char *)ggml_cuda_host_malloc(ids_bytes);
-        const void * ids_dev   = ((const ggml_tensor_extra_gpu *)ids->extra)->data_device[g_main_device];
-        CUDA_CHECK(cudaMemcpyAsync(ids_host, ids_dev, ids_bytes, cudaMemcpyDeviceToHost, stream));
-    }
-
-    const ggml_tensor_extra_gpu * src1_extra = (const ggml_tensor_extra_gpu *) src1->extra;
-    const ggml_tensor_extra_gpu * dst_extra  = (const ggml_tensor_extra_gpu *) dst->extra;
-
-    ggml_tensor_extra_gpu src1_row_extra;
-    ggml_tensor_extra_gpu dst_row_extra;
-    ggml_tensor_extra_gpu sparse_id_row_extra;
-
-    ggml_tensor src1_row; 
-    memcpy(&src1_row, src1, sizeof(ggml_tensor));
-    ggml_tensor dst_row;
-    memcpy(&dst_row, dst, sizeof(ggml_tensor));
-    for (int i = 2; i < GGML_MAX_SRC; ++i) { dst_row.src[i] = nullptr; }
-    ggml_tensor sparse_id_row;
-    if (sparse_id != nullptr) { memcpy(&sparse_id_row, sparse_id, sizeof(ggml_tensor)); }
-
-    src1_row.extra = &src1_row_extra;
-    dst_row.extra  = &dst_row_extra;
-    if (sparse_id != nullptr) { sparse_id_row.extra = &sparse_id_row_extra; }
-
-    char * src1_original = src1->backend == GGML_BACKEND_CPU ?
-        (char *) src1->data : (char *) src1_extra->data_device[g_main_device];
-    char * dst_original  =  dst->backend == GGML_BACKEND_CPU ?
-        (char *)  dst->data : (char *)  dst_extra->data_device[g_main_device];
-    char *sid_original = nullptr;
-    if (sparse_id != nullptr) {
-        sid_original = (sparse_id->backend == GGML_BACKEND_CPU) ?
-            (char *)sparse_id->data : (char *)((ggml_tensor_extra_gpu *)sparse_id->extra)->data_device[g_main_device];
-    }
-
-    if (ids->backend == GGML_BACKEND_GPU) {
-        CUDA_CHECK(cudaStreamSynchronize(stream)); // synchronize ids copy
-    }
-
-    if (src1->ne[1] == 1) {
-
-        for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-
-            const int32_t row_id = *(const int32_t *) (ids_host + i01*ids->nb[1] + id*ids->nb[0]);
-
-            GGML_ASSERT(row_id >= 0 && row_id < n_as);
-
-            const ggml_tensor * src0_row        = dst->src[row_id + 2];
-            const ggml_tensor * gpu_bucket_row  = gpu_bucket[row_id];
-
-            src1_row_extra.data_device[g_main_device] = src1_original + i01*src1->nb[1];
-            src1_row.data = (char *) src1->data + i01*src1->nb[1]; // TODO why is this set?
-
-            dst_row_extra.data_device[g_main_device] = dst_original + i01*dst->nb[1];
-            dst_row.data = (char *) dst->data + i01*dst->nb[1]; // TODO why is this set?
-
-            if (sparse_id != nullptr) {
-                sparse_id_row_extra.data_device[g_main_device] = sid_original + i01 * nbs1;
-                sparse_id_row.data = (char *) sparse_id->data + i01 * nbs1;
-            }
-
-            dst_row.src[0] = const_cast<ggml_tensor *>(src0_row);
-            dst_row.src[1] = &src1_row;
-            dst_row.src[2] = (sparse_id == nullptr) ? nullptr : &sparse_id_row; // idx
-            dst_row.src[3] = const_cast<ggml_tensor *>(gpu_bucket_row); // gpu_idx
-
-            ggml_cuda_axpy(src0_row, &src1_row, &dst_row);
-        }
-    } else if (sparse_id == nullptr) {
-        src1_row.backend  = GGML_BACKEND_GPU;
-        dst_row.backend   = GGML_BACKEND_GPU;
-
-        cuda_pool_alloc<char> src1_contiguous(sizeof(float)*ggml_nelements(src1));
-        cuda_pool_alloc<char>  dst_contiguous(sizeof(float)*ggml_nelements(dst));
-
-        src1_row_extra.data_device[g_main_device]   = src1_contiguous.get();
-        dst_row_extra.data_device[g_main_device]    =  dst_contiguous.get();
-
-        const cudaMemcpyKind src1_kind = src1->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-        const cudaMemcpyKind dst_kind  =  dst->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-
-        for (int32_t row_id = 0; row_id < n_as; ++row_id) {
-            const ggml_tensor * src0_row        = dst->src[row_id + 2];
-            const ggml_tensor * gpu_bucket_row  = gpu_bucket[row_id];
-
-            int64_t num_src1_rows = 0;
-            for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-                const int32_t row_id_i = *(const int32_t *) (ids_host + i01 * ids->nb[1] + id * ids->nb[0]);
-
-                if (row_id_i != row_id) { continue; }
-
-                GGML_ASSERT(row_id >= 0 && row_id < n_as);
-
-                CUDA_CHECK(cudaMemcpyAsync(src1_contiguous.get() + num_src1_rows * nb11, src1_original + i01 * nb11,
-                                        nb11, src1_kind, stream));
-                ++num_src1_rows;
-            }
-
-            if (num_src1_rows == 0) { continue; }
-
-            src1_row.ne[1] = num_src1_rows;
-            dst_row.ne[1]  = num_src1_rows;
-
-            src1_row.nb[1] = nb11;
-            src1_row.nb[2] = num_src1_rows*nb11;
-            src1_row.nb[3] = num_src1_rows*nb11;
-
-            dst_row.nb[1] = nb1;
-            dst_row.nb[2] = num_src1_rows*nb1;
-            dst_row.nb[3] = num_src1_rows*nb1;
-            
-            dst_row.src[0] = const_cast<ggml_tensor *>(src0_row);
-            dst_row.src[1] = &src1_row;
-            dst_row.src[2] = nullptr; // idx
-            dst_row.src[3] = const_cast<ggml_tensor *>(gpu_bucket_row); // gpu_idx
-
-            ggml_cuda_axpy(src0_row, &src1_row, &dst_row);
-
-            num_src1_rows = 0;
-            for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-                const int32_t row_id_i = *(const int32_t *) (ids_host + i01 * ids->nb[1] + id * ids->nb[0]);
-
-                if (row_id_i != row_id) { continue; }
-
-                CUDA_CHECK(cudaMemcpyAsync(dst_original + i01 * nb1, dst_contiguous.get() + num_src1_rows * nb1,
-                                        nb1, dst_kind, stream));
-                ++num_src1_rows;
-            }
-        }
-    } else {
-        
-        src1_row.backend      = GGML_BACKEND_GPU;
-        dst_row.backend       = GGML_BACKEND_GPU;
-        sparse_id_row.backend = GGML_BACKEND_GPU;
-
-        cuda_pool_alloc<char> src1_contiguous(sizeof(float)*ggml_nelements(src1));
-        cuda_pool_alloc<char>  dst_contiguous(sizeof(float)*ggml_nelements(dst));
-        cuda_pool_alloc<char>  sid_contiguous(sizeof(float)*ggml_nelements(sparse_id));
-
-        src1_row_extra.data_device[g_main_device]       = src1_contiguous.get();
-        dst_row_extra.data_device[g_main_device]        =  dst_contiguous.get();
-        sparse_id_row_extra.data_device[g_main_device]  =  sid_contiguous.get();
-
-        const cudaMemcpyKind src1_kind = src1->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-        const cudaMemcpyKind dst_kind  =  dst->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-        const cudaMemcpyKind sid_kind  = sparse_id->backend == GGML_BACKEND_CPU ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-
-        for (int32_t row_id = 0; row_id < n_as; ++row_id) {
-            const ggml_tensor * src0_row        = dst->src[row_id + 2];
-            const ggml_tensor * gpu_bucket_row  = gpu_bucket[row_id];
-
-            int64_t num_src1_rows = 0;
-            for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-                const int32_t row_id_i = *(const int32_t *) (ids_host + i01 * ids->nb[1] + id * ids->nb[0]);
-
-                if (row_id_i != row_id) { continue; }
-
-                GGML_ASSERT(row_id >= 0 && row_id < n_as);
-
-                CUDA_CHECK(cudaMemcpyAsync(src1_contiguous.get() + num_src1_rows * nb11, src1_original + i01 * nb11,
-                                        nb11, src1_kind, stream));
-                CUDA_CHECK(cudaMemcpyAsync(sid_contiguous.get() + num_src1_rows * nbs1, sid_original + i01 * nbs1,
-                                        nbs1, sid_kind, stream));
-                ++num_src1_rows;
-            }
-
-            if (num_src1_rows == 0) { continue; }
-
-            src1_row.ne[1]      = num_src1_rows;
-            dst_row.ne[1]       = num_src1_rows;
-            sparse_id_row.ne[1] = num_src1_rows;
-
-            src1_row.nb[1] = nb11;
-            src1_row.nb[2] = num_src1_rows*nb11;
-            src1_row.nb[3] = num_src1_rows*nb11;
-
-            dst_row.nb[1] = nb1;
-            dst_row.nb[2] = num_src1_rows*nb1;
-            dst_row.nb[3] = num_src1_rows*nb1;
-
-            sparse_id_row.nb[1] = nbs1;
-            sparse_id_row.nb[2] = num_src1_rows * nbs1;
-            sparse_id_row.nb[3] = num_src1_rows * nbs1;
-            
-            dst_row.src[0] = const_cast<ggml_tensor *>(src0_row);
-            dst_row.src[1] = &src1_row;
-            dst_row.src[2] = &sparse_id_row; // idx
-            dst_row.src[3] = const_cast<ggml_tensor *>(gpu_bucket_row); // gpu_idx
-
-            ggml_cuda_axpy(src0_row, &src1_row, &dst_row);
-
-            num_src1_rows = 0;
-            for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-                const int32_t row_id_i = *(const int32_t *) (ids_host + i01 * ids->nb[1] + id * ids->nb[0]);
-
-                if (row_id_i != row_id) { continue; }
-
-                CUDA_CHECK(cudaMemcpyAsync(dst_original + i01 * nb1, dst_contiguous.get() + num_src1_rows * nb1,
-                                        nb1, dst_kind, stream));
-                ++num_src1_rows;
             }
         }
     }
@@ -9992,7 +9651,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             func = ggml_cuda_mul_mat_id;
             break;
         case GGML_OP_AXPY_ID:
-            func = ggml_cuda_axpy_id;
+            GGML_ASSERT(false && "not implemented");
             break;
         case GGML_OP_SCALE:
             func = ggml_cuda_scale;

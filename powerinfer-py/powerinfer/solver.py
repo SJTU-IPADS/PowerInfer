@@ -14,28 +14,18 @@ def solve_gpu_split(
     layer: int,
     batch: int,
     threshold: int,
-    expert: int
 ):
     # Processing activation data
     values = []
     for i in range(layer):
-        freq = torch.tensor([])
-        if expert > 0:
-            for e in range(expert):
-                # Load and sort activation data for each layer
-                new_freq = torch.load(f"{activation_path}/activation_{i}_{e}.pt")
-                freq = torch.cat([freq, new_freq])
-        else:
-            freq = torch.load(f"{activation_path}/activation_{i}.pt")
+        # Load and sort activation data for each layer
+        freq = torch.load(f"{activation_path}/activation_{i}.pt")
         freq, _ = torch.sort(freq, descending=True)
         freq = freq * -1.0
         freq = freq.view(-1, batch)
         freq = freq.sum(dim=1)
         freq = freq.tolist()
         values += freq
-    
-    if expert > 0:
-        neuron *= expert
 
     # Padding zero values for additional constraints
     for i in range(layer):
