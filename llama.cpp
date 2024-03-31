@@ -4731,7 +4731,7 @@ static std::pair<struct ggml_tensor *, struct ggml_tensor *> llm_build_moe_gatin
         int                   n_expert_used,
    const llm_build_cb_short & cbs
 ) {
-    int n_tokens = cur->ne[0];
+    int n_tokens = cur->ne[1];
     ggml_tensor * logits = ggml_mul_mat(ctx, gate_inp, cur); // [n_tokens, num_experts]
     cbs(logits, "ffn_moe_logits");
 
@@ -4770,7 +4770,7 @@ static struct ggml_tensor * llm_build_moe_dense(
 ) {
     // compute expert outputs
     ggml_tensor * moe_out = nullptr;
-    int n_tokens = cur->ne[0];
+    int n_tokens = cur->ne[1];
 
     for (int i = 0; i < n_expert_used; ++i) {
         ggml_tensor * cur_expert;
@@ -4994,7 +4994,7 @@ struct llm_build_context {
                 if (model.layers[il].ffn_gate_inp) {
                     // MoE layer
                     // cb(cur, "ffn_norm", il); // TODO: depends on expert offloading?
-                    GGML_ASSERT(n_tokens == cur->ne[0]); // debugging
+                    GGML_ASSERT(n_tokens == cur->ne[1]); // debugging
                     ggml_tensor *selected_experts, *weights;
                     std::tie(selected_experts, weights) = llm_build_moe_gating(ctx0, cur, model.layers[il].ffn_gate_inp, n_expert, n_expert_used, cbs);
 
