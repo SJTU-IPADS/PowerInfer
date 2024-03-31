@@ -210,6 +210,7 @@ void dequantize_row_q5_K(const block_q5_K * restrict x, float * restrict y, int 
 void dequantize_row_q6_K(const block_q6_K * restrict x, float * restrict y, int k);
 void dequantize_row_q8_K(const block_q8_K * restrict x, float * restrict y, int k);
 
+void ggml_axpy_q8_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale);
 void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale);
 
 // Dot product

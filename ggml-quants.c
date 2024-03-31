@@ -2422,6 +2422,26 @@ static inline __m128i get_scale_shuffle(int i) {
     return _mm_loadu_si128((const __m128i*)k_shuffle + i);
 }
 #endif
+void ggml_axpy_q8_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    const int qk = QK8_0;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q8_0 * restrict x = vx;
+
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK8_0;
+
+        for (int j = 0; j < qk; ++j) {
+            const int v0 = (x[i].qs[j]);
+            res[offset + j] = res[offset + j] + ((float)(v0 * (int)alpha) * result_scale);
+        }
+    }
+}
 
 void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
     const int qk = QK8_0;
