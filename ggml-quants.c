@@ -5,7 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include <float.h>
-
+#include <stdio.h>
 #ifdef __ARM_NEON
 
 // if YCM cannot find <arm_neon.h>, make a symbolic link to it, for example:
@@ -2582,6 +2582,36 @@ void ggml_axpy_q4_0_q8_0(const int n, const void * restrict vx, const void * res
         }
     }
 #endif
+}
+void ggml_axpy_q4_1_q8_1(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    const int qk = QK8_1;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q4_1 * restrict x = vx;
+
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK4_1;
+        float m = GGML_FP16_TO_FP32(x[i].m);
+
+        for (int j = 0; j < qk/2; ++j) {
+            const int v0 = (x[i].qs[j] & 0x0F);
+            const int v1 = (x[i].qs[j] >>   4);
+            float x0 = v0*GGML_FP16_TO_FP32(x[i].d) + m;
+            float x1 = v1*GGML_FP16_TO_FP32(x[i].d) + m;
+            float y0 = scale_fp32 * alpha;
+            // res[offset + j] = res[offset + j] + x0*y0;
+            // res[offset + j + qk/2] = res[offset + j + qk/2] + x1*y0;
+            // float res = ((int)v0*(int)alpha)*GGML_FP16_TO_FP32(x[i].d)*scale_fp32+ m*y0;
+            // float res = ((int)v0*(int)alpha)*result_scale+ m*y0;
+            res[offset + j] = res[offset + j] + ((int)v0*(int)alpha)*result_scale+ m*y0;
+            res[offset + j + qk/2] = res[offset + j + qk/2] + ((int)v1*(int)alpha)*result_scale+ m*y0;
+        }
+    }
 }
 
 
