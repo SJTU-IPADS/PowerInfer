@@ -15479,7 +15479,6 @@ static void ggml_compute_forward_mul_mat_axpy_head(
             break;
     }
     
-    /
     while (atomic_flag_test_and_set(&g_axpy_head_lock)) {
         
     }
