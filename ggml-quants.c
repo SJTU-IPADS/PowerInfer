@@ -2611,6 +2611,37 @@ void ggml_axpy_q5_0_q8_0(const int n, const void * restrict vx, const void * res
         }
     }
 }
+void ggml_axpy_q5_1_q8_1(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
+    const int qk = QK8_1;
+    const int nb = n / qk;
+    assert(n % qk == 0);
+    assert(nb % 2 == 0);
+
+    const block_q5_1 * restrict x = vx;
+    float *res = (float *)vz;
+    float scale_fp32 = GGML_FP16_TO_FP32(scale);
+    for (int i = 0; i < nb; i++) {
+        float result_scale = GGML_FP16_TO_FP32(x[i].d) * scale_fp32;
+        int offset = i * QK5_1;
+        uint32_t qh;
+        memcpy(&qh, x[i].qh, sizeof(qh));
+        float m = GGML_FP16_TO_FP32(x[i].m);
+        float y0 = scale_fp32 * alpha;
+        float tmp = m * y0;
+
+        for (int j = 0; j < qk/2; ++j) {
+            // const int v0 = (x[i].qs[j] & 0x0F) - 8;
+            // const int v1 = (x[i].qs[j] >>   4) - 8;
+            const uint8_t xh_0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
+            const uint8_t xh_1 = ((qh & (1u << (j + 16))) >> (j + 12));
+
+            const int32_t v0 = ((x[i].qs[j] & 0x0F) | xh_0);
+            const int32_t v1 = ((x[i].qs[j] >>   4) | xh_1);
+            res[offset + j] = res[offset + j] + ((float)(v0 * (int)alpha) * result_scale) + tmp;
+            res[offset + j + qk/2] = res[offset + j + qk/2] + ((float)(v1 * (int)alpha) * result_scale) + tmp;
+        }
+    }
+}
 void ggml_axpy_q4_1_q8_1(const int n, const void * restrict vx, const void * restrict vy, const void * restrict vz, int8_t alpha, ggml_fp16_t scale) {
     // TODO AVX2
     const int qk = QK8_1;
