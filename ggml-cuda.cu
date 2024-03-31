@@ -9333,7 +9333,7 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * src0, const ggml_tensor * s
     }
 }
 
-static void ggml_cuda_mul_mat_id_axpy(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+static void ggml_cuda_axpy_id(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     const struct ggml_tensor * ids          = src0;
     const struct ggml_tensor * sparse_id    = dst->src[10];
     struct ggml_tensor * const * gpu_bucket = &dst->src[11];
@@ -9991,8 +9991,8 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             }
             func = ggml_cuda_mul_mat_id;
             break;
-        case GGML_OP_MUL_MAT_ID_AXPY:
-            func = ggml_cuda_mul_mat_id_axpy;
+        case GGML_OP_AXPY_ID:
+            func = ggml_cuda_axpy_id;
             break;
         case GGML_OP_SCALE:
             func = ggml_cuda_scale;

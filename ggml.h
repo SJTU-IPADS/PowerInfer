@@ -430,7 +430,7 @@ extern "C" {
 
         // MoE specification
         GGML_OP_MUL_MAT_ID,
-        GGML_OP_MUL_MAT_ID_AXPY,
+        GGML_OP_AXPY_ID,
 
         GGML_OP_OUT_PROD,
 
@@ -1158,7 +1158,7 @@ extern "C" {
         struct ggml_tensor  * const ref[],
         struct ggml_tensor  * b);
 
-    GGML_API struct ggml_tensor * ggml_mul_mat_id_axpy(
+    GGML_API struct ggml_tensor * ggml_axpy_id(
                 struct ggml_context * ctx,
                 struct ggml_tensor  * const as[],
                 int                   n_as,

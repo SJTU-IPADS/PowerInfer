@@ -2379,9 +2379,9 @@ static void llm_load_hparams(
 
     if (gguf_get_sparse_deriv(ctx)) {
         // read sparse threshold override if sparse deriv is enabled
-        GGUF_GET_KEY(ctx, hparams.sparse_pred_threshold, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_SPARSE_THRESHOLD));
+        GGUF_GET_KEY(ctx, sparse_pred_threshold, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_SPARSE_THRESHOLD));
         if (getenv("LLAMA_SPARSE_PRED_THRESHOLD"))
-            hparams.sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
+            sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
     }
 
     // arch-specific KVs
@@ -5003,7 +5003,7 @@ struct llm_build_context {
             ggml_tensor * cur_expert = ggml_mul(ctx0, cur_up, cur_gate); // [n_tokens, n_embd]
             no_offload_cb(cur_expert, "ffn_moe_gate_par", il);
 
-            struct ggml_tensor * cur_down = ggml_mul_mat_id_axpy(ctx0, model.layers[il].ffn_down_t_exp, n_expert, cpu_ids, i, cpu_idx, model.layers[il].gpu_idx_exp, cur_expert); // [n_tokens, n_embd]
+            struct ggml_tensor * cur_down = ggml_axpy_id(ctx0, model.layers[il].ffn_down_t_exp, n_expert, cpu_ids, i, cpu_idx, model.layers[il].gpu_idx_exp, cur_expert); // [n_tokens, n_embd]
             no_offload_cb(cur_down, "ffn_moe_down_sparse", il);
 
 #ifdef GGML_USE_CUBLAS
@@ -5037,7 +5037,7 @@ struct llm_build_context {
                 no_offload_cb(cur_expert_2, "ffn_moe_gate_par_gpu", il);                    
             }
 
-            struct ggml_tensor * cur_down_2 = ggml_mul_mat_id_axpy(ctx0, model.layers[il].ffn_down_exp_gpu, n_expert, cpu_ids, i, gpu_idx, model.layers[il].gpu_bucket_exp, cur_expert_2);
+            struct ggml_tensor * cur_down_2 = ggml_axpy_id(ctx0, model.layers[il].ffn_down_exp_gpu, n_expert, cpu_ids, i, gpu_idx, model.layers[il].gpu_bucket_exp, cur_expert_2);
             if (cur_down_2 != nullptr) {
                 ggml_cuda_assign_buffers_no_alloc(cur_down_2);
                 no_offload_cb(cur_down_2, "ffn_moe_down_sparse_gpu", il);

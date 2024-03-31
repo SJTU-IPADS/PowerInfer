@@ -41,6 +41,7 @@
 #pragma warning(disable: 4996)
 #endif
 
+// TODO: init-once. try to avoid using global variables
 float sparse_pred_threshold = 0.;
 
 #if defined(_WIN32)
@@ -1613,7 +1614,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "MUL_MAT_SPARSE",
     "AXPY",
     "MUL_MAT_ID",
-    "MUL_MAT_ID_AXPY",
+    "AXPY_ID",
     "OUT_PROD",
 
     "SCALE",
@@ -1778,7 +1779,7 @@ static void ggml_setup_op_has_task_pass(void) {
         p[GGML_OP_MUL_MAT_SPARSE         ] = true;
         p[GGML_OP_AXPY                   ] = true;
         p[GGML_OP_MUL_MAT_ID             ] = true;
-        p[GGML_OP_MUL_MAT_ID_AXPY        ] = true;
+        p[GGML_OP_AXPY_ID        ] = true;
         p[GGML_OP_OUT_PROD               ] = true;
         p[GGML_OP_SET                    ] = true;
         p[GGML_OP_GET_ROWS_BACK          ] = true;
@@ -4342,7 +4343,7 @@ struct ggml_tensor * ggml_mul_mat_id_special(
     return result;
 }
 
-struct ggml_tensor * ggml_mul_mat_id_axpy(
+struct ggml_tensor * ggml_axpy_id(
         struct ggml_context * ctx,
         struct ggml_tensor  * const as[],
         int                   n_as,
@@ -4373,7 +4374,7 @@ struct ggml_tensor * ggml_mul_mat_id_axpy(
     ggml_set_op_params_i32(result, 0, id);
     ggml_set_op_params_i32(result, 1, n_as);
 
-    result->op   = GGML_OP_MUL_MAT_ID_AXPY;
+    result->op   = GGML_OP_AXPY_ID;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = ids;
     result->src[1] = b;
@@ -15886,7 +15887,7 @@ static void ggml_compute_forward_mul_mat_axpy_head(
 #endif
 }
 
-static void ggml_compute_forward_mul_mat_id_axpy_dense(
+static void ggml_compute_forward_axpy_id_dense(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
@@ -16102,7 +16103,7 @@ static void ggml_compute_forward_mul_mat_id_axpy_dense(
     }
 }
 
-static void ggml_compute_forward_mul_mat_id_axpy(
+static void ggml_compute_forward_axpy_id(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
@@ -16309,7 +16310,7 @@ static void ggml_compute_forward_mul_mat_id_axpy(
     }
 }
 
-static void ggml_compute_forward_mul_mat_id_axpy_q4_0(
+static void ggml_compute_forward_axpy_id_q4_0(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
@@ -16512,7 +16513,7 @@ static void ggml_compute_forward_mul_mat_id_axpy_q4_0(
 
 }
 
-static void ggml_compute_forward_mul_mat_id_axpy_head(
+static void ggml_compute_forward_axpy_id_head(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
@@ -16868,20 +16869,20 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                     ggml_compute_forward_mul_mat_id(params, tensor->src[0], tensor->src[1], tensor);
                 }
             } break;
-        case GGML_OP_MUL_MAT_ID_AXPY:
+        case GGML_OP_AXPY_ID:
             {
                 if (tensor->src[10] == NULL) { // idx tensor is not provided
                     fprintf(stderr, "wrong implementation of axpy dense\n");
-                    ggml_compute_forward_mul_mat_id_axpy_dense(params, tensor->src[0], tensor->src[1], tensor);
+                    ggml_compute_forward_axpy_id_dense(params, tensor->src[0], tensor->src[1], tensor);
                 } else if (tensor->src[11] != NULL){
                     if (tensor->src[2]->type == GGML_TYPE_Q4_0) {
-                        ggml_compute_forward_mul_mat_id_axpy_q4_0(params, tensor->src[0], tensor->src[1], tensor);
+                        ggml_compute_forward_axpy_id_q4_0(params, tensor->src[0], tensor->src[1], tensor);
                     } else {
-                        ggml_compute_forward_mul_mat_id_axpy(params, tensor->src[0], tensor->src[1], tensor);
+                        ggml_compute_forward_axpy_id(params, tensor->src[0], tensor->src[1], tensor);
                     }
                 } else {
                     fprintf(stderr, "wrong implementation of axpy head\n");
-                    ggml_compute_forward_mul_mat_id_axpy_head(params, tensor->src[0], tensor->src[1], tensor);
+                    ggml_compute_forward_axpy_id_head(params, tensor->src[0], tensor->src[1], tensor);
                 }
             } break;
         case GGML_OP_OUT_PROD:
@@ -17645,7 +17646,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 }
             } break;
         case GGML_OP_MUL_MAT_ID:
-        case GGML_OP_MUL_MAT_ID_AXPY:
+        case GGML_OP_AXPY_ID:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
@@ -18679,7 +18680,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
         case GGML_OP_MUL_MAT_SPARSE:
         case GGML_OP_AXPY:
         case GGML_OP_MUL_MAT_ID:
-        case GGML_OP_MUL_MAT_ID_AXPY:
+        case GGML_OP_AXPY_ID:
             {
                 n_tasks = n_threads;
 
@@ -19233,7 +19234,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     }
                 } break;
             case GGML_OP_MUL_MAT_ID:
-            case GGML_OP_MUL_MAT_ID_AXPY:
+            case GGML_OP_AXPY_ID:
                 {
                     cur = 0;
                     const struct ggml_tensor * src0 = node->src[2];
