@@ -4737,11 +4737,10 @@ static std::pair<struct ggml_tensor *, struct ggml_tensor *> llm_build_moe_gatin
 
     ggml_tensor * probs = ggml_soft_max(ctx, logits); // [n_tokens, num_experts]
     cbs(probs, "ffn_moe_probs");
-    probs = ggml_reshape_3d(ctx, probs, 1, n_expert, n_tokens);
 
     ggml_tensor * selected_experts = ggml_top_k(ctx, probs, n_expert_used); // [n_tokens, num_experts_per_tok]
 
-    ggml_tensor * weights = ggml_get_rows(ctx, probs, selected_experts);
+    ggml_tensor * weights = ggml_get_rows(ctx, ggml_reshape_3d(ctx, probs, 1, n_expert, n_tokens), selected_experts);
     cbs(weights, "ffn_moe_weights");
 
     weights = ggml_reshape_2d(ctx, weights, n_expert_used, n_tokens); // [n_tokens, num_experts_per_tok]
