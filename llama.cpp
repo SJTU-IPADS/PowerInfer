@@ -2691,7 +2691,7 @@ static void llm_load_hparams(
 
     if (gguf_get_sparse_deriv(ctx)) {
         // read sparse threshold override if sparse deriv is enabled
-        GGUF_GET_KEY(ctx, hparams.sparse_pred_threshold, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_SPARSE_THRESHOLD));
+        ml.get_key(LLM_KV_SPARSE_THRESHOLD, hparams.sparse_pred_threshold, false);
         if (getenv("LLAMA_SPARSE_PRED_THRESHOLD"))
             hparams.sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
     }
@@ -3157,8 +3157,8 @@ struct llama_gpu_split_loader {
     llama_gpu_split_loader(const std::string & fname, bool use_mmap) : fname(fname), use_mmap(use_mmap) {
         GGML_ASSERT(use_mmap);
 
-        idx_loader = new llama_model_loader(fname, use_mmap);
-        GGUF_GET_KEY(idx_loader->ctx_gguf, vram_required, gguf_get_val_u64, GGUF_TYPE_UINT64, true, LLM_KV_NAMES[LLM_KV_SPLIT_VRAM_CAPACITY]);
+        idx_loader = new llama_model_loader(fname, use_mmap, NULL);
+        idx_loader->get_key(LLM_KV_NAMES[LLM_KV_SPLIT_VRAM_CAPACITY], vram_required, true);
         printf("loaded gpu_idx, vram_required: %ld\n", vram_required);
 
         n_tensors = idx_loader->n_tensors;
@@ -3725,16 +3725,17 @@ void llama_reserve_model_kv_cache(llama_model *model, const llama_context_params
     const int64_t n_mem      = n_layer*cparams->n_ctx;
     const int64_t n_elements = n_embd*n_mem;
 
-    const ggml_type wtype = cparams->f16_kv ? GGML_TYPE_F16 : GGML_TYPE_F32;
-    const size_t cache_size = n_elements*ggml_type_size(wtype);
+    const size_t k_cache_size = n_elements*ggml_type_size(cparams->type_k);
+    const size_t v_cache_size = n_elements*ggml_type_size(cparams->type_v);
 
-    // reserve for k cache and v cache
-    for (int i = 0; i < 2; i++) {
-        if (!llama_reduce_vram_budget(cache_size)) {
-            return;
-        }
-        model->n_gpu_layers++;
+    if (!llama_reduce_vram_budget(k_cache_size)) {
+        return;
     }
+    model->n_gpu_layers++;
+    if (!llama_reduce_vram_budget(v_cache_size)) {
+        return;
+    }
+    model->n_gpu_layers++;
 #endif
 }
 

@@ -1649,9 +1649,6 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-// Since we added AXPY
-// static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
-
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
 
@@ -1734,8 +1731,6 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-// Since we added AXPY
-// static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -4106,8 +4101,6 @@ struct ggml_tensor * ggml_mul_mat(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = NULL;
-    result->src[3] = NULL;
 
     return result;
 }

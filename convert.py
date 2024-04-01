@@ -1106,6 +1106,18 @@ def postprocess_transpose(model: LazyModel) -> LazyModel:
     
     return out
 
+def postprocess_transpose(model: LazyModel) -> LazyModel:
+    """Transpose ffn_down matrices for Axpy ops."""
+    out: LazyModel = {}
+    
+    for name, lazy_tensor in model.items():
+        if name.endswith(".ffn_down.weight"):
+            out[name.replace("ffn_down", "ffn_down_t")] = lazy_tensor.transposed()
+        else:
+            out[name] = lazy_tensor
+    
+    return out
+
 def nth_multifile_path(path: Path, n: int) -> Path | None:
     '''Given any path belonging to a multi-file model (e.g. foo.bin.1), return
     the nth path in the model.
