@@ -57,7 +57,15 @@ GGML_API size_t ggml_cuda_get_free_memory(int device);
 GGML_API void   ggml_cuda_set_device_constants(float sparse_pred_threshold);
 
 // backend API
-GGML_API ggml_backend_t ggml_backend_cuda_init(void); // TODO: take a list of devices to use
+GGML_API ggml_backend_t ggml_backend_cuda_init(int device);
+
+GGML_API bool ggml_backend_is_cuda(ggml_backend_t backend);
+GGML_API int  ggml_backend_cuda_get_device(ggml_backend_t backend);
+
+GGML_API ggml_backend_buffer_type_t ggml_backend_cuda_buffer_type(int device);
+
+// pinned host buffer for use with CPU backend for faster copies between CPU and GPU
+GGML_API ggml_backend_buffer_type_t ggml_backend_cuda_host_buffer_type(void);
 
 #ifdef  __cplusplus
 }
