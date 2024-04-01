@@ -221,7 +221,7 @@ class GGUFWriter:
         if self.endianess == GGUFEndian.BIG:
             tensor.byteswap(inplace=True)
         if self.use_temp_file and self.temp_file is None:
-            fp = tempfile.SpooledTemporaryFile(mode="w+b", max_size=256*1024*1024)
+            fp = tempfile.SpooledTemporaryFile(mode="w+b", max_size=256 * 1024 * 1024)
             fp.seek(0)
             self.temp_file = fp
 
@@ -339,6 +339,12 @@ class GGUFWriter:
     def add_clamp_kqv(self, value: float) -> None:
         self.add_float32(Keys.Attention.CLAMP_KQV.format(arch=self.arch), value)
 
+    def add_expert_count(self, count: int) -> None:
+        self.add_uint32(Keys.LLM.EXPERT_COUNT.format(arch=self.arch), count)
+
+    def add_expert_used_count(self, count: int) -> None:
+        self.add_uint32(Keys.LLM.EXPERT_USED_COUNT.format(arch=self.arch), count)
+
     def add_layer_norm_eps(self, value: float) -> None:
         self.add_float32(Keys.Attention.LAYERNORM_EPS.format(arch=self.arch), value)
 
@@ -398,6 +404,9 @@ class GGUFWriter:
 
     def add_add_eos_token(self, value: bool) -> None:
         self.add_bool(Keys.Tokenizer.ADD_EOS, value)
+
+    def add_chat_template(self, value: str) -> None:
+        self.add_string(Keys.Tokenizer.CHAT_TEMPLATE, value)
 
     def _pack(self, fmt: str, value: Any, skip_pack_prefix: bool = False) -> bytes:
         pack_prefix = ''

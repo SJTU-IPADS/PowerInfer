@@ -43,6 +43,7 @@ else()
 endif()
 
 # general
+option(BUILD_SHARED_LIBS                "build shared libraries"                                OFF)
 option(LLAMA_STATIC                     "llama: static link libraries"                          OFF)
 option(LLAMA_NATIVE                     "llama: enable -march=native flag"                      ON)
 option(LLAMA_LTO                        "llama: enable link time optimization"                  OFF)
@@ -96,9 +97,12 @@ option(LLAMA_METAL_NDEBUG                    "llama: disable Metal debugging"   
 option(LLAMA_MPI                             "llama: use MPI"                                   OFF)
 option(LLAMA_QKK_64                          "llama: use super-block size of 64 for k-quants"   OFF)
 
-option(LLAMA_BUILD_TESTS                "llama: build tests"    ${LLAMA_STANDALONE})
-option(LLAMA_BUILD_EXAMPLES             "llama: build examples" ${LLAMA_STANDALONE})
-option(LLAMA_BUILD_SERVER               "llama: build server example"                           ON)
+option(LLAMA_BUILD_TESTS                     "llama: build tests"    ${LLAMA_STANDALONE})
+option(LLAMA_BUILD_EXAMPLES                  "llama: build examples" ${LLAMA_STANDALONE})
+option(LLAMA_BUILD_SERVER                    "llama: build server example"                      ON)
+
+# Required for relocatable CMake package
+include(${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-info.cmake)
 
 #
 # Compile flags
@@ -111,6 +115,11 @@ set(CMAKE_C_STANDARD_REQUIRED true)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 include(CheckCXXCompilerFlag)
+
+# enable libstdc++ assertions for debug builds
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_compile_definitions($<$<CONFIG:Debug>:_GLIBCXX_ASSERTIONS>)
+endif()
 
 if (NOT MSVC)
     if (LLAMA_SANITIZE_THREAD)
@@ -161,7 +170,7 @@ if (LLAMA_METAL)
     #add_compile_definitions(GGML_METAL_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
 
     # copy ggml-metal.metal to bin directory
-    configure_file(ggml-metal.metal bin/ggml-metal.metal COPYONLY)
+    configure_file(ggml-metal.metal ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.metal COPYONLY)
 
     set(LLAMA_EXTRA_LIBS ${LLAMA_EXTRA_LIBS}
         ${FOUNDATION_LIBRARY}
@@ -574,10 +583,19 @@ elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^(x86_64|i686|AMD64)$" OR "${CMAKE_GE
     endif()
 elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64")
     message(STATUS "PowerPC detected")
-    add_compile_options(-mcpu=native -mtune=native)
-    #TODO: Add  targets for Power8/Power9 (Altivec/VSX) and Power10(MMA) and query for big endian systems (ppc64/le/be)
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64le")
+        add_compile_options(-mcpu=powerpc64le)
+    else()
+        add_compile_options(-mcpu=native -mtune=native)
+        #TODO: Add  targets for Power8/Power9 (Altivec/VSX) and Power10(MMA) and query for big endian systems (ppc64/le/be)
+    endif()
 else()
     message(STATUS "Unknown architecture")
+endif()
+
+if (MINGW)
+    # Target Windows 8 for PrefetchVirtualMemory
+    add_compile_definitions(_WIN32_WINNT=0x602)
 endif()
 
 #
@@ -649,11 +667,11 @@ add_library(ggml OBJECT
             ggml-backend.h
             ggml-quants.c
             ggml-quants.h
-            ${GGML_SOURCES_CUDA} ${GGML_HEADERS_CUDA}
+            ${GGML_SOURCES_CUDA}   ${GGML_HEADERS_CUDA}
             ${GGML_SOURCES_OPENCL} ${GGML_HEADERS_OPENCL}
-            ${GGML_SOURCES_METAL} ${GGML_HEADERS_METAL}
-            ${GGML_SOURCES_MPI} ${GGML_HEADERS_MPI}
-            ${GGML_SOURCES_EXTRA} ${GGML_HEADERS_EXTRA}
+            ${GGML_SOURCES_METAL}  ${GGML_HEADERS_METAL}
+            ${GGML_SOURCES_MPI}    ${GGML_HEADERS_MPI}
+            ${GGML_SOURCES_EXTRA}  ${GGML_HEADERS_EXTRA}
             )
 
 target_include_directories(ggml PUBLIC . ${LLAMA_EXTRA_INCLUDES})
