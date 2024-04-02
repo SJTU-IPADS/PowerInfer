@@ -5657,7 +5657,7 @@ struct llm_build_context {
                 cur = llm_build_ffn(ctx0, attn_norm, // !! use the attn norm, not the result
                         model.layers[il].ffn_up,   NULL,
                         NULL,                      NULL,
-                        model.layers[il].ffn_down_t, NULL,
+                        model.layers[il].ffn_down, NULL,
                         LLM_FFN_RELU, LLM_FFN_SEQ, cb, il);
                 cb(cur, "ffn_out", il);
             }
