@@ -3667,7 +3667,7 @@ static void llm_load_sparse_model_tensors(
     }
 
     model.n_gpu_layers = alloc.flush();
-    LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
+    LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%.2f MiB): %d/%d\n", __func__, vram_budget_bytes / 1024.0 / 1024.0, model.n_gpu_layers, hparams.n_layer);
 
     // print memory requirements
     {
@@ -10317,7 +10317,7 @@ struct llama_context * llama_new_context_with_model(
 
             LLAMA_LOG_INFO("%s: total VRAM used: %.2f MiB (model: %.2f MiB, context: %.2f MiB)\n", __func__,
                     (total_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
-                    model_vram_size / 1024.0 / 1024.0,
+                    (model_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
                     ctx_vram_size   / 1024.0 / 1024.0);
 #endif
         }
