@@ -10677,7 +10677,6 @@ static void ggml_compute_forward_get_rows(
     if (src0->type == dst->type && dst->type != GGML_TYPE_F32) {
         // Fast pass with memcpy
         // TODO: only implemented on CPU for now
-        printf("src0->type = %d, dst->type = %d\n", src0->type, dst->type);
         ggml_compute_forward_cpy_rows(params, src0, src1, dst);
         return;
     }
@@ -15283,6 +15282,7 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
 
                     }
                 } else {
+                    // TODO: dead code?
                     ggml_compute_forward_mul_mat_axpy_head(params, tensor->src[0], tensor->src[1], tensor);
                 }
                 // ggml_compute_forward_mul_mat_axpy(params, tensor->src[0], tensor->src[1], tensor);
