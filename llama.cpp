@@ -4973,33 +4973,34 @@ static struct ggml_tensor * llm_build_ffn_sparse(
 
     struct ggml_tensor * gate_out = nullptr;
     if (gate) {
-        // Only support par for now
-        GGML_ASSERT(type_gate == LLM_FFN_PAR || type_gate == LLM_FFN_SYM);
-        gate_out = llm_build_sparse_mul_mat(ctx, gate, ffn_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
+        ggml_tensor * gate_input = (type_gate == LLM_FFN_PAR || type_gate == LLM_FFN_SYM) ? ffn_input : up_out;
+        gate_out = llm_build_sparse_mul_mat(ctx, gate, gate_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
         if (gate_b) {
             gate_out = ggml_add(ctx, gate_out, gate_b);
             cb(gate_out, "ffn_gate_b");
         }
-    }
-
-    switch (type_gate) {
-        case LLM_FFN_PAR:
-            {
-                GGML_ASSERT(gate_out != nullptr);
-                ggml_tensor * act_gate = act_fn(gate_out, "ffn_gate_act");
-                cur = ggml_mul(ctx, act_gate, up_out);
-                cb(cur, "ffn_gate_par");
-            } break;
-        case LLM_FFN_SYM:
-            {
-                GGML_ASSERT(gate_out != nullptr);
-                ggml_tensor * act_gate = act_fn(gate_out, "ffn_gate_act");
-                ggml_tensor * act_up = act_fn(up_out, "ffn_up_act");
-                cur = ggml_mul(ctx, act_gate, act_up);
-                cb(cur, "ffn_gate_sym");
-            } break;
-        default:
-            GGML_ASSERT(false && "unsupported gate type");
+        switch (type_gate) {
+            case LLM_FFN_PAR:
+                {
+                    ggml_tensor * act_gate = act_fn(gate_out, "ffn_gate_act");
+                    cur = ggml_mul(ctx, act_gate, up_out);
+                    cb(cur, "ffn_gate_par");
+                } break;
+            case LLM_FFN_SYM:
+                {
+                    ggml_tensor * act_gate = act_fn(gate_out, "ffn_gate_act");
+                    ggml_tensor * act_up = act_fn(up_out, "ffn_up_act");
+                    cur = ggml_mul(ctx, act_gate, act_up);
+                    cb(cur, "ffn_gate_sym");
+                } break;
+            case LLM_FFN_SEQ:
+                {
+                    cur = act_fn(gate_out, "ffn_gate_act");
+                } break;
+            default: GGML_ASSERT(false && "unsupported gate type");
+        }
+    } else {
+        cur = act_fn(up_out, "ffn_up_act");
     }
 
     cur = llm_build_sparse_axpy(ctx, down_t, cur, idx, down_gpu, gpu_index, gpu_bucket, cb_outer, "down", full_gpu);
