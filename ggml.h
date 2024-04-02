@@ -207,6 +207,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <assert.h>
 #ifdef __cplusplus
   #include <atomic>
   using std::atomic_int;
@@ -259,7 +260,7 @@
         if (!(x)) { \
             fflush(stdout); \
             fprintf(stderr, "GGML_ASSERT: %s:%d: %s\n", __FILE__, __LINE__, #x); \
-            ggml_print_backtrace(); \
+            assert(false); \
             abort(); \
         } \
     } while (0)

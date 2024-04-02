@@ -2694,6 +2694,12 @@ static void llm_load_hparams(
         ml.get_key(LLM_KV_SPARSE_THRESHOLD, hparams.sparse_pred_threshold, false);
         if (getenv("LLAMA_SPARSE_PRED_THRESHOLD"))
             hparams.sparse_pred_threshold = (float)atof(getenv("LLAMA_SPARSE_PRED_THRESHOLD"));
+
+        // Set sparsity threshold via global virables
+        sparse_pred_threshold = hparams.sparse_pred_threshold;
+#if defined (GGML_USE_CUBLAS)
+        ggml_cuda_set_device_constants(hparams.sparse_pred_threshold);
+#endif
     }
 
     // arch-specific KVs
@@ -3129,11 +3135,7 @@ static int64_t sum_gpu_index(struct ggml_tensor * gpu_index) {
     ggml_set_name(sum, "gpu_index_sum");
     ggml_build_forward_expand(gf, sum);
 
-#if defined(GGML_USE_HYBRID_THREADING)
-    ggml_graph_compute_with_ctx(ctx_aux, gf, 2); // +1 for the gpu thread
-#else
     ggml_graph_compute_with_ctx(ctx_aux, gf, 1);
-#endif
 
     int32_t sum_val = ggml_get_i32_1d(sum, 0);
 
@@ -3322,7 +3324,7 @@ struct llama_augmentation_model_loader {
             layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
             offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
         }
-        
+
         layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
         offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
         

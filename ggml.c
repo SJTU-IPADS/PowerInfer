@@ -17799,6 +17799,12 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
 }
 
 void ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
+    GGML_ASSERT(n_threads > 0 && "n_threads must be > 0");
+
+#if defined(GGML_USE_HYBRID_THREADING)
+    n_threads = n_threads + 1; // 1 thread is dedicated to GPU communication
+#endif
+
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, n_threads);
 
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_WORK_BUFFER, cplan.work_size);
