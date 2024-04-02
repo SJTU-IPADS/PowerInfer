@@ -3219,13 +3219,6 @@ struct llama_gpu_split_loader {
                 // no hybrid inference for this layer, unset gpu_bucket
                 model_layer.gpu_bucket = NULL;
                 // TODO: maybe can also unset gpu_idx
-            } else {
-#if defined(GGML_USE_CUBLAS)
-                ggml_set_backend(gpu_bucket, GGML_BACKEND_GPU);
-                ggml_cuda_transform_tensor(gpu_bucket->data, gpu_bucket);
-#else
-                GGML_ASSERT(false && "cublas is not enabled");
-#endif
             }
         }
 
@@ -3321,29 +3314,44 @@ struct llama_augmentation_model_loader {
         printf("gpu_bucket: %p[%d]; offload_ratio: %.2f\n", gpu_bucket, gpu_bucket ? gpu_bucket->ne[0] : -1, layer.gpu_offload_ratio);
 
         if (layer.ffn_gate) {
-            layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
+            layer.ffn_gate_gpu = slice_gpu_mat(layer.ffn_gate, gpu_bucket);
             offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
         }
 
-        layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
-        offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
-        
-        layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
+        layer.ffn_up_gpu = slice_gpu_mat(layer.ffn_up, gpu_bucket);
+        layer.ffn_down_gpu = slice_gpu_mat(layer.ffn_down_t, gpu_bucket);
         offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
 
+#if defined(GGML_USE_CUBLAS)
+        ggml_set_backend(gpu_bucket, GGML_BACKEND_GPU);
+        ggml_cuda_transform_tensor(gpu_bucket->data, gpu_bucket);
+#else
+        GGML_ASSERT(false && "cublas is not enabled");
+#endif
+
         return offloaded_bytes;
+    }
+
+    ggml_tensor * slice_gpu_mat(ggml_tensor * src, ggml_tensor * gpu_bucket) {
+        ggml_tensor * sliced_mat = ggml_select_rows(aux_ctx, src, gpu_bucket);
+        ggml_cgraph * gf = ggml_new_graph_custom(aux_ctx, 3, false);
+        ggml_build_forward_expand(gf, sliced_mat);
+        ggml_graph_compute_with_ctx(aux_ctx, gf, 1);
+
+        // Turn the computed tensor into a GPU weight tensor
+        ggml_tensor *gpu_mat = ggml_dup_tensor(aux_ctx, sliced_mat);
+        std::string name = std::string(ggml_get_name(src)) + ".gpu";
+        ggml_set_name(gpu_mat, name.c_str());
+        ggml_set_backend(gpu_mat, GGML_BACKEND_GPU);
+        ggml_cuda_transform_tensor(gpu_mat->data, gpu_mat);
+
+        return gpu_mat;
     }
 
     size_t offload_ffn_split(llama_model * model) {
         LLAMA_LOG_INFO("%s: applying augmentation to model - please wait ...\n", __func__);
         const int64_t t_start_aug_us = ggml_time_us();
         std::vector<uint8_t> work_buffer;
-
-        // Set sparsity threshold via global virables
-        sparse_pred_threshold = model->hparams.sparse_pred_threshold;
-#if defined (GGML_USE_CUBLAS)
-        ggml_cuda_set_device_constants(model->hparams.sparse_pred_threshold);
-#endif
 
         // load gpu_idx and slice mat to gpu
         size_t offloaded_bytes = 0;

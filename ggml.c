@@ -4881,6 +4881,30 @@ struct ggml_tensor * ggml_get_rows(
     return result;
 }
 
+struct ggml_tensor * ggml_select_rows(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b) {
+    GGML_ASSERT(a->ne[2] == b->ne[1]);
+    GGML_ASSERT(b->ne[3] == 1);
+    GGML_ASSERT(b->type == GGML_TYPE_I32);
+
+    bool is_node = false;
+
+    if (a->grad || b->grad) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type, a->ne[0], b->ne[0], b->ne[1], b->ne[2]);
+
+    result->op   = GGML_OP_GET_ROWS;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = b;
+
+    return result;
+}
+
 // ggml_get_rows_back
 
 struct ggml_tensor * ggml_get_rows_back(
@@ -10609,11 +10633,55 @@ static void ggml_compute_forward_get_rows_f32(
     }
 }
 
+static void ggml_compute_forward_cpy_rows(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+              struct ggml_tensor * dst) {
+    assert(params->ith == 0);
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    GGML_TENSOR_BINARY_OP_LOCALS
+
+    const int64_t nc = ne00;
+    const int64_t nr = ggml_nelements(src1); GGML_UNUSED(nr);
+
+    assert(ne0  == nc);
+    assert(ne02 == ne11);
+    assert(nb00 == ggml_type_size(src0->type));
+    assert(ggml_nrows(dst) == nr);
+    assert(src0->type == dst->type && nb1 == nb01 && "src0 and dst must be of same type and row size");
+
+    for (int64_t i12 = 0; i12 < ne12; ++i12) {
+        for (int64_t i11 = 0; i11 < ne11; ++i11) {
+            for (int64_t i10 = 0; i10 < ne10; ++i10) {
+                const int64_t i01 = *(int32_t *) ((char *) src1->data + i10*nb10 + i11*nb11 + i12*nb12);
+                memcpy(
+                    (char *)  dst->data + i10*nb1  + i11*nb2  + i12*nb3,
+                    (char *) src0->data + i01*nb01 + i11*nb02 + i12*nb03,
+                    nb1
+                );
+            }
+        }
+    }
+}
+
 static void ggml_compute_forward_get_rows(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
         struct ggml_tensor * dst) {
+    if (src0->type == dst->type && dst->type != GGML_TYPE_F32) {
+        // Fast pass with memcpy
+        // TODO: only implemented on CPU for now
+        printf("src0->type = %d, dst->type = %d\n", src0->type, dst->type);
+        ggml_compute_forward_cpy_rows(params, src0, src1, dst);
+        return;
+    }
+
     switch (src0->type) {
         case GGML_TYPE_Q4_0:
         case GGML_TYPE_Q4_1:
