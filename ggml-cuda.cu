@@ -7127,24 +7127,6 @@ static cudaError_t ggml_cuda_cpy_tensor_1d(
     return cudaMemcpyAsync(dst_ptr, x, i1_diff*nb0/blck, kind, stream);
 }
 
-void ggml_cuda_cpy_1d(struct ggml_tensor * dst, const struct ggml_tensor * src) {
-    ggml_cuda_set_device(g_main_device);
-    const cudaStream_t main_stream = g_cudaStreams[g_main_device][0];
-
-    // TODO: only supports CPU -> GPU as of now
-    GGML_ASSERT(src->backend == GGML_BACKEND_CPU && dst->backend == GGML_BACKEND_GPU);
-    struct ggml_tensor_extra_gpu * dst_extra = (ggml_tensor_extra_gpu *) dst->extra;
-
-    CUDA_CHECK(ggml_cuda_cpy_tensor_1d(dst_extra->data_device[0], src, 0, src->ne[0], main_stream));
-}
-
-void ** ggml_cuda_get_data_pp(struct ggml_tensor * tensor) {
-    // only supports one device for now
-    GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
-    struct ggml_tensor_extra_gpu * extra = (ggml_tensor_extra_gpu *) tensor->extra;
-    return &extra->data_device[0];
-}
-
 template<class op>
 inline void ggml_cuda_op_bin_bcast(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
@@ -9680,10 +9662,6 @@ static void ggml_cuda_transform_tensor_impl(void * data, struct ggml_tensor * te
 
 void ggml_cuda_transform_tensor(void * data, struct ggml_tensor * tensor) {
     return ggml_cuda_transform_tensor_impl(data, tensor, false);
-}
-
-void ggml_cuda_alloc_tensor(struct ggml_tensor * tensor) {
-    return ggml_cuda_transform_tensor_impl(nullptr, tensor, true);
 }
 
 void ggml_cuda_free_data(struct ggml_tensor * tensor) {
