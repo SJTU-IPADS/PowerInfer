@@ -3129,9 +3129,11 @@ static int64_t sum_gpu_index(struct ggml_tensor * gpu_index) {
     ggml_set_name(sum, "gpu_index_sum");
     ggml_build_forward_expand(gf, sum);
 
-    // TODO: +1 worker for GPU under hybrid inference but no use
-    // ggml_graph_compute_helper(work_buffer, gf, 2);
-    ggml_graph_compute_with_ctx(ctx_aux, gf, 2);
+#if defined(GGML_USE_HYBRID_THREADING)
+    ggml_graph_compute_with_ctx(ctx_aux, gf, 2); // +1 for the gpu thread
+#else
+    ggml_graph_compute_with_ctx(ctx_aux, gf, 1);
+#endif
 
     int32_t sum_val = ggml_get_i32_1d(sum, 0);
 
@@ -3159,7 +3161,7 @@ struct llama_gpu_split_loader {
 
         idx_loader = new llama_model_loader(fname, use_mmap, NULL);
         idx_loader->get_key(LLM_KV_NAMES[LLM_KV_SPLIT_VRAM_CAPACITY], vram_required, true);
-        printf("loaded gpu_idx, vram_required: %ld\n", vram_required);
+        printf("loaded gpu_idx, vram_required: %.2f MiB\n", vram_required / 1024.0 / 1024.0);
 
         n_tensors = idx_loader->n_tensors;
 
@@ -3314,6 +3316,8 @@ struct llama_augmentation_model_loader {
 
         GGML_ASSERT((layer.gpu_bucket != NULL) == (layer.gpu_offload_ratio < 1.0));
 
+        printf("gpu_bucket: %p[%d]; offload_ratio: %.2f\n", gpu_bucket, gpu_bucket ? gpu_bucket->ne[0] : -1, layer.gpu_offload_ratio);
+
         if (layer.ffn_gate) {
             layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
             offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
@@ -3341,7 +3345,8 @@ struct llama_augmentation_model_loader {
 
         // load gpu_idx and slice mat to gpu
         size_t offloaded_bytes = 0;
-        for (llama_layer &model_layer : model -> layers) {
+        for (int il = 0; il < model->layers.size(); il++) {
+            llama_layer &model_layer = model->layers[il];
             // gpu_idx load
             if (model_layer.gpu_idx == NULL && model_layer.gpu_bucket == NULL) {
                 ggml_tensor * gpu_idx = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, model_layer.mlp_pre_w2 -> ne[1]);
@@ -3350,7 +3355,11 @@ struct llama_augmentation_model_loader {
                 ggml_tensor * gpu_bucket = ggml_new_tensor_1d(aux_ctx, GGML_TYPE_I32, 0);
                 model_layer.gpu_bucket = gpu_bucket;
             }
-            offloaded_bytes += slice_ffn_mat_to_gpu(model_layer);
+            auto this_offloaded_bytes = slice_ffn_mat_to_gpu(model_layer);
+            offloaded_bytes += this_offloaded_bytes;
+            if (this_offloaded_bytes > 0) {
+                printf("layer %d offloaded_bytes: %.2f MiB\n", il, this_offloaded_bytes/1024.0/1024.0);
+            }
             LLAMA_LOG_INFO(".");
         }
 
@@ -4822,10 +4831,10 @@ static struct ggml_tensor * llm_build_ffn(
 
 static struct ggml_tensor * llm_build_sparse_mul_mat(
         struct ggml_context * ctx,
-         struct ggml_tensor * up,
-         struct ggml_tensor * inp,
+         struct ggml_tensor * lhs,
+         struct ggml_tensor * rhs,
          struct ggml_tensor * idx,
-         struct ggml_tensor * up_gpu,
+         struct ggml_tensor * lhs_gpu,
          struct ggml_tensor * gpu_index,
          struct ggml_tensor * gpu_bucket,
    const llm_build_cb_short & cb,
@@ -4837,20 +4846,20 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
     if (full_gpu) {
-        GGML_ASSERT(up_gpu && "full_gpu but no up_gpu");
-        out = ggml_mul_mat_idx(ctx, up_gpu, inp, idx, NULL);
+        GGML_ASSERT(lhs_gpu && "full_gpu but no lhs_gpu");
+        out = ggml_mul_mat_idx(ctx, lhs_gpu, rhs, idx, NULL);
         ggml_cuda_assign_buffers_no_alloc(out);
         cb(out, (full_name).c_str());
         return out;
     }
 #endif
 
-    out = ggml_mul_mat_idx(ctx, up, inp, idx, gpu_index);
+    out = ggml_mul_mat_idx(ctx, lhs, rhs, idx, gpu_index);
     cb(out, full_name.c_str());
 
 #ifdef GGML_USE_CUBLAS
-    if (up_gpu) {
-        ggml_tensor * out_gpu = ggml_mul_mat_idx_upscale(ctx, up_gpu, inp, idx, gpu_bucket, out->ne[0]);
+    if (lhs_gpu) {
+        ggml_tensor * out_gpu = ggml_mul_mat_idx_upscale(ctx, lhs_gpu, rhs, idx, gpu_bucket, out->ne[0]);
         ggml_cuda_assign_buffers_no_alloc(out_gpu);
         cb(out_gpu, (full_name + "_gpu").c_str());
         out = ggml_add(ctx, out, out_gpu);
@@ -4971,10 +4980,9 @@ static struct ggml_tensor * llm_build_ffn_sparse(
         cb(up_out, "ffn_up_b");
     }
 
-    struct ggml_tensor * gate_out = nullptr;
     if (gate) {
         ggml_tensor * gate_input = (type_gate == LLM_FFN_PAR || type_gate == LLM_FFN_SYM) ? ffn_input : up_out;
-        gate_out = llm_build_sparse_mul_mat(ctx, gate, gate_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
+        ggml_tensor * gate_out = llm_build_sparse_mul_mat(ctx, gate, gate_input, idx, gate_gpu, gpu_index, gpu_bucket, cb_outer, "gate", full_gpu);
         if (gate_b) {
             gate_out = ggml_add(ctx, gate_out, gate_b);
             cb(gate_out, "ffn_gate_b");

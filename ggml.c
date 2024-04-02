@@ -17017,8 +17017,6 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 if (node->backend == GGML_BACKEND_GPU && node->op_params[0] > 0) {
                     // Fully offloaded to GPU
                     n_tasks = 1;
-                } else {
-                    GGML_ASSERT(n_threads > 1 && "n_threads must be > 1 to enable hybrid CPU/GPU computation");
                 }
 #endif
             } break;
