@@ -613,7 +613,7 @@ static ggml_backend_t ggml_backend_reg_cpu_init(const char * params, void * user
 
 #define GGML_MAX_BACKENDS 4
 #define GGML_MAX_SPLITS 256
-#define GGML_MAX_SPLIT_INPUTS 16
+#define GGML_MAX_SPLIT_INPUTS 256
 
 struct ggml_backend_sched_split {
     ggml_tallocr_t tallocr;
