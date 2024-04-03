@@ -3263,10 +3263,10 @@ struct llama_augmentation_model_loader {
         ggml_tensor * gpu_idx = layer.gpu_idx;
         ggml_tensor * gpu_bucket = layer.gpu_bucket;
         size_t offloaded_bytes = 0;
-
         if (layer.gpu_offload_ratio == 0.) {
             return 0;
         }
+#ifdef GGML_USE_CUBLAS
 
         GGML_ASSERT((layer.gpu_bucket != NULL) == (layer.gpu_offload_ratio < 1.0));
 
@@ -3282,6 +3282,7 @@ struct llama_augmentation_model_loader {
         if (layer.ffn_down_gpu) {
             offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
         }
+#endif
 
         return offloaded_bytes;
     }
@@ -3290,7 +3291,7 @@ struct llama_augmentation_model_loader {
         if (src == NULL) {
             return NULL;
         }
-
+#ifdef GGML_USE_CUBLAS
         if (gpu_bucket == NULL) {
             ggml_set_backend(src, GGML_BACKEND_GPU);
             ggml_cuda_transform_tensor(src->data, src);
@@ -3313,8 +3314,11 @@ struct llama_augmentation_model_loader {
         ggml_set_backend(gpu_mat, GGML_BACKEND_GPU);
         ggml_cuda_transform_tensor(gpu_mat->data, gpu_mat);
         ggml_set_no_alloc(aux_ctx, false);
-
         return gpu_mat;
+#else
+        return nullptr;
+#endif
+
     }
 
     size_t offload_ffn_split(llama_model * model) {
