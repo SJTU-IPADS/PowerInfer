@@ -624,6 +624,7 @@ enum tensor_offloading_levels {
     TENSOR_OFFLOAD_FFN,
     TENSOR_OFFLOAD_ATTN,
     TENSOR_OFFLOAD_MLP_PRED,
+    TENSOR_OFFLOAD_FFN_IO,
     TENSOR_OFFLOAD_OUTPUT,
     TENSOR_OFFLOAD_KV_CACHE,
 };
@@ -641,8 +642,10 @@ tensor_offloading_levels get_offloading_level(llm_tensor tensor) {
         case LLM_TENSOR_ATTN_Q_NORM: case LLM_TENSOR_ATTN_K_NORM:
             return TENSOR_OFFLOAD_ATTN;
         case LLM_TENSOR_FFN_GATE: case LLM_TENSOR_FFN_DOWN: case LLM_TENSOR_FFN_UP:
-        case LLM_TENSOR_FFN_NORM: case LLM_TENSOR_FFN_DOWN_T: 
+        case LLM_TENSOR_FFN_DOWN_T:
             return TENSOR_OFFLOAD_FFN;
+        case LLM_TENSOR_FFN_NORM:
+            return TENSOR_OFFLOAD_FFN_IO;
         case LLM_TENSOR_MLP_PRED_FC1: case LLM_TENSOR_MLP_PRED_FC2:
             return TENSOR_OFFLOAD_MLP_PRED;
         default:
