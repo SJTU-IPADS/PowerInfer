@@ -4529,7 +4529,7 @@ static void llm_load_tensors(
                         layer.ffn_down_exp[x] = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_DOWN_EXP, "weight", i, x), {  n_ff_exp, n_embd}, backend_split);
                         layer.ffn_up_exp[x]   = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_UP_EXP,   "weight", i, x), {n_embd,   n_ff_exp}, backend_split);
                     }
-                    layer.ffn_gate_inp_shared_exp = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_GATE_INP_SHARED_EXP, "weight", i), {n_embd}, backend_split);
+                    layer.ffn_gate_inp_shared_exp = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_GATE_INP_SHARED_EXP, "weight", i), {n_embd}, backend);
                     layer.ffn_gate_shared_exp = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_GATE_SHARED_EXP, "weight", i), {n_embd,   n_ff}, backend_split);
                     layer.ffn_down_shared_exp = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_DOWN_SHARED_EXP, "weight", i), {n_ff, n_embd}, backend_split);
                     layer.ffn_up_shared_exp = ml.create_tensor(ctx, tn(LLM_TENSOR_FFN_UP_SHARED_EXP, "weight", i), {n_embd,   n_ff}, backend_split);
