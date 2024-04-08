@@ -1,4 +1,3 @@
-
 import argparse
 
 from .solver import solve_gpu_split
@@ -10,8 +9,8 @@ if __name__ == "__main__":
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Optimize neuron activation based on VRAM capacity and other parameters.')
     parser.add_argument('--activation', type=str, required=True, help='Path to the directory containing activation data.')
-    parser.add_argument('--neuron', type=int, default=8192*4, help='Total number of neurons in the network.')
-    parser.add_argument('--capacity', type=int, default=int(8192*4*32*0.1), help='Total VRAM capacity for the model.')
+    parser.add_argument('--neuron', type=int, default=8192*4, help='Total number of neurons in each layer.')
+    parser.add_argument('--capacity', type=int, help='Max neurons that can be stored in VRAM.')
     parser.add_argument('--layer', type=int, default=59, help='Total number of layers in the neural network.')
     parser.add_argument('--vram-capacity', type=int, help='Total VRAM capacity (Bytes) available for splitting')
     parser.add_argument('--batch', type=int, default=256, help='Batch size for processing.')

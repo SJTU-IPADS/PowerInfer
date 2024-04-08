@@ -1,11 +1,7 @@
-#!/usr/bin/env python
-# coding=utf-8
-import argparse
 from cvxopt.glpk import ilp
 import numpy as np
 from cvxopt import matrix
 import torch
-import pickle
 
 def solve_gpu_split(
     activation_path: str,
