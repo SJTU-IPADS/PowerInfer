@@ -17,7 +17,14 @@ def load_activation_weights(models_base: Path):
     activation_files.sort()
     return [torch.load(models_base / f) for f in activation_files]
 
-def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> None:
+
+def append_gpu_idx(
+    gguf: GGUFWriter,
+    i_layer: int,
+    activation: torch.Tensor,
+    select_count: int,
+    skip_bucket=False,
+):
     _, indices = torch.topk(activation, k=int(select_count))
     gpu_idx = torch.zeros_like(activation)
     gpu_idx[indices] = 1
@@ -32,7 +39,12 @@ def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> 
         raw_shape=gpu_idx.shape[::-1],
         raw_dtype=GGMLQuantizationType.I32,
     )
+    if skip_bucket:
+        return
+    append_gpu_bucket(gguf, i_layer, indices)
 
+
+def append_gpu_bucket(gguf: GGUFWriter, i_layer: int, indices: torch.Tensor):
     indices = indices.numpy().astype(np.int32)
     gpu_bucket = np.sort(indices)
     key = f"blk.{i_layer}.gpu_bucket"
@@ -46,14 +58,24 @@ def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> 
         raw_dtype=GGMLQuantizationType.I32,
     )
 
-def export_split(activations_path: str, output_path: str, solved_list: list[int], vram_capacity: int):
-    predictors = load_activation_weights(Path(activations_path)) # predictor => activation acount
-    gguf_out = GGUFWriter(output_path, "generic.gpu_index")
-    for i, (activation, selected_count) in enumerate(zip(predictors, solved_list)):
-        append_gpu_idx(gguf_out, i, activation, selected_count)
+
+def export_split(
+    activations_path: str,
+    output_path: str,
+    solved_list: list[int],
+    vram_capacity: int,
+    for_moe=False,
+):
+    activations = load_activation_weights(Path(activations_path))
+    gguf_out = GGUFWriter(
+        output_path, "moe.gpu_idx" if for_moe else "generic.gpu_index"
+    )
+    for i, (activation, selected_count) in enumerate(zip(activations, solved_list)):
+        # MoE models do not have remapping of neurons, so skip the bucket
+        append_gpu_idx(gguf_out, i, activation, selected_count, skip_bucket=not for_moe)
 
     # set kvs
-    gguf_out.add_block_count(len(predictors))
+    gguf_out.add_block_count(len(activations))
     # TODO: better to save the actual capacity that split neurons require
     gguf_out.add_uint64(gguf.Keys.Split.VRAM_CAPACITY, vram_capacity)
 
@@ -69,4 +91,3 @@ def export_split(activations_path: str, output_path: str, solved_list: list[int]
         fout.write(struct.pack("<I", 3))
 
     print(f"exported GPU index to {output_path}")
-

@@ -13,6 +13,7 @@ if __name__ == "__main__":
     parser.add_argument('--capacity', type=int, help='Max neurons that can be stored in VRAM.')
     parser.add_argument('--layer', type=int, default=59, help='Total number of layers in the neural network.')
     parser.add_argument('--vram-capacity', type=int, help='Total VRAM capacity (Bytes) available for splitting')
+    parser.add_argument('--moe', type=bool, default=False, help='Flag to indicate whether the model is a MoE model.')
     parser.add_argument('--batch', type=int, default=256, help='Batch size for processing.')
     parser.add_argument('--threshold', type=int, default=0, help='Threshold for splitting a layer across multiple GPUs.')
     parser.add_argument('--output', type=str, required=True, help='File path for the output pickle file.')
@@ -36,7 +37,8 @@ if __name__ == "__main__":
         activations_path=args.activation,
         output_path=args.output,
         solved_list=solved,
-        vram_capacity=args.vram_capacity
+        vram_capacity=args.vram_capacity,
+        for_moe=args.moe,
     )
 
     print(f"Exported to {args.output}")
