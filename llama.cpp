@@ -194,7 +194,8 @@ static size_t llama_set_vram_budget(double budget_gb, int gpu_device) {
     if (budget_gb < 0) {
         // if the user didn't specify a budget, use all available memory
         // and leave 256 MB as a safety margin
-        vram_budget_bytes = ggml_cuda_get_free_memory(gpu_device) - 256 * 1024 * 1024;
+        vram_budget_bytes = ggml_cuda_get_free_memory(gpu_device); // - 256 * 1024 * 1024;
+        printf("Free memory: %.3f GiB\n", vram_budget_bytes / (1024.0 * 1024 * 1024));
     } else {
         // otherwise, use the specified budget
         vram_budget_bytes = (size_t) (budget_gb * 1024 * 1024 * 1024);
@@ -1472,7 +1473,7 @@ struct llama_model {
     struct ggml_tensor * output_norm_b;
     struct ggml_tensor * output;
 
-    std::vector<llama_layer> layers;
+    VectorWithAccessCapture<llama_layer> layers;
 
     int n_gpu_layers;
 
@@ -9676,7 +9677,7 @@ struct llama_context * llama_new_context_with_model(
 
             LLAMA_LOG_INFO("%s: total VRAM used: %.2f MB (model: %.2f MB, context: %.2f MB)\n", __func__,
                     (total_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
-                    model_vram_size / 1024.0 / 1024.0,
+                    (model_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
                     ctx_vram_size / 1024.0 / 1024.0);
 #endif
         }

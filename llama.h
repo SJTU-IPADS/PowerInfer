@@ -783,6 +783,32 @@ const std::vector<std::pair<std::string, struct ggml_tensor *>> & llama_internal
     struct llama_context * ctx
 );
 
+
+#include <vector>
+#include <iostream>
+
+template<typename T>
+class VectorWithAccessCapture : public std::vector<T> {
+public:
+    using std::vector<T>::vector; // 继承构造函数
+
+    T& operator[](std::size_t idx) {
+        captureAccess(idx);
+        return std::vector<T>::operator[](idx);
+    }
+
+    const T& operator[](std::size_t idx) const {
+        captureAccess(idx);
+        return std::vector<T>::operator[](idx);
+    }
+
+private:
+    void captureAccess(std::size_t idx) const {
+        // 这里实现你的堆栈捕获逻辑
+        // printf("Accessing element at index: %zu\n", idx);
+    }
+};
+
 #endif // LLAMA_API_INTERNAL
 
 #endif // LLAMA_H
