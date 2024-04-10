@@ -3076,10 +3076,11 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     // Calculate solver parameters
     ggml_tensor * ffn_up = model.layers[0].ffn_up;
     ggml_tensor * ffn_gate = model.layers[0].ffn_gate;
-    int slice_size = ffn_up->ne[1] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
+    int neuron_size = ffn_up->ne[0] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
     // For model arch with FFN gate, the gate is also sliced, otherwise only the up and down matrices are sliced
-    int vram_bytes_per_slice = slice_size * (ffn_gate ? 4.5 : 2); // TODO: why 4.5, not 3?
-    int neuron_cap = floor((double)vram_allocatable_bytes / vram_bytes_per_slice) * 4;
+    int vram_bytes_per_neuron = neuron_size * (ffn_gate ? 3 : 2); // TODO: why 4.5, not 3?
+    // For MoE models just x by expert neurons?
+    int neuron_cap = floor((double)vram_allocatable_bytes / vram_bytes_per_neuron);
 
     LLAMA_LOG_INFO("invoking powerinfer Python module to generate gpu split for %.2f MiB of VRAM\n", vram_allocatable_bytes / 1024.0 / 1024.0);
 
