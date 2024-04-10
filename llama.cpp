@@ -1451,6 +1451,7 @@ struct llama_vocab {
 
 struct llama_gpu_split_loader;
 struct llama_augmentation_model_loader;
+struct buffered_tensor_allocator;
 
 struct llama_model {
     e_model     type  = MODEL_UNKNOWN;
@@ -1493,6 +1494,9 @@ struct llama_model {
     // objects representing data potentially being locked in memory
     llama_mlock mlock_buf;
     llama_mlock mlock_mmap;
+
+    // lazy tensor loader
+    buffered_tensor_allocator * lazy_alloc = NULL;
 
     // for quantize-stats only
     std::vector<std::pair<std::string, struct ggml_tensor *>> tensors_by_name;
@@ -3270,8 +3274,25 @@ static void llm_load_sparse_model_tensors(
         }
     }
 
+    // populate `tensors_by_name`
+    for (int i = 0; i < ml.n_tensors; ++i) {
+        struct ggml_tensor * cur = ggml_get_tensor(ctx, ml.get_tensor_name(i));
+        model.tensors_by_name.emplace_back(ggml_get_name(cur), cur);
+    }
+
     model.n_gpu_layers = alloc.flush();
     LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
+
+    ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
+
+    if (progress_callback) {
+        progress_callback(1.0f, progress_callback_user_data);
+    }
+
+    model.mapping = std::move(ml.mapping);
+
+    // Offload FFN segments to GPU if possible
+    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
 
     // print memory requirements
     {
@@ -3284,27 +3305,6 @@ static void llm_load_sparse_model_tensors(
         LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
 #endif
     }
-
-    // populate `tensors_by_name`
-    for (int i = 0; i < ml.n_tensors; ++i) {
-        struct ggml_tensor * cur = ggml_get_tensor(ctx, ml.get_tensor_name(i));
-        model.tensors_by_name.emplace_back(ggml_get_name(cur), cur);
-    }
-
-    ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
-
-    if (progress_callback) {
-        progress_callback(1.0f, progress_callback_user_data);
-    }
-
-    model.mapping = std::move(ml.mapping);
-
-    // Reserve KV cache in VRAM
-    if (cparams != NULL) {
-        llama_reserve_model_kv_cache(&model, cparams);
-    }
-    // Offload FFN segments to GPU if possible
-    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
 
     // loading time will be recalculate after the first eval, so
     // we take page faults deferred by mmap() into consideration
@@ -4064,57 +4064,46 @@ static void llm_load_tensors(
     model.t_load_us = ggml_time_us() - model.t_start_us;
 }
 
-static bool llama_model_load(const std::string & fname, llama_model & model, const llama_model_params & params, const llama_context_params * cparams) {
-    try {
-        llama_model_loader ml(fname, params.use_mmap);
-
-        if (ml.sparse_deriv == GGML_SPARSE_INFERENCE) {
-            LLAMA_LOG_INFO("%s: PowerInfer model loaded. Sparse inference will be used.\n", __func__);
-        }
-
-        model.hparams.vocab_only = params.vocab_only;
-        model.sparse_deriv = ml.sparse_deriv;
-
-        llm_load_arch   (ml, model);
-        llm_load_hparams(ml, model);
-        llm_load_vocab  (ml, model);
-
-        llm_load_print_meta(ml, model);
-
-        if (model.hparams.n_vocab != model.vocab.id_to_token.size()) {
-            throw std::runtime_error("vocab size mismatch");
-        }
-
-        if (params.vocab_only) {
-            LLAMA_LOG_INFO("%s: vocab only - skipping tensors\n", __func__);
-            return true;
-        }
-
-        if (llama_use_sparse_inference(&model)) {
-            if (params.n_gpu_layers > 0) {
-                LLAMA_LOG_WARN("%s: sparse inference ignores n_gpu_layers, you can use --vram-budget option instead\n", __func__);
-                return false;
-            }
-#if defined GGML_USE_CUBLAS
-            llama_set_vram_budget(params.vram_budget_gb, params.main_gpu);
-#endif
-            llm_load_sparse_model_tensors(
-                ml, model, cparams, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
-                params.use_mlock, params.progress_callback, params.progress_callback_user_data
-            );
-        } else {
-            llm_load_tensors(
-                ml, model, params.n_gpu_layers, params.main_gpu, params.tensor_split, params.use_mlock,
-                params.progress_callback, params.progress_callback_user_data
-            );
-        }
-
-    } catch (const std::exception & err) {
-        LLAMA_LOG_ERROR("error loading model: %s\n", err.what());
-        return false;
+static void llama_model_load(llama_model_loader &ml, llama_model & model, const llama_model_params & params, const llama_context_params * cparams) {
+    if (ml.sparse_deriv == GGML_SPARSE_INFERENCE) {
+        LLAMA_LOG_INFO("%s: PowerInfer model loaded. Sparse inference will be used.\n", __func__);
     }
 
-    return true;
+    model.hparams.vocab_only = params.vocab_only;
+    model.sparse_deriv = ml.sparse_deriv;
+
+    llm_load_arch   (ml, model);
+    llm_load_hparams(ml, model);
+    llm_load_vocab  (ml, model);
+
+    llm_load_print_meta(ml, model);
+
+    if (model.hparams.n_vocab != model.vocab.id_to_token.size()) {
+        throw std::runtime_error("vocab size mismatch");
+    }
+
+    if (params.vocab_only) {
+        LLAMA_LOG_INFO("%s: vocab only - skipping tensors\n", __func__);
+        return;
+    }
+
+    if (llama_use_sparse_inference(&model)) {
+        if (params.n_gpu_layers > 0) {
+            throw std::runtime_error("sparse inference rejects n_gpu_layers, you can use --vram-budget option instead");
+        }
+#if defined GGML_USE_CUBLAS
+        llama_set_vram_budget(params.vram_budget_gb, params.main_gpu);
+#endif
+        llm_load_sparse_model_tensors(
+            ml, model, cparams, params.main_gpu, vram_budget_bytes, params.reset_gpu_index, params.disable_gpu_index,
+            params.use_mlock, params.progress_callback, params.progress_callback_user_data
+        );
+    } else {
+        llm_load_tensors(
+            ml, model, params.n_gpu_layers, params.main_gpu, params.tensor_split, params.use_mlock,
+            params.progress_callback, params.progress_callback_user_data
+        );
+    }
 }
 
 //
@@ -9511,8 +9500,11 @@ struct llama_model * llama_load_model_from_file_with_context(
         };
     }
 
-    if (!llama_model_load(path_model, *model, params, cparams)) {
-        LLAMA_LOG_ERROR("%s: failed to load model\n", __func__);
+    try {
+        llama_model_loader ml(path_model, params.use_mmap);
+        llama_model_load(ml, *model, params, cparams);
+    } catch (const std::exception & err) {
+        LLAMA_LOG_ERROR("error loading model: %s\n", err.what());
         delete model;
         return nullptr;
     }
