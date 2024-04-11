@@ -3185,7 +3185,9 @@ static void llm_load_sparse_model_tensors(
         llama_backend_offload_split = GGML_BACKEND_GPU;
 #endif
 
-    buffered_tensor_allocator alloc(ml, ctx, hparams);
+    buffered_tensor_allocator & alloc = *model.lazy_alloc;
+    alloc.ctx = model.ctx; // ADHOC: set the context for the allocator
+
     uint32_t current_layer = 0;
     auto create_tensor = [&alloc, &current_layer] (
         const std::pair<std::string, llm_tensor> & tn, 
@@ -3280,35 +3282,37 @@ static void llm_load_sparse_model_tensors(
         model.tensors_by_name.emplace_back(ggml_get_name(cur), cur);
     }
 
-    model.n_gpu_layers = alloc.flush();
-    LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
+    model.n_gpu_layers = hparams.n_layer; // MOCK: all layers are offloaded
 
-    ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
+//     model.n_gpu_layers = alloc.flush();
+//     LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
 
-    if (progress_callback) {
-        progress_callback(1.0f, progress_callback_user_data);
-    }
+//     ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
 
-    model.mapping = std::move(ml.mapping);
+//     if (progress_callback) {
+//         progress_callback(1.0f, progress_callback_user_data);
+//     }
 
-    // Offload FFN segments to GPU if possible
-    model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
+//     model.mapping = std::move(ml.mapping);
 
-    // print memory requirements
-    {
-        // this is the total memory required to run the inference
-        size_t mem_required = ctx_size + mmapped_size;
+//     // Offload FFN segments to GPU if possible
+//     model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
 
-        LLAMA_LOG_INFO("%s: mem required  = %7.2f MB\n", __func__, mem_required / 1024.0 / 1024.0);
+//     // print memory requirements
+//     {
+//         // this is the total memory required to run the inference
+//         size_t mem_required = ctx_size + mmapped_size;
 
-#if defined(GGML_USE_CUBLAS) || defined(GGML_USE_CLBLAST)
-        LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
-#endif
-    }
+//         LLAMA_LOG_INFO("%s: mem required  = %7.2f MB\n", __func__, mem_required / 1024.0 / 1024.0);
 
-    // loading time will be recalculate after the first eval, so
-    // we take page faults deferred by mmap() into consideration
-    model.t_load_us = ggml_time_us() - model.t_start_us;
+// #if defined(GGML_USE_CUBLAS) || defined(GGML_USE_CLBLAST)
+//         LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
+// #endif
+//     }
+
+//     // loading time will be recalculate after the first eval, so
+//     // we take page faults deferred by mmap() into consideration
+//     model.t_load_us = ggml_time_us() - model.t_start_us;
 }
 
 void llama_reserve_model_kv_cache(llama_model *model, const llama_context_params *cparams) {
@@ -9501,8 +9505,9 @@ struct llama_model * llama_load_model_from_file_with_context(
     }
 
     try {
-        llama_model_loader ml(path_model, params.use_mmap);
-        llama_model_load(ml, *model, params, cparams);
+        llama_model_loader * ml = new llama_model_loader(path_model, params.use_mmap);
+        model->lazy_alloc = new buffered_tensor_allocator(*ml, NULL, model->hparams);
+        llama_model_load(*ml, *model, params, cparams);
     } catch (const std::exception & err) {
         LLAMA_LOG_ERROR("error loading model: %s\n", err.what());
         delete model;
@@ -9524,7 +9529,8 @@ void llama_free_model(struct llama_model * model) {
 
 struct llama_context * llama_new_context_with_model(
                  struct llama_model * model,
-        struct llama_context_params   params) {
+        struct llama_context_params   params,
+        struct llama_model_params     mparams) {
 
     if (!model) {
         return nullptr;
@@ -9589,6 +9595,8 @@ struct llama_context * llama_new_context_with_model(
         {
             const size_t memory_size = ggml_nbytes(ctx->kv_self.k) + ggml_nbytes(ctx->kv_self.v);
             LLAMA_LOG_INFO("%s: kv self size  = %7.2f MB\n", __func__, memory_size / 1024.0 / 1024.0);
+
+            llama_reduce_vram_budget(memory_size);
         }
 
         // resized during inference
@@ -9634,6 +9642,30 @@ struct llama_context * llama_new_context_with_model(
             size_t alloc_size = ggml_allocr_alloc_graph(ctx->alloc, gf) + tensor_alignment;
 
             LLAMA_LOG_INFO("%s: compute buffer total size = %.2f MB\n", __func__, (ctx->buf_compute.size + alloc_size) / 1024.0 / 1024.0);
+
+            llama_reduce_vram_budget(alloc_size);
+
+            {
+                buffered_tensor_allocator & alloc = *model->lazy_alloc;
+                llama_model_loader & ml = alloc.ml;
+
+                model->n_gpu_layers = alloc.flush();
+                LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%.2f MiB): %d/%d\n", __func__, vram_budget_bytes / (1024.0 * 1024.0), model->n_gpu_layers, model->hparams.n_layer);
+                ml.load_all_data(model->ctx, mparams.progress_callback, mparams.progress_callback_user_data, mparams.use_mlock ? &model->mlock_mmap : NULL);
+
+                if (mparams.progress_callback) {
+                    mparams.progress_callback(1.0f, mparams.progress_callback_user_data);
+                }
+
+                model->mapping = std::move(ml.mapping);
+
+                // Offload FFN segments to GPU if possible
+                model->ffn_offloaded_bytes = llm_load_gpu_split(ml, *model, mparams.reset_gpu_index, mparams.disable_gpu_index || !alloc.tensor_offload_complete);
+
+                // loading time will be recalculate after the first eval, so
+                // we take page faults deferred by mmap() into consideration
+                model->t_load_us = ggml_time_us() - model->t_start_us;
+            }
 
             // recreate allocator with exact memory requirements
             ggml_allocr_free(ctx->alloc);

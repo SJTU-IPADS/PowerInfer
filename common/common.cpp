@@ -969,7 +969,7 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
         return std::make_tuple(nullptr, nullptr);
     }
 
-    llama_context * lctx = llama_new_context_with_model(model, cparams);
+    llama_context * lctx = llama_new_context_with_model(model, cparams, mparams);
     if (lctx == NULL) {
         fprintf(stderr, "%s: error: failed to create context with model '%s'\n", __func__, params.model.c_str());
         llama_free_model(model);

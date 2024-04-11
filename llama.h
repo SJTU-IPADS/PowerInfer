@@ -285,7 +285,8 @@ extern "C" {
 
     LLAMA_API struct llama_context * llama_new_context_with_model(
                      struct llama_model * model,
-            struct llama_context_params   params);
+            struct llama_context_params   params,
+            struct llama_model_params     mparams);
 
     // Frees all allocated memory
     LLAMA_API void llama_free(struct llama_context * ctx);
