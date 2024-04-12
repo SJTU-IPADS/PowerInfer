@@ -10738,7 +10738,7 @@ static void ggml_compute_forward_soft_max_f32(
 
 #ifndef NDEBUG
         for (int i = 0; i < nc; ++i) {
-            //printf("p[%d] = %f\n", i, p[i]);
+            //printf("p[%d] = %f\n", i, sp[i]);
             assert(!isnan(sp[i]));
         }
 #endif
@@ -14793,6 +14793,14 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
     if (skip_cpu) {
         return;
     }
+
+    printf("%s: src0=%p(backend=%d, data=%p); src1=%p(backend=%d, data=%p); src2=%p(backend=%d, data=%p); src3=%p(backend=%d, data=%p); tensor=%p(backend=%d, data=%p)\n",
+        ggml_get_name(tensor),
+        tensor->src[0], tensor->src[0] ? tensor->src[0]->backend : -1, tensor->src[0] ? tensor->src[0]->data : NULL,
+        tensor->src[1], tensor->src[1] ? tensor->src[1]->backend : -1, tensor->src[1] ? tensor->src[1]->data : NULL,
+        tensor->src[2], tensor->src[2] ? tensor->src[2]->backend : -1, tensor->src[2] ? tensor->src[2]->data : NULL,
+        tensor->src[3], tensor->src[3] ? tensor->src[3]->backend : -1, tensor->src[3] ? tensor->src[3]->data : NULL,
+        tensor, tensor->data);
     // Make sure src[0] (weight for binary ops) is on CPU to avoid any weight transfer
     GGML_ASSERT((tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU) && "weight should be on the CPU to compute on the CPU");
 #endif // GGML_USE_CUBLAS

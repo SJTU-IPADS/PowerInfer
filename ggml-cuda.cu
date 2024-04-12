@@ -9157,6 +9157,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
     // when src0 (weights) is not on device, we compute on CPU with sparsity
     if (!src0_on_device && (tensor->op == GGML_OP_MUL_MAT_SPARSE || tensor->op == GGML_OP_AXPY)
         || !any_on_device && tensor->op != GGML_OP_MUL_MAT) {
+        printf("ggml_cuda_compute_forward: op=%d, src0_on_device=%d, any_on_device=%d\n", tensor->op, src0_on_device, any_on_device);
         return false;
     }
 
