@@ -2168,6 +2168,8 @@ struct llama_model_loader {
                     // old code:
                     //ggml_cuda_transform_tensor(lt.data, lt.ggml_tensor);
 
+                    printf("transforming tensor %s at %p to GPU\n", ggml_get_name(cur), cur);
+
                     // TODO: test if this works !!
                     ggml_cuda_transform_tensor(cur->data, cur);
                     if (!use_mmap) {
@@ -2989,6 +2991,7 @@ struct buffered_tensor_allocator {
         ggml_tensor * meta_tensor = ml.create_tensor(ctx, name, ne, GGML_BACKEND_GPU); // Assmues GPU backend
         ggml_set_no_alloc(ctx, no_alloc);
         alloc_queues[level].push_back(std::make_tuple(i_layer, tensor_type, meta_tensor));
+        printf("postponed tensor alloc %s: %p\n", meta_tensor->name, meta_tensor);
         return meta_tensor;
 #else
         return ml.create_tensor(ctx, name, ne, GGML_BACKEND_CPU);
@@ -3037,7 +3040,7 @@ struct buffered_tensor_allocator {
                     continue;
                 }
 
-                printf("offloading tensor %s\n", meta_tensor->name);
+                printf("offloading tensor %s: %p\n", meta_tensor->name, meta_tensor);
 
                 if (level == TENSOR_OFFLOAD_ATTN && tensor_type == LLM_TENSOR_ATTN_OUT) {
                     offloaded_layers = i_layer + 1;
@@ -3290,6 +3293,12 @@ static void llm_load_sparse_model_tensors(
     }
 
     model.n_gpu_layers = hparams.n_layer; // MOCK: all layers are offloaded
+    for (llama_layer & layer : model.layers) {
+        layer.ffn_up_gpu = layer.ffn_up;
+        layer.ffn_down_gpu = layer.ffn_down_t;
+        layer.ffn_gate_gpu = layer.ffn_gate;
+        layer.gpu_offload_ratio = 1.; // MOCK: all neurons are offloaded
+    }
 
 //     model.n_gpu_layers = alloc.flush();
 //     LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
@@ -4814,6 +4823,7 @@ struct llm_build_context {
             {
                 // compute Q and K and RoPE them
                 struct ggml_tensor * Qcur = ggml_mul_mat(ctx0, model.layers[il].wq, cur);
+                printf("Qcur: %p, wq-%d: %p\n", Qcur, il, model.layers[il].wq);
                 cb(Qcur, "Qcur", il);
 
                 struct ggml_tensor * Kcur = ggml_mul_mat(ctx0, model.layers[il].wk, cur);
