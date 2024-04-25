@@ -3001,8 +3001,6 @@ struct buffered_tensor_allocator {
     bool try_mark_tensor_offloaded(ggml_tensor * meta_tensor) {
         size_t tensor_data_size = ggml_nbytes(meta_tensor);
         if (!llama_reduce_vram_budget(tensor_data_size)) {
-            // Fall back to CPU
-            ggml_set_backend(meta_tensor, GGML_BACKEND_CPU);
             return false;
         }
         vram_allocated_bytes += tensor_data_size;
@@ -3027,21 +3025,19 @@ struct buffered_tensor_allocator {
         bool offloading_no_fault = true;
         for (int enum_i = TENSOR_OFFLOAD_ATTN; enum_i <= TENSOR_OFFLOAD_OUTPUT; enum_i ++) {
             tensor_offloading_levels level = static_cast<tensor_offloading_levels>(enum_i);
-
             for (auto tensor_tup : alloc_queues[level]) {
                 const int i_layer = std::get<0>(tensor_tup);
                 const llm_tensor tensor_type = std::get<1>(tensor_tup);
                 ggml_tensor * meta_tensor = std::get<2>(tensor_tup);
-                offloading_no_fault = offloading_no_fault && try_mark_tensor_offloaded(meta_tensor);
-
+                if (offloading_no_fault) {
+                    offloading_no_fault = try_mark_tensor_offloaded(meta_tensor);
+                }
                 if (!offloading_no_fault) {
                     // Still iterate over all tensors to mark them as CPU tensors
                     // but do not update the model's n_gpu_layers
+                    ggml_set_backend(meta_tensor, GGML_BACKEND_CPU);
                     continue;
                 }
-
-                printf("offloading tensor %s: %p\n", meta_tensor->name, meta_tensor);
-
                 if (level == TENSOR_OFFLOAD_ATTN && tensor_type == LLM_TENSOR_ATTN_OUT) {
                     offloaded_layers = i_layer + 1;
                 } else if (level == TENSOR_OFFLOAD_OUTPUT) {

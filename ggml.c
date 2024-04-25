@@ -14208,7 +14208,7 @@ static void ggml_compute_forward_mul_mat_sparse(
     // attempt to reduce false-sharing (does not seem to make a difference)
     // float tmp[16];
     float *ffdata = (float *)dst->src[2]->data;
-    int *gid = (int *)dst->src[3]->data;
+    int *gid = dst->src[3] ? (int *)dst->src[3]->data : NULL;
     float *predictor_data = (float *)dst->src[2]->data;
     const size_t predictor_row_size = dst->src[2]->ne[0]*ggml_type_size(GGML_TYPE_F32)/ggml_blck_size(GGML_TYPE_F32);
 
@@ -14253,7 +14253,7 @@ static void ggml_compute_forward_mul_mat_sparse(
                     float *dst_col = (float *)((char *)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
 
                     // if (ffdata[ir0] <= 0.0f) {
-                    if (gid[ir0] == 1 || ffdata[ir0] < threshold) {
+                    if (gid && gid[ir0] == 1 || ffdata[ir0] < threshold) {
                         dst_col[ir0] = 0;
                         continue;
                     }
@@ -14421,7 +14421,7 @@ static void ggml_compute_forward_mul_mat_axpy(
                 }
 		        if (src1_ptr[ir1]==0)
 			        continue;
-                if (!gpu_idx || gpu_idx[ir1] == 1) {
+                if (gpu_idx && gpu_idx[ir1] == 1) {
                     continue;
                 }
                 if (sparse_idx[ir1] < threshold)
@@ -14547,7 +14547,7 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
     const int64_t nr1 = ne11*ne12*ne13;
     float *idx = src2->data;
     int idx_row_size = src2->nb[1];
-    int *gid = (int *)(dst->src[3]->data);
+    int *gid = dst->src[3] ? (int *)(dst->src[3]->data) : NULL;
     // printf("down %d up %d ne00 %d\n", ir10, ir11, ne00);
 
 #if defined(_MSC_VER)
@@ -14568,7 +14568,7 @@ static void ggml_compute_forward_mul_mat_axpy_q4_0(
         {
             if (ir1 >= nr)
                 break;
-            if (gid[ir1] == 1)
+            if (gid && gid[ir1] == 1)
                 continue;
             if (idx[ir1] < threshold)
                 continue;
