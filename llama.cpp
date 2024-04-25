@@ -1474,7 +1474,7 @@ struct llama_model {
     struct ggml_tensor * output_norm_b;
     struct ggml_tensor * output;
 
-    VectorWithAccessCapture<llama_layer> layers;
+    std::vector<llama_layer> layers;
 
     int n_gpu_layers;
 
@@ -2991,7 +2991,6 @@ struct buffered_tensor_allocator {
         ggml_tensor * meta_tensor = ml.create_tensor(ctx, name, ne, GGML_BACKEND_GPU); // Assmues GPU backend
         ggml_set_no_alloc(ctx, no_alloc);
         alloc_queues[level].push_back(std::make_tuple(i_layer, tensor_type, meta_tensor));
-        printf("postponed tensor alloc %s: %p\n", meta_tensor->name, meta_tensor);
         return meta_tensor;
 #else
         return ml.create_tensor(ctx, name, ne, GGML_BACKEND_CPU);
@@ -3041,7 +3040,7 @@ struct buffered_tensor_allocator {
                 if (level == TENSOR_OFFLOAD_ATTN && tensor_type == LLM_TENSOR_ATTN_OUT) {
                     offloaded_layers = i_layer + 1;
                 } else if (level == TENSOR_OFFLOAD_OUTPUT) {
-                    offloaded_layers = hparams.n_layer + 1; // indicate all layers + output are offloaded
+                    offloaded_layers = hparams.n_layer; // indicate all layers + output are offloaded
                 }
             }
         }
@@ -3089,7 +3088,7 @@ static bool llm_load_gpu_split_with_budget(llama_model_loader & ml, llama_model 
     ggml_tensor * ffn_gate = model.layers[0].ffn_gate;
     int neuron_size = ffn_up->ne[0] * ggml_type_size(ffn_up->type) / ggml_blck_size(ffn_up->type);
     // For model arch with FFN gate, the gate is also sliced, otherwise only the up and down matrices are sliced
-    int vram_bytes_per_neuron = neuron_size * (ffn_gate ? 3 : 2); // TODO: why 4.5, not 3?
+    int vram_bytes_per_neuron = neuron_size * (ffn_gate ? 3 : 2);
     // For MoE models just x by expert neurons?
     int neuron_cap = floor((double)vram_allocatable_bytes / vram_bytes_per_neuron);
 
@@ -3296,35 +3295,6 @@ static void llm_load_sparse_model_tensors(
         layer.gpu_offload_ratio = 1.; // MOCK: all neurons are offloaded
     }
 
-//     model.n_gpu_layers = alloc.flush();
-//     LLAMA_LOG_INFO("%s: offloaded layers from VRAM budget(%ld bytes): %d/%d\n", __func__, vram_budget_bytes, model.n_gpu_layers, hparams.n_layer);
-
-//     ml.load_all_data(ctx, progress_callback, progress_callback_user_data, use_mlock ? &model.mlock_mmap : NULL);
-
-//     if (progress_callback) {
-//         progress_callback(1.0f, progress_callback_user_data);
-//     }
-
-//     model.mapping = std::move(ml.mapping);
-
-//     // Offload FFN segments to GPU if possible
-//     model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
-
-//     // print memory requirements
-//     {
-//         // this is the total memory required to run the inference
-//         size_t mem_required = ctx_size + mmapped_size;
-
-//         LLAMA_LOG_INFO("%s: mem required  = %7.2f MB\n", __func__, mem_required / 1024.0 / 1024.0);
-
-// #if defined(GGML_USE_CUBLAS) || defined(GGML_USE_CLBLAST)
-//         LLAMA_LOG_INFO("%s: VRAM used: %.2f MB\n", __func__, alloc.vram_allocated_bytes / 1024.0 / 1024.0);
-// #endif
-//     }
-
-//     // loading time will be recalculate after the first eval, so
-//     // we take page faults deferred by mmap() into consideration
-//     model.t_load_us = ggml_time_us() - model.t_start_us;
 }
 
 void llama_reserve_model_kv_cache(llama_model *model, const llama_context_params *cparams) {
@@ -4819,7 +4789,6 @@ struct llm_build_context {
             {
                 // compute Q and K and RoPE them
                 struct ggml_tensor * Qcur = ggml_mul_mat(ctx0, model.layers[il].wq, cur);
-                printf("Qcur: %p, wq-%d: %p\n", Qcur, il, model.layers[il].wq);
                 cb(Qcur, "Qcur", il);
 
                 struct ggml_tensor * Kcur = ggml_mul_mat(ctx0, model.layers[il].wk, cur);
@@ -9672,8 +9641,10 @@ struct llama_context * llama_new_context_with_model(
 
                 model->mapping = std::move(ml.mapping);
 
-                // Offload FFN segments to GPU if possible
-                model->ffn_offloaded_bytes = llm_load_gpu_split(ml, *model, mparams.reset_gpu_index, mparams.disable_gpu_index || !alloc.tensor_offload_complete);
+                if (model->n_gpu_layers >= hparams.n_layer) {
+                    // Offload FFN segments to GPU all other tensors are offloaded to GPU
+                    model->ffn_offloaded_bytes = llm_load_gpu_split(ml, *model, mparams.reset_gpu_index, mparams.disable_gpu_index || !alloc.tensor_offload_complete);
+                }
 
                 // loading time will be recalculate after the first eval, so
                 // we take page faults deferred by mmap() into consideration

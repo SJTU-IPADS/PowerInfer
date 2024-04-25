@@ -14787,27 +14787,12 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
     if (tensor->op == GGML_OP_NONE) {
         return;
     }
-    
-    printf("dst (%s) = %p; backend = %d, data = %p\n", ggml_get_name(tensor), tensor, tensor->backend, tensor->data);
-    if (tensor->src[0]) {
-        printf("src0 (%s) = %p; backend = %d, data = %p\n", ggml_get_name(tensor->src[0]), tensor->src[0], tensor->src[0]->backend, tensor->src[0]->data);
-    }
-    if (tensor->src[1]) {
-        printf("src1 (%s) = %p; backend = %d, data = %p\n", ggml_get_name(tensor->src[1]), tensor->src[1], tensor->src[1]->backend, tensor->src[1]->data);
-    }
-    if (tensor->src[2]) {
-        printf("src2 (%s) = %p; backend = %d, data = %p\n", ggml_get_name(tensor->src[2]), tensor->src[2], tensor->src[2]->backend, tensor->src[2]->data);
-    }
-    if (tensor->src[3]) {
-        printf("src3 (%s) = %p; backend = %d, data = %p\n", ggml_get_name(tensor->src[3]), tensor->src[3], tensor->src[3]->backend, tensor->src[3]->data);
-    }
 
 #ifdef GGML_USE_CUBLAS
     bool skip_cpu = ggml_cuda_compute_forward(params, tensor);
     if (skip_cpu) {
         return;
     }
-
     // Make sure src[0] (weight for binary ops) is on CPU to avoid any weight transfer
     GGML_ASSERT((tensor->src[0] == NULL || tensor->src[0]->backend == GGML_BACKEND_CPU) && "weight should be on the CPU to compute on the CPU");
 #endif // GGML_USE_CUBLAS
