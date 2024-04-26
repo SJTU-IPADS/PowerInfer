@@ -2738,9 +2738,7 @@ static int64_t sum_gpu_index(struct ggml_tensor * gpu_index) {
     ggml_set_name(sum, "gpu_index_sum");
     ggml_build_forward_expand(gf, sum);
 
-    // TODO: +1 worker for GPU under hybrid inference but no use
-    // ggml_graph_compute_helper(work_buffer, gf, 2);
-    ggml_graph_compute_with_ctx(ctx_aux, gf, 2);
+    ggml_graph_compute_with_ctx(ctx_aux, gf, 1);
 
     int32_t sum_val = ggml_get_i32_1d(sum, 0);
 
@@ -4796,6 +4794,7 @@ struct llm_build_context {
 
                 struct ggml_tensor * Vcur = ggml_mul_mat(ctx0, model.layers[il].wv, cur);
                 cb(Vcur, "Vcur", il);
+                printf("%s backend = %d\n", Vcur->name, Vcur->backend);
 
                 Qcur = ggml_rope_custom(
                     ctx0, ggml_reshape_3d(ctx0, Qcur, n_embd_head, n_head,    n_tokens), inp_pos,
@@ -9578,7 +9577,7 @@ struct llama_context * llama_new_context_with_model(
             const size_t memory_size = ggml_nbytes(ctx->kv_self.k) + ggml_nbytes(ctx->kv_self.v);
             LLAMA_LOG_INFO("%s: kv self size  = %7.2f MB\n", __func__, memory_size / 1024.0 / 1024.0);
 
-            llama_reduce_vram_budget(memory_size);
+            bool kv_offloaded = llama_reduce_vram_budget(memory_size);
         }
 
         // resized during inference
