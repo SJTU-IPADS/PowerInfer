@@ -179,9 +179,8 @@ int main(int argc, char ** argv) {
     LOG("%s: load the model and apply lora adapter, if any\n", __func__);
     std::tie(model, ctx) = llama_init_from_gpt_params(params);
     if (sparams.cfg_scale > 1.f) {
-        struct llama_model_params mparams = llama_model_params_from_gpt_params(params);
         struct llama_context_params lparams = llama_context_params_from_gpt_params(params);
-        ctx_guidance = llama_new_context_with_model(model, lparams, mparams);
+        ctx_guidance = llama_new_context_with_model(model, lparams);
     }
 
     if (model == NULL) {
