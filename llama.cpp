@@ -1575,6 +1575,8 @@ struct llama_context {
     llama_buffer buf_alloc;
     ggml_allocr * alloc = NULL;
 
+    size_t ctx_vram_size = 0;
+
 #ifdef GGML_USE_METAL
     ggml_metal_context * ctx_metal = NULL;
 #endif
@@ -3125,6 +3127,8 @@ static size_t llm_load_gpu_split(llama_model_loader & ml, llama_model & model, b
     return ffn_offloaded_bytes;
 }
 
+struct llama_context * llama_new_context_with_model(struct llama_model * model, struct llama_context_params params);
+
 static void llm_load_sparse_model_tensors(
         llama_model_loader & ml,
         llama_model & model,
@@ -3271,6 +3275,29 @@ static void llm_load_sparse_model_tensors(
             default:
                 throw std::runtime_error("unknown architecture");
         }
+    }
+
+    {
+        ggml_context * tmp_ctx = ggml_init({ 1 << 20, NULL, true });
+        model.n_gpu_layers = hparams.n_layer; // MOCK: all layers are offloaded
+        for (llama_layer & layer : model.layers) {
+            printf("%s backend: %d\n", layer.ffn_norm->name, layer.ffn_norm->backend);
+            printf("%s backend: %d\n", layer.ffn_up->name, layer.ffn_up->backend);
+            layer.ffn_up_gpu = ggml_dup_tensor(tmp_ctx, layer.ffn_up);
+            ggml_set_backend(layer.ffn_up_gpu, GGML_BACKEND_GPU);
+            layer.ffn_down_gpu = ggml_dup_tensor(tmp_ctx, layer.ffn_down_t);
+            ggml_set_backend(layer.ffn_down_gpu, GGML_BACKEND_GPU);
+            layer.ffn_gate_gpu = ggml_dup_tensor(tmp_ctx, layer.ffn_gate);
+            ggml_set_backend(layer.ffn_gate_gpu, GGML_BACKEND_GPU);
+            layer.gpu_offload_ratio = 1.; // MOCK: all neurons are offloaded
+        }
+        llama_context * lctx = llama_new_context_with_model(&model, *cparams);
+        if (!lctx) {
+            throw std::runtime_error(format("llama_new_context_with_model() failed"));
+        }
+        printf("context vram size: %ld\n", lctx->ctx_vram_size);
+
+        delete lctx;
     }
 
     model.n_gpu_layers = alloc.flush();
@@ -9675,6 +9702,7 @@ struct llama_context * llama_new_context_with_model(
                     (total_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
                     (model_vram_size + model->ffn_offloaded_bytes) / 1024.0 / 1024.0,
                     ctx_vram_size / 1024.0 / 1024.0);
+            ctx->ctx_vram_size = ctx_vram_size;
 #endif
         }
 
