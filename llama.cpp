@@ -3279,10 +3279,8 @@ static void llm_load_sparse_model_tensors(
 
     {
         ggml_context * tmp_ctx = ggml_init({ 1 << 20, NULL, true });
-        model.n_gpu_layers = hparams.n_layer; // MOCK: all layers are offloaded
+        model.n_gpu_layers = hparams.n_layer + 2; // MOCK: all layers + KV cache are offloaded
         for (llama_layer & layer : model.layers) {
-            printf("%s backend: %d\n", layer.ffn_norm->name, layer.ffn_norm->backend);
-            printf("%s backend: %d\n", layer.ffn_up->name, layer.ffn_up->backend);
             layer.ffn_up_gpu = ggml_dup_tensor(tmp_ctx, layer.ffn_up);
             ggml_set_backend(layer.ffn_up_gpu, GGML_BACKEND_GPU);
             layer.ffn_down_gpu = ggml_dup_tensor(tmp_ctx, layer.ffn_down_t);
@@ -3296,8 +3294,17 @@ static void llm_load_sparse_model_tensors(
             throw std::runtime_error(format("llama_new_context_with_model() failed"));
         }
         printf("context vram size: %ld\n", lctx->ctx_vram_size);
+        // reserve vram budget for activation + kv cache; but their sizes are under worst case
+        llama_reduce_vram_budget(std::min(lctx->ctx_vram_size, (size_t) vram_budget_bytes));
+        for (llama_layer & layer : model.layers) {
+            layer.ffn_up_gpu = NULL;
+            layer.ffn_down_gpu = NULL;
+            layer.ffn_gate_gpu = NULL;
+            layer.gpu_offload_ratio = 0.;
+        }
 
         delete lctx;
+        // TODO: free gpu tensors in this context
     }
 
     model.n_gpu_layers = alloc.flush();
@@ -3329,10 +3336,6 @@ static void llm_load_sparse_model_tensors(
 
     model.mapping = std::move(ml.mapping);
 
-    // Reserve KV cache in VRAM
-    if (cparams != NULL) {
-        llama_reserve_model_kv_cache(&model, cparams);
-    }
     // Offload FFN segments to GPU if possible
     model.ffn_offloaded_bytes = llm_load_gpu_split(ml, model, reset_gpu_index, disable_ffn_split || !alloc.tensor_offload_complete);
 

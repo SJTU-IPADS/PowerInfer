@@ -194,7 +194,7 @@ static_assert(sizeof(half) == sizeof(ggml_fp16_t), "wrong fp16 size");
             fprintf(stderr, "\nCUDA error %d at %s:%d: %s\n", err_, __FILE__, __LINE__, \
                 cudaGetErrorString(err_));                                              \
             fprintf(stderr, "current device: %d\n", id);                                \
-            exit(1);                                                                    \
+            assert(false);                                                              \
         }                                                                               \
     } while (0)
 
@@ -208,7 +208,7 @@ static_assert(sizeof(half) == sizeof(ggml_fp16_t), "wrong fp16 size");
             fprintf(stderr, "\ncuBLAS error %d at %s:%d: %s\n",                         \
                     err_, __FILE__, __LINE__, cublasGetStatusString(err_));             \
             fprintf(stderr, "current device: %d\n", id);                                \
-            exit(1);                                                                    \
+            assert(false);                                                              \
         }                                                                               \
     } while (0)
 #else
@@ -220,7 +220,7 @@ static_assert(sizeof(half) == sizeof(ggml_fp16_t), "wrong fp16 size");
             cudaGetDevice(&id);                                                         \
             fprintf(stderr, "\ncuBLAS error %d at %s:%d\n", err_, __FILE__, __LINE__);  \
             fprintf(stderr, "current device: %d\n", id);                                \
-            exit(1);                                                                    \
+            assert(false);                                                              \
         }                                                                               \
     } while (0)
 #endif // CUDART_VERSION >= 11
@@ -8975,11 +8975,11 @@ static ggml_tensor_extra_gpu * ggml_cuda_alloc_temp_tensor_extra() {
 }
 
 static void ggml_cuda_assign_buffers_impl(struct ggml_tensor * tensor, bool scratch, bool force_inplace, bool no_alloc) {
+    tensor->backend = GGML_BACKEND_GPU;
+
     if (scratch && g_scratch_size == 0) {
         return;
     }
-
-    tensor->backend = GGML_BACKEND_GPU;
 
     // recursively assign CUDA buffers until a compute tensor is found
     if (tensor->src[0] != nullptr && tensor->src[0]->backend == GGML_BACKEND_CPU) {
