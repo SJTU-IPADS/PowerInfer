@@ -8,6 +8,7 @@ PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** 
 [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2)
 
 ## Latest News 🔥
+- [2024/5/11] We provide support for the AMD device with ROCm.
 - [2024/3/28] We are trilled to present [Bamboo LLM](https://github.com/SJTU-IPADS/Bamboo) that achieves both top-level performance and unparalleled speed with PowerInfer! Experience it with Bamboo-7B [Base](https://huggingface.co/PowerInfer/Bamboo-base-v0.1-gguf) / [DPO](https://huggingface.co/PowerInfer/Bamboo-DPO-v0.1-gguf).
 - [2024/3/14] We supported ProSparse Llama 2 ([7B](https://huggingface.co/SparseLLM/prosparse-llama-2-7b)/[13B](https://huggingface.co/SparseLLM/prosparse-llama-2-13b)), ReLU models with ~90% sparsity, matching original Llama 2's performance (Thanks THUNLP & ModelBest)!
 - [2024/1/11] We supported Windows with GPU inference!
@@ -102,6 +103,7 @@ cd PowerInfer
 pip install -r requirements.txt # install Python helpers' dependencies
 ```
 ### Build
+
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
 Using `CMake`(3.17+):
@@ -110,7 +112,15 @@ Using `CMake`(3.17+):
 cmake -S . -B build -DLLAMA_CUBLAS=ON
 cmake --build build --config Release
 ```
+* If you have an AMD GPU:
+```bash
+# Replace '1100' to your card architecture name, you can get it by rocminfo
+CC=/opt/rocm/llvm/bin/clang CXX=/opt/rocm/llvm/bin/clang++ cmake -S . -B build -DLLAMA_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1100
+cmake --build build --config Release
+```
+
 * If you have just CPU:
+
 ```bash
 cmake -S . -B build
 cmake --build build --config Release
