@@ -8,12 +8,19 @@ PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** 
 [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2)
 
 ## Latest News 🔥
-- [2024/5/11] We provide support for the AMD device with ROCm.
+- [2024/5/20] Competition Recruitment: **CCF-TCArch Customized Computing Challenge 2024**
+
+The CCF TCARCH Customized Computing Challenge is a national competition organized by the Technical Committee on Computer Architecture (TCARCH) of the China Computer Federation (CCF). It aims to discover talents in computer architecture, stimulate students' research interest in computer architecture, and cultivate their innovative spirit. It is one of the best platforms for outstanding students in the field of computer architecture to exchange and learn in China. The competition was first held in 2018 and has been held for 5 sessions. Since 2021, the finals of this competition have been held at the CCFSys/CCFChip conference hosted by the CCF TCARCH, and an awards ceremony has been held. Outstanding papers have the opportunity to be selected for the conference proceedings. This year's competition goal is to optimize the PowerInfer inference engine using the open-source ROCm/HIP, with the expectation of achieving faster inference speed and more accurate generation results. 
+
+Welcome everyone who is interested to participate in the registration competition. The competition information website is: https://ccf-tcarch-ccc.github.io/2024/
+
+- [2024/5/17] We provide support for the AMD device with ROCm(Limited to relatively smaller models, there are some bugs in models exceeding 40B. We are currently working on fixing them.)
 - [2024/3/28] We are trilled to present [Bamboo LLM](https://github.com/SJTU-IPADS/Bamboo) that achieves both top-level performance and unparalleled speed with PowerInfer! Experience it with Bamboo-7B [Base](https://huggingface.co/PowerInfer/Bamboo-base-v0.1-gguf) / [DPO](https://huggingface.co/PowerInfer/Bamboo-DPO-v0.1-gguf).
 - [2024/3/14] We supported ProSparse Llama 2 ([7B](https://huggingface.co/SparseLLM/prosparse-llama-2-7b)/[13B](https://huggingface.co/SparseLLM/prosparse-llama-2-13b)), ReLU models with ~90% sparsity, matching original Llama 2's performance (Thanks THUNLP & ModelBest)!
 - [2024/1/11] We supported Windows with GPU inference!
 - [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16!
 - [2023/12/19] We officially released PowerInfer!
+
 ## Demo 🔥
 
 https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/fe441a42-5fce-448b-a3e5-ea4abb43ba23
