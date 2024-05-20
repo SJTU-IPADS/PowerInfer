@@ -8,11 +8,14 @@ PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** 
 [Project Kanban](https://github.com/orgs/SJTU-IPADS/projects/2/views/2)
 
 ## Latest News 🔥
+- [2024/5/20] **Competition Recruitment: CCF-TCArch Customized Computing Challenge 2024**. The CCF TCARCH CCC is a national competition organized by the Technical Committee on Computer Architecture (TCARCH) of the China Computer Federation (CCF). This year's competition aims to optimize the PowerInfer inference engine using the open-source ROCm/HIP. More information about the competition can be found [here](https://ccf-tcarch-ccc.github.io/2024/).
+- [2024/5/17] We now provide support for AMD devices with ROCm. (WIP - there are known issues for models exceeding 40B).
 - [2024/3/28] We are trilled to present [Bamboo LLM](https://github.com/SJTU-IPADS/Bamboo) that achieves both top-level performance and unparalleled speed with PowerInfer! Experience it with Bamboo-7B [Base](https://huggingface.co/PowerInfer/Bamboo-base-v0.1-gguf) / [DPO](https://huggingface.co/PowerInfer/Bamboo-DPO-v0.1-gguf).
 - [2024/3/14] We supported ProSparse Llama 2 ([7B](https://huggingface.co/SparseLLM/prosparse-llama-2-7b)/[13B](https://huggingface.co/SparseLLM/prosparse-llama-2-13b)), ReLU models with ~90% sparsity, matching original Llama 2's performance (Thanks THUNLP & ModelBest)!
 - [2024/1/11] We supported Windows with GPU inference!
 - [2023/12/24] We released an online [gradio demo](https://powerinfer-gradio.vercel.app/) for Falcon(ReLU)-40B-FP16!
 - [2023/12/19] We officially released PowerInfer!
+
 ## Demo 🔥
 
 https://github.com/SJTU-IPADS/PowerInfer/assets/34213478/fe441a42-5fce-448b-a3e5-ea4abb43ba23
@@ -102,6 +105,7 @@ cd PowerInfer
 pip install -r requirements.txt # install Python helpers' dependencies
 ```
 ### Build
+
 In order to build PowerInfer you have two different options. These commands are supposed to be run from the root directory of the project.
 
 Using `CMake`(3.17+):
@@ -110,7 +114,15 @@ Using `CMake`(3.17+):
 cmake -S . -B build -DLLAMA_CUBLAS=ON
 cmake --build build --config Release
 ```
+* If you have an AMD GPU:
+```bash
+# Replace '1100' to your card architecture name, you can get it by rocminfo
+CC=/opt/rocm/llvm/bin/clang CXX=/opt/rocm/llvm/bin/clang++ cmake -S . -B build -DLLAMA_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1100
+cmake --build build --config Release
+```
+
 * If you have just CPU:
+
 ```bash
 cmake -S . -B build
 cmake --build build --config Release

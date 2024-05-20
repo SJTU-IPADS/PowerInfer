@@ -4614,6 +4614,44 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
     }
 }
 
+// nrows: 11008(or 32 * x < 11008), ncols: 4096
+template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
+static __global__ void dequantize_mul_mat_axpy_sparse_lessatom(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int *lst, float *idx) {
+    int warp_id = threadIdx.y;
+    int tid = threadIdx.x + blockIdx.x * 32;
+    int col = tid * 2;
+    dfloat2 v;
+    int iqs = (col % qk) / qr;
+    float tmp[2];
+    tmp[0] = 0.0;
+    tmp[1] = 0.0;
+    __shared__ float res[64];
+    res[threadIdx.x] = 0.0;
+    res[threadIdx.x + 32] = 0.0;
+
+#pragma unroll 32
+    for (int row = warp_id; row < nrows; row += 32) {
+        int raw_row = lst ? lst[row] : row;
+        // int raw_row = row;
+        dfloat y_row = y[raw_row];
+        if (y_row == 0.0) {
+            continue;
+        }
+        const int ib = (row * ncols + col) / qk;
+        dequantize_kernel(vx, ib, iqs, v);
+        tmp[0] += v.x * y_row;
+        tmp[1] += v.y * y_row;
+    }
+    const int adder_loc = threadIdx.x % 16 + threadIdx.x / 16 * 32;
+    atomicAdd(res + adder_loc, tmp[0]);
+    atomicAdd(res + adder_loc + 16, tmp[1]);
+    __syncthreads();
+    if (warp_id < 1) {
+        int write_back_loc = warp_id * 32 + threadIdx.x;
+        dst[write_back_loc + blockIdx.x * 64] = res[write_back_loc];
+    }
+}
+
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
 static __global__ void dequantize_mul_mat_vec_sparse(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int * lst, float * idx) {
     // qk = quantized weights per x block
@@ -5598,13 +5636,10 @@ static void dequantize_axpy_vec_q4_0_cuda(const void * vx, const dfloat * y, flo
 }
 static void dequantize_axpy_sparse_vec_q4_0_cuda(const void * vx, const dfloat * y, float * dst, const int ncols, const int nrows, cudaStream_t stream, int *lst, float *idx)  {
     GGML_ASSERT(ncols % GGML_CUDA_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_CUDA_MMV_Y - 1) / GGML_CUDA_MMV_Y;
-    const dim3 block_nums(1, block_num_y, 1);
-    const dim3 block_dims(WARP_SIZE, GGML_CUDA_MMV_Y, 1);
-    // dequantize_mul_mat_axpy<QK4_0, QR4_0, dequantize_q4_0>
-    //     <<<block_nums, block_dims, ncols*sizeof(float), stream>>>(vx, y, dst, ncols, nrows);
-    dequantize_mul_mat_axpy_sparse<QK4_0, QR4_0, dequantize_q4_0>
-        <<<block_nums, block_dims, ncols*sizeof(float), stream>>>(vx, y, dst, ncols, nrows, lst, idx);
+    const dim3 block_dim = dim3(32, 32);
+    const int block_num = (ncols + 63) / 64;
+    dequantize_mul_mat_axpy_sparse_lessatom<QK4_0, QR4_0, dequantize_q4_0>
+        <<<block_num, block_dim, 0, stream>>>(vx, y, dst, ncols, nrows, lst, idx);
 }
 
 static void dequantize_axpy_sparse_batch_q4_0_cuda(const void * vx, const dfloat * y, float * dst, const int ncols, const int nrows, int src1_rows, int src1_ncols, cudaStream_t stream, int *lst, float *idx) {
