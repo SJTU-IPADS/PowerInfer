@@ -5637,7 +5637,7 @@ static void dequantize_axpy_vec_q4_0_cuda(const void * vx, const dfloat * y, flo
 static void dequantize_axpy_sparse_vec_q4_0_cuda(const void * vx, const dfloat * y, float * dst, const int ncols, const int nrows, cudaStream_t stream, int *lst, float *idx)  {
     GGML_ASSERT(ncols % GGML_CUDA_DMMV_X == 0);
     const dim3 block_dim = dim3(32, 32);
-    const int block_num = ncols / 64;
+    const int block_num = (ncols + 63) / 64;
     dequantize_mul_mat_axpy_sparse_batch_lessatom<QK4_0, QR4_0, dequantize_q4_0>
         <<<block_num, block_dim, 0, stream>>>(vx, y, dst, ncols, nrows, lst, idx);
 }
