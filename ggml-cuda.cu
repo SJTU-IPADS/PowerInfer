@@ -4646,7 +4646,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch_lessatom(const void 
     atomicAdd(res + adder_loc, tmp[0]);
     atomicAdd(res + adder_loc + 16, tmp[1]);
     __syncthreads();
-    if (warp_id <= 1) {
+    if (warp_id < 1) {
         int write_back_loc = warp_id * 32 + threadIdx.x;
         dst[write_back_loc + blockIdx.x * 64] = res[write_back_loc];
     }
