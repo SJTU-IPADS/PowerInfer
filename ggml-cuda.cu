@@ -4616,7 +4616,7 @@ static __global__ void dequantize_mul_mat_axpy_sparse_batch(const void * __restr
 
 // nrows: 11008(or 32 * x < 11008), ncols: 4096
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
-static __global__ void dequantize_mul_mat_axpy_sparse_batch_lessatom(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int *lst, float *idx) {
+static __global__ void dequantize_mul_mat_axpy_sparse_lessatom(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows, int *lst, float *idx) {
     int warp_id = threadIdx.y;
     int tid = threadIdx.x + blockIdx.x * 32;
     int col = tid * 2;
@@ -5638,7 +5638,7 @@ static void dequantize_axpy_sparse_vec_q4_0_cuda(const void * vx, const dfloat *
     GGML_ASSERT(ncols % GGML_CUDA_DMMV_X == 0);
     const dim3 block_dim = dim3(32, 32);
     const int block_num = (ncols + 63) / 64;
-    dequantize_mul_mat_axpy_sparse_batch_lessatom<QK4_0, QR4_0, dequantize_q4_0>
+    dequantize_mul_mat_axpy_sparse_lessatom<QK4_0, QR4_0, dequantize_q4_0>
         <<<block_num, block_dim, 0, stream>>>(vx, y, dst, ncols, nrows, lst, idx);
 }
 
