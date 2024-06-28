@@ -751,7 +751,7 @@ install(
         WORLD_EXECUTE
     DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(
-    FILES convert-lora-to-ggml.py
+    FILES convert-hf-to-powerinfer-gguf.py
     PERMISSIONS
         OWNER_READ
         OWNER_WRITE
