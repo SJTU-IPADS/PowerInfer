@@ -4534,8 +4534,8 @@ static __global__ void dequantize_mul_mat_axpy_sparse_pro(const void * __restric
     if (wid == 0) {
         const int iybs = col - col%qk; // y block start index
         const int y_offset = qr == 1 ? 1 : qk/2;
-        unsafeAtomicAdd(&dst[iybs + iqs], dst_tmp[wid][tid]);
-        unsafeAtomicAdd(&dst[iybs + iqs + y_offset], dst_tmp[wid][tid+AXPY_BLOCK_X]); 
+        atomicAdd(&dst[iybs + iqs], dst_tmp[wid][tid]);
+        atomicAdd(&dst[iybs + iqs + y_offset], dst_tmp[wid][tid+AXPY_BLOCK_X]); 
     }
 }
 
