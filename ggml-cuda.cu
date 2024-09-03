@@ -239,11 +239,9 @@ static_assert(sizeof(half) == sizeof(ggml_fp16_t), "wrong fp16 size");
 #ifdef GGML_CUDA_F16
 typedef half dfloat; // dequantize float
 typedef half2 dfloat2;
-typedef half4 dfloat4;
 #else
 typedef float dfloat; // dequantize float
 typedef float2 dfloat2;
-typedef float4 dfloat4;
 #endif //GGML_CUDA_F16
 
 static __device__ __forceinline__ int get_int_from_int8(const int8_t * x8, const int & i32) {
