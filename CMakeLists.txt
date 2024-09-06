@@ -348,6 +348,8 @@ endif()
 
 if (LLAMA_HIPBLAS)
     list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
+    # enable fast atomic operation
+    add_compile_options(-munsafe-fp-atomics)
 
     if (NOT ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
         message(WARNING "Only LLVM is supported for HIP, hint: CC=/opt/rocm/llvm/bin/clang")

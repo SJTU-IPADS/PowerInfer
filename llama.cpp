@@ -4402,6 +4402,16 @@ static struct ggml_tensor * llm_build_sparse_mul_mat(
     std::string full_name = "ffn_" + std::string(name) + "_sparse";
     ggml_tensor * out = nullptr;
 
+#ifdef GGML_USE_HIPBLAS
+// WARNING: THIS IS A HACK! 
+// if up_gpu->data is null
+// inference fails when model exceeds 40B on rocm device
+// so we just let up_gpu->data point to itself
+    
+    up_gpu->data = up_gpu;
+
+#endif 
+
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
     if (full_gpu) {
@@ -4444,6 +4454,16 @@ static struct ggml_tensor * llm_build_sparse_axpy(
                          bool full_gpu) {
     std::string full_name = "ffn_" + std::string(name) + "_sparse";
     ggml_tensor * out = nullptr;
+
+#ifdef GGML_USE_HIPBLAS
+// WARNING: THIS IS A HACK! 
+// if wt_gpu->data is null
+// inference fails when model exceeds 40B on rocm device
+// so we just let wt_gpu->data point to itself
+    
+    wt_gpu->data = wt_gpu;
+
+#endif 
 
 #ifdef GGML_USE_CUBLAS
     // Full offloading fast path
