@@ -185,6 +185,8 @@ class Model(ABC):
             return FalconModel
         if model_architecture == "LlamaForCausalLM":
             return LlamaModel
+        if model_architecture == "OPTForCausalLM":
+            return OptModel
 
         raise NotImplementedError(f'Architecture "{model_architecture}" not supported!')
 
@@ -218,6 +220,8 @@ class Model(ABC):
             return gguf.MODEL_ARCH.FALCON
         if arch == "RWForCausalLM" or arch == "LlamaForCausalLM":
             return gguf.MODEL_ARCH.LLAMA
+        if arch == "OPTForCausalLM":
+            return gguf.MODEL_ARCH.OPT
 
         raise NotImplementedError(f'Architecture "{arch}" not supported!')
 
@@ -513,7 +517,63 @@ class FalconModel(Model):
 
             self.gguf_writer.add_tensor(new_name, data)
 
+class OptModel(Model):
+    def set_gguf_parameters(self, params: PredictorParams):
+        self.gguf_writer.add_name("opt")
+        self.gguf_writer.add_context_length(2048)  # not in config.json
+        self.gguf_writer.add_embedding_length(self.hparams["hidden_size"])
+        self.gguf_writer.add_block_count(self.hparams["num_hidden_layers"])
+        self.gguf_writer.add_feed_forward_length(self.hparams["ffn_dim"])
+        self.gguf_writer.add_head_count(self.hparams["num_attention_heads"])
+        # self.gguf_writer.add_vocab_size(self.hparams["vocab_size"])
+        self.gguf_writer.add_file_type(self.ftype)
+        
+        if params.sparse_threshold is not None:
+            self.gguf_writer.add_sparse_threshold(params.sparse_threshold)
 
+    def write_tensors(self):
+        for name, data_torch in self.get_tensors():
+            old_dtype = data_torch.dtype
+            
+            # convert any unsupported data types to float32
+            if data_torch.dtype not in (torch.float16, torch.float32):
+                data_torch = data_torch.to(torch.float32)
+                
+            data = data_torch.squeeze().numpy()
+            
+            # map tensor names
+            new_name = self._translate_tensor_key(name)
+            if new_name is None:
+                print(f"Can not map tensor {name!r}")
+                sys.exit()
+
+            # We need to transpose the weight matrices for the FFN Down layers to support the
+            # Axpy operation in PowerInfer. So we don't need to transpose them at runtime.
+            if "ffn_down" in new_name:
+                new_name = new_name.replace("ffn_down", "ffn_down_t")
+                data = data.T
+            
+            n_dims = len(data.shape)    
+            data_dtype = data.dtype
+
+            # if f32 desired, convert any float16 to float32
+            if self.ftype == 0 and data_dtype == np.float16:
+                data = data.astype(np.float32)
+            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
+                data = data.astype(np.float32)
+            # if f16 desired, convert any float32 2-dim weight tensors to float16
+            if (
+                self.ftype == 1
+                and data_dtype == np.float32
+                and name.endswith(".weight")
+                and n_dims == 2
+            ):
+                data = data.astype(np.float16)
+                
+            print(f"{new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype}")
+            
+            self.gguf_writer.add_tensor(new_name, data)
 
 @dataclass
 class PredictorParams:

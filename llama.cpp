@@ -247,7 +247,7 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
     { LLM_ARCH_GPT2,            "gpt2"      },
     { LLM_ARCH_GPTJ,            "gptj"      },
     { LLM_ARCH_GPTNEOX,         "gptneox"   },
-    { LLM_ARCH_OPT,              "opt"      },
+    { LLM_ARCH_OPT,             "opt"       },
     { LLM_ARCH_MPT,             "mpt"       },
     { LLM_ARCH_BAICHUAN,        "baichuan"  },
     { LLM_ARCH_STARCODER,       "starcoder" },
@@ -499,7 +499,10 @@ static std::map<llm_arch, std::map<llm_tensor, std::string>> LLM_TENSOR_NAMES = 
             {LLM_TENSOR_ATTN_OUT,        "blk.%d.attn_output"},
             {LLM_TENSOR_FFN_NORM,        "blk.%d.ffn_norm"},
             {LLM_TENSOR_FFN_DOWN,        "blk.%d.ffn_down"},
+            {LLM_TENSOR_FFN_DOWN_T,      "blk.%d.ffn_down_t"},
             {LLM_TENSOR_FFN_UP,          "blk.%d.ffn_up"},
+            { LLM_TENSOR_MLP_PRED_FC1,    "blk.%d.fc1" },
+            { LLM_TENSOR_MLP_PRED_FC2,    "blk.%d.fc2" },
         },
     },
     {
@@ -3264,7 +3267,47 @@ static void llm_load_sparse_model_tensors(
                 } break;
             case LLM_ARCH_OPT:
                 {
-                    // TODO: load sparse tensor model
+                    model.tok_embd = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab});
+                    model.pos_embd = create_tensor(tn(LLM_TENSOR_POS_EMBD, "weight"), {n_embd, hparams.n_ctx_train});
+                    // output
+                    {
+                       model.output_norm = create_tensor(tn(LLM_TENSOR_OUTPUT_NORM, "weight"), {n_embd});
+                       model.output_norm_b = create_tensor(tn(LLM_TENSOR_OUTPUT_NORM, "bias"), {n_embd});
+                    //    model.output      = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD,      "weight"), {n_embd, n_vocab});
+                    }
+
+                    const uint32_t n_ff = hparams.n_ff;
+                    model.layers.resize(n_layer);
+
+                    for (uint32_t &i = current_layer; i < n_layer; ++i) {
+                        auto & layer = model.layers[i];
+                        layer.attn_norm = create_tensor(tn(LLM_TENSOR_ATTN_NORM, "weight", i), {n_embd});
+                        layer.attn_norm_b = create_tensor(tn(LLM_TENSOR_ATTN_NORM, "bias", i), {n_embd});
+
+                        layer.wq = create_tensor(tn(LLM_TENSOR_ATTN_Q,   "weight", i), {n_embd, n_embd});
+                        layer.bq = create_tensor(tn(LLM_TENSOR_ATTN_Q,   "bias", i), {n_embd});
+
+                        layer.wk = create_tensor(tn(LLM_TENSOR_ATTN_K,   "weight", i), {n_embd, n_embd_gqa});
+                        layer.bk = create_tensor(tn(LLM_TENSOR_ATTN_K,   "bias", i), {n_embd_gqa});
+
+                        layer.wv = create_tensor(tn(LLM_TENSOR_ATTN_V,   "weight", i), {n_embd, n_embd_gqa});
+                        layer.bv = create_tensor(tn(LLM_TENSOR_ATTN_V,   "bias", i), {n_embd_gqa});
+
+                        layer.wo = create_tensor(tn(LLM_TENSOR_ATTN_OUT, "weight", i), {n_embd, n_embd});
+                        layer.bo = create_tensor(tn(LLM_TENSOR_ATTN_OUT, "bias", i), {n_embd});
+
+                        layer.ffn_norm = create_tensor(tn(LLM_TENSOR_FFN_NORM, "weight", i), {n_embd});
+                        layer.ffn_norm_b = create_tensor(tn(LLM_TENSOR_FFN_NORM, "bias", i), {n_embd});
+
+                        layer.ffn_down_t = create_tensor(tn(LLM_TENSOR_FFN_DOWN_T, "weight", i), {n_embd, n_ff});
+                        layer.ffn_down_b = create_tensor(tn(LLM_TENSOR_FFN_DOWN_T, "bias", i), {n_embd}); 
+
+                        layer.mlp_pre_w1 = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC1, "weight", i), {n_embd, GGML_NE_WILDCARD});
+                        layer.mlp_pre_w2 = create_tensor(tn(LLM_TENSOR_MLP_PRED_FC2, "weight", i), {GGML_NE_WILDCARD, n_ff});
+
+                        layer.ffn_up   = create_tensor(tn(LLM_TENSOR_FFN_UP,   "weight", i), {n_embd,   n_ff});
+                        layer.ffn_up_b = create_tensor(tn(LLM_TENSOR_FFN_UP,   "bias", i), {n_ff});
+                    }
                 } break;
             case LLM_ARCH_FALCON:
                 {
@@ -5110,14 +5153,37 @@ struct llm_build_context {
                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
                        model.layers[il].ffn_norm, model.layers[il].ffn_norm_b,
                        LLM_NORM, cb, il);
-                cb(cur, "ffn_norm", il);
 
-                cur = llm_build_ffn(ctx0, cur,
+                if(llama_use_sparse_inference(&model)) {
+                    llm_build_cb_short cbs = [&](ggml_tensor * cur, const char * name) {
+                        std::string name_str = std::string(name) + "-" + std::to_string(il);
+                        ggml_set_name(cur, name_str.c_str());
+                    };
+                    // We only offload the ffn input to GPU if all neurons are offloaded
+                    if (model.layers[il].gpu_offload_ratio >= 1.) {
+                        cb(cur, "ffn_norm", il);
+                    } else {
+                        cbs(cur, "ffn_norm");
+                    }
+                    cur = llm_build_ffn_sparse(ctx0, cur,
+                        model.layers[il].ffn_up,   model.layers[il].ffn_up_b,
+                        NULL,                      NULL,
+                        model.layers[il].ffn_down_t, model.layers[il].ffn_down_b,
+                        model.layers[il].mlp_pre_w1,
+                        model.layers[il].mlp_pre_w2,
+                        ffn_inp, 
+                        model.layers[il].gpu_idx,
+                        model.layers[il].gpu_bucket, model.layers[il].ffn_gate_gpu, model.layers[il].ffn_down_gpu, model.layers[il].ffn_up_gpu,
+                        LLM_FFN_RELU, LLM_FFN_SEQ, model.layers[il].gpu_offload_ratio, cbs);
+                } else {
+                    cb(cur, "ffn_norm", il);
+                    cur = llm_build_ffn(ctx0, cur,
                         model.layers[il].ffn_up, model.layers[il].ffn_up_b,
                         NULL,                    NULL,
                         model.layers[il].ffn_down, model.layers[il].ffn_down_b,
                         LLM_FFN_RELU, LLM_FFN_SEQ, cb, il);
-                cb(cur, "ffn_out", il);
+                    cb(cur, "ffn_out", il);
+                }
             }
 
             cur = ggml_add(ctx0, cur, ffn_inp);
