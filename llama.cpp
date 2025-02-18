@@ -6483,6 +6483,9 @@ static struct ggml_cgraph * llama_build_graph(
 
                 for (int i = 0; i < n_tokens; ++i) {
                     data[i] = batch.pos[i];
+                    if(model.arch == LLM_ARCH_OPT) {
+                        data[i] += 2;
+                    }
                 }
             }
 

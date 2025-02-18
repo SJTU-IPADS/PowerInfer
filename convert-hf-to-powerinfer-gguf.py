@@ -520,7 +520,7 @@ class FalconModel(Model):
 class OptModel(Model):
     def set_gguf_parameters(self, params: PredictorParams):
         self.gguf_writer.add_name("opt")
-        self.gguf_writer.add_context_length(2048)  # not in config.json
+        self.gguf_writer.add_context_length(2050)  # not in config.json
         self.gguf_writer.add_embedding_length(self.hparams["hidden_size"])
         self.gguf_writer.add_block_count(self.hparams["num_hidden_layers"])
         self.gguf_writer.add_feed_forward_length(self.hparams["ffn_dim"])
