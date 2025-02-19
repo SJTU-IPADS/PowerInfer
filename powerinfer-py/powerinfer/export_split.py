@@ -1,11 +1,14 @@
 import argparse
 import pickle
-import gguf
+import sys
 from gguf.constants import GGMLQuantizationType
 from gguf.gguf_writer import GGUFWriter
 import torch
 from pathlib import Path
 import os
+if 'NO_LOCAL_GGUF' not in os.environ:
+    sys.path.insert(1, str(Path(__file__).parent / 'gguf-py'))
+import gguf
 import struct
 import numpy as np
 import re
