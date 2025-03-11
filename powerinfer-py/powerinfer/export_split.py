@@ -18,7 +18,10 @@ def load_activation_weights(models_base: Path):
     # But for now, let's assume it is a plain directory of activation_{0, ... , n_layers - 1}.pt
     *_, files = next(os.walk(models_base))
     activation_files = [f for f in files if re.match(r"activation_\d+.pt", f)]
-    activation_files.sort()
+
+    layer_num = np.array([int(re.sub(f'[^0-9]', '', f)) for f in activation_files])
+    idx = np.argsort(layer_num)
+    activation_files = [activation_files[i] for i in idx]
     return [torch.load(models_base / f) for f in activation_files]
 
 def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> None:
