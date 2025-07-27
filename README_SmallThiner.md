@@ -3,7 +3,9 @@
 
 - This inference framework is specifically optimized for sparse model inference to achieve faster speeds, leveraging the router's pre-selection mechanism to enable efficient inference even in memory-constrained scenarios.
 
+
 ## Demo
+https://github.com/user-attachments/assets/c4caed33-4db3-4b12-be31-4ad7f2f6013c
 
 ## Speed
 ### SmallThinker 21B 
