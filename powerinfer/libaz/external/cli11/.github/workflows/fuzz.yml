@@ -1,0 +1,54 @@
+name: Fuzz
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - v*
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quick_fuzz1:
+    name: quickfuzz1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCLI11_SINGLE_FILE_TESTS=OFF \
+            -DCLI11_BUILD_EXAMPLES=OFF \
+            -DCLI11_FUZZ_TARGET=ON \
+            -DCLI11_BUILD_TESTS=OFF \
+            -DCLI11_BUILD_DOCS=OFF \
+            -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_FORCED=ON \
+            -DCMAKE_CXX_FLAGS="-g -O1 -fsanitize=fuzzer,undefined,address"
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test_app
+        run: |
+          cd build
+          make QUICK_CLI11_APP_FUZZ
+
+      - name: Test_file
+        run: |
+          cd build
+          make QUICK_CLI11_FILE_FUZZ
+
+
+      - name: artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: file_failure
+          path: ./build/fuzz/cli11_*_fail_artifact.txt

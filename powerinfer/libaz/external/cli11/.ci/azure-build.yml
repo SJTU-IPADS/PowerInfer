@@ -1,0 +1,23 @@
+steps:
+  # Needed on GCC 4.8 docker image for some reason
+  - script: mkdir build
+    displayName: "Make build directory"
+
+  - task: CMake@1
+    inputs:
+      cmakeArgs:
+        .. -DCLI11_WARNINGS_AS_ERRORS=ON -DCLI11_SINGLE_FILE=$(cli11.single)
+        -DCMAKE_CXX_STANDARD=$(cli11.std)
+        -DCLI11_SINGLE_FILE_TESTS=$(cli11.single)
+        -DCMAKE_BUILD_TYPE=$(cli11.build_type) $(cli11.options)
+    displayName: "Configure"
+
+  - script: cmake --build . -- -j2 --keep-going
+    displayName: "Build Unix"
+    workingDirectory: build
+    condition: ne( variables['Agent.OS'], 'Windows_NT' )
+
+  - script: cmake --build .
+    displayName: "Build Windows"
+    workingDirectory: build
+    condition: eq( variables['Agent.OS'], 'Windows_NT' )

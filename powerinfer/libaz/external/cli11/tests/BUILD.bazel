@@ -1,0 +1,75 @@
+cc_binary(
+    name = "ensure_utf8",
+    srcs = ["applications/ensure_utf8.cpp"],
+    deps = ["//:cli11"],
+)
+
+cc_binary(
+    name = "ensure_utf8_twice",
+    srcs = ["applications/ensure_utf8_twice.cpp"],
+    deps = ["//:cli11"],
+)
+
+cc_library(
+    name = "catch_main",
+    srcs = ["main.cpp"],
+    hdrs = ["catch.hpp"],
+    defines = ["CLI11_CATCH3"],
+    deps = ["@catch2//:catch2_main"],
+)
+
+cc_test(
+    name = "AppTest",
+    srcs = [
+        "AppTest.cpp",
+        "app_helper.hpp",
+    ],
+    data = [
+        "ensure_utf8",
+        "ensure_utf8_twice",
+    ],
+    local_defines = [
+        'CLI11_ENSURE_UTF8_EXE=\\"$(rootpath ensure_utf8)\\"',
+        'CLI11_ENSURE_UTF8_TWICE_EXE=\\"$(rootpath ensure_utf8_twice)\\"',
+    ],
+    deps = [
+        "catch_main",
+        "//:cli11",
+        "@catch2",
+    ],
+)
+
+[
+    cc_test(
+        name = test,
+        srcs = [
+            test + ".cpp",
+            "app_helper.hpp",
+        ],
+        deps = [
+            "catch_main",
+            "//:cli11",
+            "@catch2",
+        ],
+    )
+    for test in [
+        "HelpersTest",
+        "ConfigFileTest",
+        "OptionTypeTest",
+        "SimpleTest",
+        "SetTest",
+        "TransformTest",
+        "CreationTest",
+        "SubcommandTest",
+        "HelpTest",
+        "FormatterTest",
+        "NewParseTest",
+        "OptionalTest",
+        "DeprecatedTest",
+        "StringParseTest",
+        "ComplexTypeTest",
+        "TrueFalseTest",
+        "OptionGroupTest",
+        "EncodingTest",
+    ]
+]

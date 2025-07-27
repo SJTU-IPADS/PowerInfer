@@ -1,0 +1,6 @@
+format:
+  line_width: 99
+
+# Causes a few issues - can be solved later, possibly.
+markup:
+  enable_markup: false

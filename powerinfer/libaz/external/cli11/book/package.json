@@ -1,0 +1,14 @@
+{
+  "name": "cli11-gitbook",
+  "version": "1.0.0",
+  "dependencies": {
+    "gitbook-cli": "2.2.0",
+    "gitbook-plugin-hints": "^1.0.2",
+    "gitbook-plugin-include-codeblock": "^3.2.2",
+    "gitbook-plugin-term": "^0.5.1",
+    "svgexport": ">=0.4.2"
+  },
+  "scripts": {
+    "postinstall": "npx gitbook fetch 3.2.3 && npx gitbook install"
+  }
+}

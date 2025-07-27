@@ -1,0 +1,188 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+trigger:
+  - main
+  - "v*"
+
+pr:
+  - main
+
+variables:
+  cli11.single: ON
+  cli11.std: 14
+  cli11.build_type: Debug
+  cli11.options: -DCLI11_EXAMPLES_JSON=ON
+  cli11.precompile: OFF
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+
+jobs:
+  - job: CppLint
+    pool:
+      vmImage: "ubuntu-latest"
+    container: helics/buildenv:cpplint
+    steps:
+      - bash: cpplint --counting=detailed --recursive examples include/CLI tests
+        displayName: Checking against google style guide
+
+  - job: build_only
+    strategy:
+      matrix:
+        visual_studio_arm64:
+          vmImage: "windows-2022"
+          cli11.std: 17
+          cli11.build_type: Debug
+          cli11.options: -G "Visual Studio 17 2022" -A ARM64
+    pool:
+      vmImage: $(vmImage)
+
+    steps:
+      - template: .ci/azure-build.yml
+
+  - job: Native
+    strategy:
+      matrix:
+        Linux14:
+          vmImage: "ubuntu-latest"
+        Linux14PC:
+          vmImage: "ubuntu-latest"
+          cli11.precompile: ON
+        macOS-15_23:
+          vmImage: "macOS-15"
+          cli11.std: 23
+        macOS-14_20:
+          vmImage: "macOS-14"
+          cli11.std: 20
+        macOS-13_17:
+          vmImage: "macOS-13"
+          cli11.std: 17
+        macOS-14_11:
+          vmImage: "macOS-14"
+          cli11.std: 11
+        macOS-14_14_PC:
+          vmImage: "macOS-14"
+          cli11.std: 14
+          cli11.precompile: ON
+        Windows17:
+          vmImage: "windows-2019"
+          cli11.std: 17
+        Windows17PC:
+          vmImage: "windows-2019"
+          cli11.std: 17
+          cli11.precompile: ON
+        Windows11:
+          vmImage: "windows-2019"
+          cli11.std: 11
+        Windows20:
+          vmImage: "windows-2022"
+          cli11.std: 20
+          cli11.options: -DCMAKE_CXX_FLAGS="/EHsc"
+        WindowsLatest:
+          vmImage: "windows-2022"
+          cli11.std: 23
+          cli11.options: -DCMAKE_CXX_FLAGS="/EHsc"
+        Linux17nortti:
+          vmImage: "ubuntu-latest"
+          cli11.std: 17
+          cli11.options: -DCMAKE_CXX_FLAGS="-fno-rtti"
+    pool:
+      vmImage: $(vmImage)
+    steps:
+      - template: .ci/azure-build.yml
+      - template: .ci/azure-test.yml
+
+  - job: Meson
+    pool:
+      vmImage: "ubuntu-latest"
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "3.7"
+      - script: python3 -m pip install meson ninja
+        displayName: install meson
+      - script: mkdir tests/mesonTest/subprojects
+        displayName: generate test directories
+      - script: ln -s  "$(pwd)" tests/mesonTest/subprojects/CLI11
+        displayName: generate CLI11 symlink
+        # Ensure that Meson doesn't use cmake or pkgconfig to find CLI11
+      - script: meson setup build --force-fallback-for=CLI11
+        displayName: Run meson to generate build
+        workingDirectory: tests/mesonTest
+      - script: ninja -C tests/mesonTest/build
+        displayName: Build with Ninja
+      - script: ./tests/mesonTest/build/main --help
+        displayName: Run help
+
+  - job: Docker
+    variables:
+      cli11.single: OFF
+    pool:
+      vmImage: "ubuntu-latest"
+    strategy:
+      matrix:
+        gcc9:
+          containerImage: gcc:9
+          cli11.std: 17
+          cli11.options: -DCMAKE_CXX_FLAGS="-Wstrict-overflow=5"
+        gcc11:
+          containerImage: gcc:11
+          cli11.std: 20
+          cli11.options: -DCMAKE_CXX_FLAGS="-Wredundant-decls -Wconversion"
+        gcc7:
+          containerImage: gcc:7
+          cli11.std: 14
+          cli11.options: -DCMAKE_CXX_FLAGS="-Wconversion"
+        gcc4.8:
+          containerImage: helics/buildenv:gcc4-8-builder
+          cli11.std: 11
+        clang3.4:
+          containerImage: silkeh/clang:3.4
+          cli11.std: 11
+        clang8:
+          containerImage: silkeh/clang:8
+          cli11.std: 14
+          cli11.options: -DCLI11_FORCE_LIBCXX=ON
+        clang8_17:
+          containerImage: silkeh/clang:8
+          cli11.std: 17
+          cli11.options: -DCLI11_FORCE_LIBCXX=ON
+        clang10_20:
+          containerImage: silkeh/clang:10
+          cli11.std: 20
+          cli11.options: -DCLI11_FORCE_LIBCXX=ON -DCMAKE_CXX_FLAGS=-std=c++20
+    container: $[ variables['containerImage'] ]
+    steps:
+      - template: .ci/azure-cmake.yml
+      - template: .ci/azure-build.yml
+      - template: .ci/azure-test.yml
+
+  - job: Docker_new
+    variables:
+      cli11.single: OFF
+    pool:
+      vmImage: "ubuntu-latest"
+    strategy:
+      matrix:
+        gcc13_17:
+          containerImage: gcc:13
+          cli11.std: 17
+          cli11.options: -DCMAKE_CXX_FLAGS="-Wstrict-overflow=5"
+        gcc12_20:
+          containerImage: gcc:12
+          cli11.std: 20
+          cli11.options: -DCMAKE_CXX_FLAGS="-Wredundant-decls -Wconversion"
+        clang17_23:
+          containerImage: silkeh/clang:17
+          cli11.std: 23
+          cli11.options: -DCMAKE_CXX_FLAGS=-std=c++23
+        clang19_26:
+          containerImage: silkeh/clang:19
+          cli11.std: 26
+          cli11.options: -DCMAKE_CXX_FLAGS=-std=c++2c
+    container: $[ variables['containerImage'] ]
+    steps:
+      - template: .ci/azure-cmake-new.yml
+      - template: .ci/azure-build.yml
+      - template: .ci/azure-test.yml

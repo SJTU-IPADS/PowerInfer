@@ -1,0 +1,25 @@
+name: Quick CMake config
+description: "Runs CMake 3.10+ (if already setup)"
+inputs:
+  args:
+    description: "Other arguments"
+    required: false
+    default: ""
+  cmake-version:
+    description: "The CMake version to run"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: CMake ${{ inputs.cmake-version }}
+      uses: jwlawson/actions-setup-cmake@v2.0.2
+      with:
+        cmake-version: "${{ inputs.cmake-version }}"
+    - run: |
+        mkdir -p build-tmp
+        touch build-tmp/tmp
+        rm -r build-tmp/*
+        (cd build-tmp && cmake .. ${{ inputs.args }})
+        rm -r build-tmp
+      shell: bash

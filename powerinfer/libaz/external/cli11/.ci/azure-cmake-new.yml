@@ -1,0 +1,17 @@
+steps:
+  # Note that silkeh/clang does not include ca-certificates, so check the shasum for verification
+  - bash: |
+      wget --no-check-certificate "https://cmake.org/files/v3.31/cmake-3.31.1-linux-x86_64.tar.gz"
+      echo "3b72fde0d40fa8be617667ea08d12c5ee47f6cf8950c2fbfcf2acfb5f83fb9de  cmake-3.31.1-linux-x86_64.tar.gz" | shasum -sca 256
+    displayName: Download CMake
+
+  - task: ExtractFiles@1
+    inputs:
+      archiveFilePatterns: "cmake*.tar.gz"
+      destinationFolder: "cmake_program"
+      displayName: Extract CMake
+
+  - bash:
+      echo
+      "##vso[task.prependpath]$(Build.SourcesDirectory)/cmake_program/cmake-3.31.1-linux-x86_64/bin"
+    displayName: Add CMake to PATH
