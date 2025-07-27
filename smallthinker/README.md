@@ -13,26 +13,27 @@ https://github.com/user-attachments/assets/cefd466e-3b1f-47a9-8dc3-f1cf5119045e
 ### SmallThinker 21B 
 | Model                            | Memory(GiB)         | i9 14900 | 1+13 8ge4 | rk3588 (16G) | Raspberry PI 5 |
 |--------------------------------------|---------------------|----------|-----------|--------------|----------------|
-| SmallThinker 21B+sparse              | 11.47               | 30.19    | 23.03     | 10.84        | 6.61           |
-| SmallThinker 21B+sparse +limited memory | limit 8G         | 20.30     | 15.50        | 8.56     | -              |
+| SmallThinker 21B (sparse)             | 11.47               | 30.19    | 23.03     | 10.84        | 6.61           |
+| SmallThinker 21B (sparse + limited memory) | limit 8G         | 20.30     | 15.50        | 8.56     | -              |
 | Qwen3 30B A3B                        | 16.20               | 33.52    | 20.18     | 9.07         | -              |
-| Qwen3 30B A3Blimited memory          | limit 8G            | 10.11     | 0.18         | 6.32     | -              |
+| Qwen3 30B A3B (limited memory)          | limit 8G            | 10.11     | 0.18         | 6.32     | -              |
 | Gemma 3n E2B                         | 1G, theoretically   | 36.88    | 27.06     | 12.50        | 6.66           |
 | Gemma 3n E4B                         | 2G, theoretically   | 21.93    | 16.58     | 7.37         | 4.01           |
 
 ### SmallThinker 4B 
 | Model                                         | Memory(GiB)         | i9 14900 | 1+13 8gen4 | rk3588 (16G) | rk3576 | Raspberry PI 5 | RDK X5 | rk3566 |
 |-----------------------------------------------|---------------------|----------|------------|--------------|--------|----------------|--------|--------|
-| SmallThinker 4B+sparse ffn +sparse lm_head    | 2.24                | 108.17   | 78.99      | 39.76        | 15.10  | 28.77          | 7.23   | 6.33   |
-| SmallThinker 4B+sparse ffn +sparse lm_head+limited memory | limit 1G           | 29.99    | 20.91      | 15.04        | 2.60   | 0.75           | 0.67   | 0.74   |
+| SmallThinker 4B (sparse)                      | 2.24                | 108.17   | 78.99      | 39.76        | 15.10  | 28.77          | 7.23   | 6.33   |
+| SmallThinker 4B (sparse + limited memory) | limit 1G           | 29.99    | 20.91      | 15.04        | 2.60   | 0.75           | 0.67   | 0.74   |
 | Qwen3 0.6B                                    | 0.6                 | 148.56   | 94.91      | 45.93        | 15.29  | 27.44          | 13.32  | 9.76   |
 | Qwen3 1.7B                                    | 1.3                 | 62.24    | 41.00      | 20.29        | 6.09   | 11.08          | 6.35   | 4.15   |
-| Qwen3 1.7B limited memory                     | limit 1G            | 2.66     | 1.09       | 1.00         | 0.47   | -              | -      | 0.11   |
+| Qwen3 1.7B (limited memory)                     | limit 1G            | 2.66     | 1.09       | 1.00         | 0.47   | -              | -      | 0.11   |
 | Gemma3n E2B                                   | 1G, theoretically   | 36.88    | 27.06      | 12.50        | 3.80   | 6.66           | 3.46   | 2.45   |
 
 
 
-Note：i9 14900、1+13 8ge4 use 4 threads，others use the number of threads that  can achieve the maximum speed 
+Note：
+- sparse: refers to leveraging the sparsity induced by the ReLU activation function to skip certain computations during the UP/DOWN calculation of each expert based on the GATE output, as well as using a predictor to perform sparse computation when calculating the lm_head
 
 ## Setup
 1. init submodule：
@@ -45,17 +46,21 @@ git submodule update --init --recursive
 ```bash
 sudo apt install clang-21 mold
 ```
-3. cd smallthinker before compiling
+3. Install the required Python packages
+```bash
+pip install -r requirements.txt
+```
+4. cd smallthinker before compiling
 ```bash
 cd smallthinker
 ```
-
+### NOTE: Compilation, model conversion, and other related operations must be performed in the `smallthinker` directory.
 
 ## Convert Model
 ```bash
 python3 convert_hf_to_gguf.py /path/to/safetensors_model --outtype f16 --outfile /path/to/gguf_fp16 --transpose-down all
 
-./build_x86/bin/llama-quantize --pure /path/to/gguf_fp16  /path/to/gguf_q4_0 Q4_0  8
+./build/bin/llama-quantize --pure /path/to/gguf_fp16  /path/to/gguf_q4_0 Q4_0  8
 ```
 Note:lm_head sparsity is not included. If needed, please merge model_lm_head.pt into the safetensors file before executing the above commands, or directly download the GGUF file we provide.
 ## x86 Compile
