@@ -1,0 +1,15 @@
+ignore:
+  - "tests"
+  - "examples"
+  - "book"
+  - "docs"
+  - "test_package"
+  - "fuzz"
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no

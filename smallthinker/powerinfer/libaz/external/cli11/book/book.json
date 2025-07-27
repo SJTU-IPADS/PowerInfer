@@ -1,0 +1,12 @@
+{
+  "title": "CLI11 Tutorial",
+  "description": "A set of examples and detailed information about CLI11",
+  "author": "Henry Schreiner",
+  "plugins": ["include-codeblock", "term", "hints"],
+  "pluginsConfig": {
+    "include-codeblock": {
+      "unindent": true,
+      "fixlang": true
+    }
+  }
+}

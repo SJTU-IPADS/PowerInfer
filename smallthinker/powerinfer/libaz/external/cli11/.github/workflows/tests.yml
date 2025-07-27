@@ -1,0 +1,381 @@
+name: Tests
+on:
+  push:
+    branches:
+      - main
+      - v*
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: "1"
+
+jobs:
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        std: ["11", "14", "17", "20"]
+        precompile: ["ON", "OFF"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get LCov
+        run: |
+          sudo apt-get install ca-certificates lcov
+          #wget https://github.com/linux-test-project/lcov/releases/download/v1.16/lcov-1.16.tar.gz
+          #tar -xzf lcov-1.16.tar.gz
+          #cd lcov-1.16
+          #sudo make install
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_CXX_STANDARD=${{matrix.std}} \
+            -DCLI11_SINGLE_FILE_TESTS=OFF \
+            -DCLI11_BUILD_EXAMPLES=OFF \
+            -DCLI11_PRECOMPILED=${{matrix.precompile}} \
+            -DCMAKE_BUILD_TYPE=Coverage
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: cmake --build build --target CLI11_coverage
+
+      - name: Prepare coverage
+        run: |
+          lcov --ignore-errors gcov,mismatch --directory . --capture --output-file coverage.info
+          lcov --remove coverage.info '*/tests/*' '/usr/*' --output-file coverage.info
+          lcov --list coverage.info
+        working-directory: build
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: build/coverage.info
+          functionalities: fixes
+
+  catch2-3:
+    name: Catch 2 3.x
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Catch 2
+        run: brew install catch2
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_CXX_STANDARD=14 \
+            -DCLI11_SINGLE_FILE_TESTS=OFF \
+            -DCLI11_BUILD_EXAMPLES=OFF \
+            -DCLI11_PRECOMPILED=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: cmake --build build --target test
+
+
+  clang-tidy:
+    name: Clang-Tidy
+    runs-on: ubuntu-latest
+    container: silkeh/clang:17
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_CXX_STANDARD=17
+          -DCMAKE_CXX_CLANG_TIDY="$(which
+          clang-tidy);--use-color;--warnings-as-errors=*"
+
+      - name: Build
+        run: cmake --build build -j4 -- --keep-going
+
+  cuda11-build:
+    name: CUDA 11 build only
+    runs-on: ubuntu-latest
+    container: nvidia/cuda:11.8.0-devel-ubuntu22.04
+    steps:
+      - name: Add build tools
+        run: apt-get update && apt-get install -y wget git cmake
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Configure
+        run: cmake -S . -B build -DCLI11_CUDA_TESTS=ON
+      - name: Build
+        run: cmake --build build -j2
+
+  cuda12-build:
+    name: CUDA 12 build only
+    runs-on: ubuntu-latest
+    container: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    steps:
+      - name: Add build tools
+        run: apt-get update && apt-get install -y wget git cmake
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Configure
+        run: cmake -S . -B build -DCLI11_CUDA_TESTS=ON
+      - name: Build
+        run: cmake --build build -j2
+
+  boost-build:
+    name: Boost build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Add boost
+        run: sudo apt-get update && sudo apt-get install -y libboost-dev
+      # NOTE: If a boost version matching all requirements cannot be found,
+      # this build step will fail
+      - name: Configure
+        run: cmake -S . -B build -DCLI11_BOOST=ON
+      - name: Build
+        run: cmake --build build -j2
+      - name: Run tests
+        run: ctest --output-on-failure
+        working-directory: build
+
+  meson-build:
+    name: Meson build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare commands
+        run: |
+          pipx install meson
+          pipx install ninja
+
+      - name: Configure
+        run: meson setup build-meson . -Dtests=true
+
+      - name: Build
+        run: meson compile -C build-meson
+
+      - name: Test
+        run: meson test -C build-meson
+
+  bazel-build:
+    name: Bazel build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: bazel build //...
+
+      - name: Test
+        run: bazel test --test_output=errors //...
+
+  install:
+    name: install tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Configure
+        run: cmake -S . -B build -DCLI11_INSTALL_PACKAGE_TESTS=ON -DCMAKE_INSTALL_PREFIX=/home/runner/work/install
+      - name: Build
+        run: cmake --build build  -j2
+      - name: install
+        run: cmake --install build
+      - name: Run tests
+        run: ctest --output-on-failure -L Packaging
+        working-directory: build
+
+  install-precompiled:
+    name: install tests precompiled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Configure
+        run: cmake -S . -B build -DCLI11_INSTALL_PACKAGE_TESTS=ON -DCMAKE_INSTALL_PREFIX=/home/runner/work/install -DCLI11_PRECOMPILED=ON
+      - name: Build
+        run: cmake --build build  -j2
+      - name: install
+        run: cmake --install build
+      - name: Run tests
+        run: ctest --output-on-failure -L Packaging
+        working-directory: build
+
+  install-single_file:
+    name: install tests single file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Configure
+        run: cmake -S . -B build -DCLI11_INSTALL_PACKAGE_TESTS=ON -DCMAKE_INSTALL_PREFIX=/home/runner/work/install -DCLI11_SINGLE_FILE=ON
+      - name: Build
+        run: cmake --build build  -j2
+      - name: install
+        run: cmake --install build
+      - name: Run tests
+        run: ctest --output-on-failure -L Packaging
+        working-directory: build
+
+  cmake-config-ubuntu-2004:
+    name: CMake config check (Ubuntu 20.04)
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check CMake 3.10
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.10"
+        if: success() || failure()
+
+      - name: Check CMake 3.11
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.11"
+        if: success() || failure()
+
+      - name: Check CMake 3.12
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.12"
+        if: success() || failure()
+
+      - name: Check CMake 3.13
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.13"
+        if: success() || failure()
+
+      - name: Check CMake 3.14.7
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.14.7"
+          args: -DCLI11_SANITIZERS=ON -DCLI11_BUILD_EXAMPLES_JSON=ON
+        if: success() || failure()
+
+      - name: Check CMake 3.15
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.15"
+        if: success() || failure()
+
+      - name: Check CMake 3.16
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.16"
+        if: success() || failure()
+
+  cmake-config-ubuntu-2204:
+    name: CMake config check (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check CMake 3.17
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.17"
+        if: success() || failure()
+
+      - name: Check CMake 3.18
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.18"
+        if: success() || failure()
+
+      - name: Check CMake 3.19
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.19"
+        if: success() || failure()
+
+      - name: Check CMake 3.20
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.20"
+        if: success() || failure()
+
+      - name: Check CMake 3.21
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.21"
+        if: success() || failure()
+
+      - name: Check CMake 3.22
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.22"
+        if: success() || failure()
+
+      - name: Check CMake 3.23
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.23"
+        if: success() || failure()
+
+      - name: Check CMake 3.24
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.24"
+        if: success() || failure()
+
+      - name: Check CMake 3.25
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.25"
+        if: success() || failure()
+
+      - name: Check CMake 3.26 (full)
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.26"
+          args: -DCLI11_SANITIZERS=ON -DCLI11_BUILD_EXAMPLES_JSON=ON
+        if: success() || failure()
+
+      - name: Check CMake 3.27
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.27"
+        if: success() || failure()
+
+      - name: Check CMake 3.28 (full)
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.28.X"
+          args: -DCLI11_SANITIZERS=ON -DCLI11_BUILD_EXAMPLES_JSON=ON
+        if: success() || failure()
+
+      - name: Check CMake 3.29
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.29"
+        if: success() || failure()
+
+      - name: Check CMake 3.30
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.30"
+        if: success() || failure()
+
+      - name: Check CMake 3.31
+        uses: ./.github/actions/quick_cmake
+        with:
+          cmake-version: "3.31"
+        if: success() || failure()

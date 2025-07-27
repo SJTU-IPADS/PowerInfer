@@ -1,0 +1,93 @@
+exclude: ^(.github/workflows/|docs/img/|tests/fuzzFail)
+ci:
+  autoupdate_commit_msg: "chore(deps): pre-commit.ci autoupdate"
+  autofix_commit_msg: "style: pre-commit.ci fixes"
+
+repos:
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: check-shebang-scripts-are-executable
+      - id: check-executables-have-shebangs
+      - id: debug-statements
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v19.1.7
+    hooks:
+      - id: clang-format
+        types_or: [c++, c, cuda]
+
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        additional_dependencies: [pyyaml]
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: "v4.0.0-alpha.8"
+    hooks:
+      - id: prettier
+        types_or: [yaml, markdown, html, css, scss, javascript, json]
+        args: [--prose-wrap=always]
+
+  - repo: https://github.com/markdownlint/markdownlint
+    rev: v0.12.0
+    hooks:
+      - id: markdownlint
+        args: ["--style=scripts/mdlint_style.rb"]
+        # Uncomment on macOS - Apple has deprecated Ruby, so macOS is stuck on 2.6
+        # language_version: 3.1.2
+
+  # - repo: local
+  #   hooks:
+  #     - id: remarklint
+  #       name: remarklint
+  #       language: node
+  #       entry: remark
+  #       types: [markdown]
+  #       args: ["--frail", "--quiet"]
+  #       additional_dependencies:
+  #         [
+  #           remark,
+  #           remark-lint,
+  #           remark-cli,
+  #           remark-preset-lint-recommended,
+  #           remark-lint-list-item-indent,
+  #           remark-lint-no-undefined-references,
+  #         ]
+
+  - repo: local
+    hooks:
+      - id: disallow-caps
+        name: Disallow improper capitalization
+        language: pygrep
+        entry: PyBind|Numpy|Cmake|CCache|PyTest|Github
+        exclude: .pre-commit-config.yaml
+
+  - repo: local
+    hooks:
+      - id: avoid-msvc-macro
+        name: Avoid MSVC <=2017 min/max macro (use extra parens)
+        language: pygrep
+        entry: \b(min|max)\(
+        exclude: .pre-commit-config.yaml
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: ["-L", "atleast,ans,doub,inout,AtMost,hep"]
