@@ -35,20 +35,21 @@ https://github.com/user-attachments/assets/cefd466e-3b1f-47a9-8dc3-f1cf5119045e
 Note：i9 14900、1+13 8ge4 use 4 threads，others use the number of threads that  can achieve the maximum speed 
 
 ## Setup
-1. cd smallthinker before compiling
+1. init submodule：
+
 ```bash
-cd smallthinker
+git submodule update --init --recursive
 ```
 2. install clang-21 and mold：
 
 ```bash
 sudo apt install clang-21 mold
 ```
-3. init submodule：
-
+3. cd smallthinker before compiling
 ```bash
-git submodule update --init --recursive
+cd smallthinker
 ```
+
 
 ## Convert Model
 ```bash
