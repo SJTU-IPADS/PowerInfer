@@ -1,0 +1,1966 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="get-started.html">
+      
+      
+        <link rel="next" href="syntax.html">
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.25">
+    
+    
+      
+        <title>API - {fmt}</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.6543a935.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
+    
+      <link rel="stylesheet" href="fmt.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="{fmt}" class="md-header__button md-logo" aria-label="{fmt}" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            {fmt}
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var media,input,key,value,palette=__md_get("__palette");if(palette&&palette.color){"(prefers-color-scheme)"===palette.color.media&&(media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']"),palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent"));for([key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fmtlib/fmt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="index.html" class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="get-started.html" class="md-tabs__link">
+        
+  
+    
+  
+  Get Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="api.html" class="md-tabs__link">
+        
+  
+    
+  
+  API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="syntax.html" class="md-tabs__link">
+        
+  
+    
+  
+  Syntax
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="{fmt}" class="md-nav__button md-logo" aria-label="{fmt}" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    {fmt}
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fmtlib/fmt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="get-started.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Get Started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    API
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="api.html" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    API
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#base-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Base API
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Base API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formatting-user-defined-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Formatting User-Defined Types
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compile-time-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compile-Time Checks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-erasure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Type Erasure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#named-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      Named Arguments
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compatibility
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#format-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Format API
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Format API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      Utilities
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      System Errors
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-allocators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Custom Allocators
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locale" class="md-nav__link">
+    <span class="md-ellipsis">
+      Locale
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#legacy-compile-time-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Legacy Compile-Time Checks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#range-and-tuple-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Range and Tuple Formatting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#date-and-time-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Date and Time Formatting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standard-library-types-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Standard Library Types Formatting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Standard Library Types Formatting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      Variants
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bit-fields-and-packed-structs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bit-Fields and Packed Structs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#format-string-compilation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Format String Compilation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#terminal-colors-and-text-styles" class="md-nav__link">
+    <span class="md-ellipsis">
+      Terminal Colors and Text Styles
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      System APIs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stdostream-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      std::ostream Support
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dynamic-argument-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dynamic Argument Lists
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safe-printf" class="md-nav__link">
+    <span class="md-ellipsis">
+      Safe printf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wide-strings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wide Strings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility-with-c20-stdformat" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compatibility with C++20 std::format
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="syntax.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Syntax
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="api-reference">API Reference</h1>
+<p>The {fmt} library API consists of the following components:</p>
+<ul>
+<li><a href="#base-api"><code>fmt/base.h</code></a>: the base API providing main formatting functions
+  for <code>char</code>/UTF-8 with C++20 compile-time checks and minimal dependencies</li>
+<li><a href="#format-api"><code>fmt/format.h</code></a>: <code>fmt::format</code> and other formatting functions
+  as well as locale support</li>
+<li><a href="#ranges-api"><code>fmt/ranges.h</code></a>: formatting of ranges and tuples</li>
+<li><a href="#chrono-api"><code>fmt/chrono.h</code></a>: date and time formatting</li>
+<li><a href="#std-api"><code>fmt/std.h</code></a>: formatters for standard library types</li>
+<li><a href="#compile-api"><code>fmt/compile.h</code></a>: format string compilation</li>
+<li><a href="#color-api"><code>fmt/color.h</code></a>: terminal colors and text styles</li>
+<li><a href="#os-api"><code>fmt/os.h</code></a>: system APIs</li>
+<li><a href="#ostream-api"><code>fmt/ostream.h</code></a>: <code>std::ostream</code> support</li>
+<li><a href="#args-api"><code>fmt/args.h</code></a>: dynamic argument lists</li>
+<li><a href="#printf-api"><code>fmt/printf.h</code></a>: safe <code>printf</code></li>
+<li><a href="#xchar-api"><code>fmt/xchar.h</code></a>: optional <code>wchar_t</code> support</li>
+</ul>
+<p>All functions and types provided by the library reside in namespace <code>fmt</code>
+and macros have prefix <code>FMT_</code>.</p>
+<h2 id="base-api">Base API</h2>
+<p><code>fmt/base.h</code> defines the base API which provides main formatting functions
+for <code>char</code>/UTF-8 with C++20 compile-time checks. It has minimal include
+dependencies for better compile times. This header is only beneficial when
+using {fmt} as a library (the default) and not in the header-only mode.
+It also provides <code>formatter</code> specializations for the following types:</p>
+<ul>
+<li><code>int</code>, <code>long long</code>,</li>
+<li><code>unsigned</code>, <code>unsigned long long</code></li>
+<li><code>float</code>, <code>double</code>, <code>long double</code></li>
+<li><code>bool</code></li>
+<li><code>char</code></li>
+<li><code>const char*</code>, <a href="#basic_string_view"><code>fmt::string_view</code></a></li>
+<li><code>const void*</code></li>
+</ul>
+<p>The following functions use <a href="syntax.html">format string syntax</a> similar to that
+of <a href="https://docs.python.org/3/library/stdtypes.html#str.format">str.format</a>
+in Python. They take <em>fmt</em> and <em>args</em> as arguments.</p>
+<p><em>fmt</em> is a format string that contains literal text and replacement fields
+surrounded by braces <code>{}</code>. The fields are replaced with formatted arguments
+in the resulting string. <a href="#format_string"><code>fmt::format_string</code></a> is a format
+string which can be implicitly constructed from a string literal or a
+<code>constexpr</code> string and is checked at compile time in C++20. To pass a runtime
+format string wrap it in <a href="#runtime"><code>fmt::runtime</code></a>.</p>
+<p><em>args</em> is an argument list representing objects to be formatted.</p>
+<p>I/O errors are reported as <a href="https://en.cppreference.com/w/cpp/error/system_error"><code>std::system_error</code></a> exceptions unless
+specified otherwise.</p>
+<div class="docblock">
+<a id="print">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>void print(format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to <code>stdout</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print("The answer is {}.", 42);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="print">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>void print(FILE* f, format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to the file <code>f</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print(stderr, "Don't {}!", "panic");
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="println">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>void println(format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to <code>stdout</code> followed by a newline. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="println">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>void println(FILE* f, format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to the file <code>f</code> followed by a newline. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="format_to">
+<pre><code class="language-cpp decl"><div>template &lt;typename OutputIt, typename...&nbsp;T&gt;
+</div><div>auto format_to(OutputIt&& out, format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;remove_cvref_t&lt;OutputIt>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code>, writes the result to the output iterator <code>out</code> and returns the iterator past the end of the output range. <code>format_to</code> does not append a terminating null character.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">auto out = std::vector&lt;char>();
+fmt::format_to(std::back_inserter(out), "{}", 42);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="format_to_n">
+<pre><code class="language-cpp decl"><div>template &lt;typename OutputIt, typename...&nbsp;T&gt;
+</div><div>auto format_to_n(OutputIt out, size_t n, format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;format_to_n_result&lt;OutputIt>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code>, writes up to <code>n</code> characters of the result to the output iterator <code>out</code> and returns the total (not truncated) output size and the iterator past the end of the output range. <code>format_to_n</code> does not append a terminating null character. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="format_to_n_result">
+<pre><code class="language-cpp decl"><div>template &lt;typename OutputIt&gt;
+</div><div>struct format_to_n_result;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>OutputIt out;</div></code></pre>
+<div class="docblock-desc">
+<p>Iterator past the end of the output range. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>size_t size;</div></code></pre>
+<div class="docblock-desc">
+<p>Total (not truncated) output size. </p>
+        </div>
+</div>
+</div>
+</div>
+<div class="docblock">
+<a id="formatted_size">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>auto formatted_size(format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;size_t;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns the number of chars in the output of <code>format(fmt, args...)</code>. </p>
+        </div>
+</div>
+<p><a id="udt"></a></p>
+<h3 id="formatting-user-defined-types">Formatting User-Defined Types</h3>
+<p>The {fmt} library provides formatters for many standard C++ types.
+See <a href="#ranges-api"><code>fmt/ranges.h</code></a> for ranges and tuples including standard
+containers such as <code>std::vector</code>, <a href="#chrono-api"><code>fmt/chrono.h</code></a> for date and
+time formatting and <a href="#std-api"><code>fmt/std.h</code></a> for other standard library types.</p>
+<p>There are two ways to make a user-defined type formattable: providing a
+<code>format_as</code> function or specializing the <code>formatter</code> struct template.</p>
+<p>Use <code>format_as</code> if you want to make your type formattable as some other
+type with the same format specifiers. The <code>format_as</code> function should
+take an object of your type and return an object of a formattable type.
+It should be defined in the same namespace as your type.</p>
+<p>Example (<a href="https://godbolt.org/z/nvME4arz8">run</a>):</p>
+<pre class="highlight"><code>#include &lt;fmt/format.h&gt;
+
+namespace kevin_namespacy {
+
+enum class film {
+  house_of_cards, american_beauty, se7en = 7
+};
+
+auto format_as(film f) { return fmt::underlying(f); }
+
+}
+
+int main() {
+  fmt::print("{}\n", kevin_namespacy::film::se7en); // Output: 7
+}</code></pre>
+<p>Using specialization is more complex but gives you full control over
+parsing and formatting. To use this method specialize the <code>formatter</code>
+struct template for your type and implement <code>parse</code> and <code>format</code>
+methods.</p>
+<p>The recommended way of defining a formatter is by reusing an existing
+one via inheritance or composition. This way you can support standard
+format specifiers without implementing them yourself. For example:</p>
+<pre><code class="language-c++">// color.h:
+#include &lt;fmt/base.h&gt;
+
+enum class color {red, green, blue};
+
+template &lt;&gt; struct fmt::formatter&lt;color&gt;: formatter&lt;string_view&gt; {
+  // parse is inherited from formatter&lt;string_view&gt;.
+
+  auto format(color c, format_context&amp; ctx) const
+    -&gt; format_context::iterator;
+};
+</code></pre>
+<pre><code class="language-c++">// color.cc:
+#include &quot;color.h&quot;
+#include &lt;fmt/format.h&gt;
+
+auto fmt::formatter&lt;color&gt;::format(color c, format_context&amp; ctx) const
+    -&gt; format_context::iterator {
+  string_view name = &quot;unknown&quot;;
+  switch (c) {
+  case color::red:   name = &quot;red&quot;; break;
+  case color::green: name = &quot;green&quot;; break;
+  case color::blue:  name = &quot;blue&quot;; break;
+  }
+  return formatter&lt;string_view&gt;::format(name, ctx);
+}
+</code></pre>
+<p>Note that <code>formatter&lt;string_view&gt;::format</code> is defined in <code>fmt/format.h</code>
+so it has to be included in the source file. Since <code>parse</code> is inherited
+from <code>formatter&lt;string_view&gt;</code> it will recognize all string format
+specifications, for example</p>
+<pre><code class="language-c++">fmt::format(&quot;{:&gt;10}&quot;, color::blue)
+</code></pre>
+<p>will return <code>"      blue"</code>.</p>
+<!-- The experimental `nested_formatter` provides an easy way of applying a
+formatter to one or more subobjects.
+
+For example:
+
+    #include <fmt/format.h>
+
+    struct point {
+      double x, y;
+    };
+
+    template <>
+    struct fmt::formatter<point> : nested_formatter<double> {
+      auto format(point p, format_context& ctx) const {
+        return write_padded(ctx, [=](auto out) {
+          return format_to(out, "({}, {})", this->nested(p.x),
+                           this->nested(p.y));
+        });
+      }
+    };
+
+    int main() {
+      fmt::print("[{:>20.2f}]", point{1, 2});
+    }
+
+prints:
+
+    [          (1.00, 2.00)]
+
+Notice that fill, align and width are applied to the whole object which
+is the recommended behavior while the remaining specifiers apply to
+elements. -->
+
+<p>In general the formatter has the following form:</p>
+<pre class="highlight"><code>template &lt;&gt; struct fmt::formatter&lt;T&gt; {
+  // Parses format specifiers and stores them in the formatter.
+  //
+  // [ctx.begin(), ctx.end()) is a, possibly empty, character range that
+  // contains a part of the format string starting from the format
+  // specifications to be parsed, e.g. in
+  //
+  //   fmt::format("{:f} continued", ...);
+  //
+  // the range will contain "f} continued". The formatter should parse
+  // specifiers until '}' or the end of the range. In this example the
+  // formatter should parse the 'f' specifier and return an iterator
+  // pointing to '}'.
+  constexpr auto parse(format_parse_context&amp; ctx)
+    -&gt; format_parse_context::iterator;
+
+  // Formats value using the parsed format specification stored in this
+  // formatter and writes the output to ctx.out().
+  auto format(const T&amp; value, format_context&amp; ctx) const
+    -&gt; format_context::iterator;
+};</code></pre>
+<p>It is recommended to at least support fill, align and width that apply
+to the whole object and have the same semantics as in standard
+formatters.</p>
+<p>You can also write a formatter for a hierarchy of classes:</p>
+<pre><code class="language-c++">// demo.h:
+#include &lt;type_traits&gt;
+#include &lt;fmt/format.h&gt;
+
+struct A {
+  virtual ~A() {}
+  virtual std::string name() const { return &quot;A&quot;; }
+};
+
+struct B : A {
+  virtual std::string name() const { return &quot;B&quot;; }
+};
+
+template &lt;typename T&gt;
+struct fmt::formatter&lt;T, std::enable_if_t&lt;std::is_base_of_v&lt;A, T&gt;, char&gt;&gt; :
+    fmt::formatter&lt;std::string&gt; {
+  auto format(const A&amp; a, format_context&amp; ctx) const {
+    return formatter&lt;std::string&gt;::format(a.name(), ctx);
+  }
+};
+</code></pre>
+<pre><code class="language-c++">// demo.cc:
+#include &quot;demo.h&quot;
+#include &lt;fmt/format.h&gt;
+
+int main() {
+  B b;
+  A&amp; a = b;
+  fmt::print(&quot;{}&quot;, a); // Output: B
+}
+</code></pre>
+<p>Providing both a <code>formatter</code> specialization and a <code>format_as</code> overload is
+disallowed.</p>
+<div class="docblock">
+<a id="basic_format_parse_context">
+<pre><code class="language-cpp decl"><div>template &lt;typename Char&gt;
+</div><div>using basic_format_parse_context = parse_context&lt;Char>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="context">
+<pre><code class="language-cpp decl"><div></div><div>class context;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>context(iterator out, format_args args, detail::locale_ref loc);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a <code>context</code> object. References to the arguments are stored in the object so make sure they have appropriate lifetimes. </p>
+        </div>
+</div>
+</div>
+</div>
+<div class="docblock">
+<a id="format_context">
+<pre><code class="language-cpp decl"><div></div><div>using format_context = context;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<h3 id="compile-time-checks">Compile-Time Checks</h3>
+<p>Compile-time format string checks are enabled by default on compilers
+that support C++20 <code>consteval</code>. On older compilers you can use the
+<a href="#legacy-checks">FMT_STRING</a> macro defined in <code>fmt/format.h</code> instead.</p>
+<p>Unused arguments are allowed as in Python's <code>str.format</code> and ordinary functions.</p>
+<p>See <a href="#type-erasure">Type Erasure</a> for an example of how to enable compile-time
+checks in your own functions with <code>fmt::format_string</code> while avoiding template
+bloat.</p>
+<div class="docblock">
+<a id="fstring">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>struct fstring;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>A compile-time format string. Use <code>format_string</code> in the public API to prevent type deduction. </p>
+    </div>
+</div>
+<div class="docblock">
+<a id="format_string">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>using format_string = typename fstring&lt;T...>::t;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="runtime">
+<pre><code class="language-cpp decl"><div></div><div>auto runtime(string_view s) -&NoBreak;>&nbsp;runtime_format_string&lt;>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Creates a runtime format string.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">// Check format string at runtime instead of compile-time.
+fmt::print(fmt::runtime("{:d}"), "I am not a number");
+</code></pre> </p>
+        </div>
+</div>
+<h3 id="type-erasure">Type Erasure</h3>
+<p>You can create your own formatting function with compile-time checks and
+small binary footprint, for example (<a href="https://godbolt.org/z/b9Pbasvzc">run</a>):</p>
+<pre><code class="language-c++">#include &lt;fmt/format.h&gt;
+
+void vlog(const char* file, int line,
+          fmt::string_view fmt, fmt::format_args args) {
+  fmt::print(&quot;{}: {}: {}&quot;, file, line, fmt::vformat(fmt, args));
+}
+
+template &lt;typename... T&gt;
+void log(const char* file, int line,
+         fmt::format_string&lt;T...&gt; fmt, T&amp;&amp;... args) {
+  vlog(file, line, fmt, fmt::make_format_args(args...));
+}
+
+#define MY_LOG(fmt, ...) log(__FILE__, __LINE__, fmt, __VA_ARGS__)
+
+MY_LOG(&quot;invalid squishiness: {}&quot;, 42);
+</code></pre>
+<p>Note that <code>vlog</code> is not parameterized on argument types which improves
+compile times and reduces binary code size compared to a fully
+parameterized version.</p>
+<div class="docblock">
+<a id="make_format_args">
+<pre><code class="language-cpp decl"><div>template &lt;typename Context, typename...&nbsp;T, int&nbsp;NUM_ARGS, int&nbsp;NUM_NAMED_ARGS, unsigned long long&nbsp;DESC&gt;
+</div><div>constexpr auto make_format_args(T&... args) -&NoBreak;>&nbsp;detail::format_arg_store&lt;Context, NUM_ARGS, NUM_NAMED_ARGS, DESC>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Constructs an object that stores references to arguments and can be implicitly converted to <code>format_args</code>. <code>Context</code> can be omitted in which case it defaults to <code>context</code>. See <code>arg</code> for lifetime considerations. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="basic_format_args">
+<pre><code class="language-cpp decl"><div>template &lt;typename Context&gt;
+</div><div>class basic_format_args;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>A view of a collection of formatting arguments. To avoid lifetime issues it should only be used as a parameter type in type-erased functions such as <code>vformat</code>: <pre><code class="language-cpp">void vlog(fmt::string_view fmt, fmt::format_args args);  // OK
+fmt::format_args args = fmt::make_format_args();  // Dangling reference
+</code></pre> </p>
+    <div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr basic_format_args(const store&lt;NUM_ARGS, NUM_NAMED_ARGS, DESC>& s);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a <code>basic_format_args</code> object from <code>format_arg_store</code>. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr basic_format_args(const format_arg* args, int count, bool has_named);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a <code>basic_format_args</code> object from a dynamic list of arguments. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>auto get(int id) -&NoBreak;>&nbsp;format_arg;</div></code></pre>
+<div class="docblock-desc">
+<p>Returns the argument with the specified id. </p>
+        </div>
+</div>
+</div>
+</div>
+<div class="docblock">
+<a id="format_args">
+<pre><code class="language-cpp decl"><div></div><div>using format_args = basic_format_args&lt;context>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="basic_format_arg">
+<pre><code class="language-cpp decl"><div>template &lt;typename Context&gt;
+</div><div>class basic_format_arg;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>auto visit(Visitor&& vis) -&NoBreak;>&nbsp;decltype(vis(0));</div></code></pre>
+<div class="docblock-desc">
+<p>Visits an argument dispatching to the appropriate visit method based on the argument type. For example, if the argument type is <code>double</code> then <code>vis(value)</code> will be called with the value of type <code>double</code>. </p>
+        </div>
+</div>
+</div>
+</div>
+<h3 id="named-arguments">Named Arguments</h3>
+<div class="docblock">
+<a id="arg">
+<pre><code class="language-cpp decl"><div>template &lt;typename Char, typename T&gt;
+</div><div>auto arg(const Char* name, const T& arg) -&NoBreak;>&nbsp;detail::named_arg&lt;Char, T>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns a named argument to be used in a formatting function. It should only be used in a call to a formatting function.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print("The answer is {answer}.", fmt::arg("answer", 42));
+</code></pre> </p>
+        </div>
+</div>
+<p>Named arguments are not supported in compile-time checks at the moment.</p>
+<h3 id="compatibility">Compatibility</h3>
+<div class="docblock">
+<a id="basic_string_view">
+<pre><code class="language-cpp decl"><div>template &lt;typename Char&gt;
+</div><div>class basic_string_view;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>An implementation of <code>std::basic_string_view</code> for pre-C++17. It provides a subset of the API. <code>fmt::basic_string_view</code> is used for format strings even if <code>std::basic_string_view</code> is available to prevent issues when a library is compiled with a different <code>-std</code> option than the client code (which is not recommended). </p>
+    <div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr basic_string_view(const Char* s, size_t count);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a string view object from a C string and a size. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>basic_string_view(const Char* s);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a string view object from a C string. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>basic_string_view(const S& s);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a string view from a <code>std::basic_string</code> or a <code>std::basic_string_view</code> object. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr auto data() -&NoBreak;>&nbsp;const Char*;</div></code></pre>
+<div class="docblock-desc">
+<p>Returns a pointer to the string data. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr auto size() -&NoBreak;>&nbsp;size_t;</div></code></pre>
+<div class="docblock-desc">
+<p>Returns the string size. </p>
+        </div>
+</div>
+</div>
+</div>
+<div class="docblock">
+<a id="string_view">
+<pre><code class="language-cpp decl"><div></div><div>using string_view = basic_string_view&lt;char>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<h2 id="format-api">Format API</h2>
+<p><code>fmt/format.h</code> defines the full format API providing additional
+formatting functions and locale support.</p>
+<p><a id="format"></a>
+</p>
+<div class="docblock">
+<a id="format">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>auto format(format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;std::string;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and returns the result as a string.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">#include &lt;fmt/format.h>
+std::string message = fmt::format("The answer is {}.", 42);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="vformat">
+<pre><code class="language-cpp decl"><div></div><div>auto vformat(string_view fmt, format_args args) -&NoBreak;>&nbsp;std::string;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="operator""_a">
+<pre><code class="language-cpp decl"><div>template &lt;detail::fixed_string&nbsp;S&gt;
+</div><div>constexpr auto operator""_a();</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<h3 id="utilities">Utilities</h3>
+<div class="docblock">
+<a id="ptr">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto ptr(T p) -&NoBreak;>&nbsp;const void*;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Converts <code>p</code> to <code>const void*</code> for pointer formatting.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">auto s = fmt::format("{}", fmt::ptr(p));
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="underlying">
+<pre><code class="language-cpp decl"><div>template &lt;typename Enum&gt;
+</div><div>constexpr auto underlying(Enum e) -&NoBreak;>&nbsp;underlying_t&lt;Enum>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Converts <code>e</code> to the underlying type.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">enum class color { red, green, blue };
+auto s = fmt::format("{}", fmt::underlying(color::red));  // s == "0"
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="to_string">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto to_string(const T& value) -&NoBreak;>&nbsp;std::string;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="group_digits">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto group_digits(T value) -&NoBreak;>&nbsp;group_digits_view&lt;T>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns a view that formats an integer value using ',' as a locale-independent thousands separator.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print("{}", fmt::group_digits(12345));
+// Output: "12,345"
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="detail::buffer">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>class detail::buffer;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>A contiguous memory buffer with an optional growing ability. It is an internal class and shouldn't be used directly, only via <code>memory_buffer</code>. </p>
+    <div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr auto size() -&NoBreak;>&nbsp;size_t;</div></code></pre>
+<div class="docblock-desc">
+<p>Returns the size of this buffer. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>constexpr auto capacity() -&NoBreak;>&nbsp;size_t;</div></code></pre>
+<div class="docblock-desc">
+<p>Returns the capacity of this buffer. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>auto data() -&NoBreak;>&nbsp;T*;</div></code></pre>
+<div class="docblock-desc">
+<p>Returns a pointer to the buffer data (not null-terminated). </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void clear();</div></code></pre>
+<div class="docblock-desc">
+<p>Clears this buffer. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void append(const U* begin, const U* end);</div></code></pre>
+<div class="docblock-desc">
+<p>Appends data to the end of the buffer. </p>
+        </div>
+</div>
+</div>
+</div>
+<div class="docblock">
+<a id="basic_memory_buffer">
+<pre><code class="language-cpp decl"><div>template &lt;typename T, size_t&nbsp;SIZE, typename Allocator&gt;
+</div><div>class basic_memory_buffer;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>A dynamically growing memory buffer for trivially copyable/constructible types with the first <code>SIZE</code> elements stored in the object itself. Most commonly used via the <code>memory_buffer</code> alias for <code>char</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">auto out = fmt::memory_buffer();
+fmt::format_to(std::back_inserter(out), "The answer is {}.", 42);
+</code></pre> This will append "The answer is 42." to <code>out</code>. The buffer content can be converted to <code>std::string</code> with <code>to_string(out)</code>. </p>
+    <div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>basic_memory_buffer(basic_memory_buffer&& other);</div></code></pre>
+<div class="docblock-desc">
+<p>Constructs a <code>basic_memory_buffer</code> object moving the content of the other object to it. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>auto operator=(basic_memory_buffer&& other) -&NoBreak;>&nbsp;basic_memory_buffer&;</div></code></pre>
+<div class="docblock-desc">
+<p>Moves the content of the other <code>basic_memory_buffer</code> object to this one. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void resize(size_t count);</div></code></pre>
+<div class="docblock-desc">
+<p>Resizes the buffer to contain <code>count</code> elements. If T is a POD type new elements may not be initialized. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void reserve(size_t new_capacity);</div></code></pre>
+<div class="docblock-desc">
+<p>Increases the buffer capacity to <code>new_capacity</code>. </p>
+        </div>
+</div>
+</div>
+</div>
+<h3 id="system-errors">System Errors</h3>
+<p>{fmt} does not use <code>errno</code> to communicate errors to the user, but it may
+call system functions which set <code>errno</code>. Users should not make any
+assumptions about the value of <code>errno</code> being preserved by library
+functions.</p>
+<div class="docblock">
+<a id="system_error">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>auto system_error(int error_code, format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;std::system_error;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Constructs <code>std::system_error</code> with a message formatted with <code>fmt::format(fmt, args...)</code>. <code>error_code</code> is a system error code as given by <code>errno</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">// This throws std::system_error with the description
+//   cannot open file 'madeup': No such file or directory
+// or similar (system message may vary).
+const char* filename = "madeup";
+FILE* file = fopen(filename, "r");
+if (!file)
+  throw fmt::system_error(errno, "cannot open file '{}'", filename);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="format_system_error">
+<pre><code class="language-cpp decl"><div></div><div>void format_system_error(detail::buffer&lt;char>& out, int error_code, const char* message);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats an error message for an error returned by an operating system or a language runtime, for example a file opening error, and writes it to <code>out</code>. The format is the same as the one used by <code>std::system_error(ec, message)</code> where <code>ec</code> is <code>std::error_code(error_code, std::generic_category())</code>. It is implementation-defined but normally looks like: <pre><code class="language-cpp">&lt;message>: &lt;system-message>
+</code></pre> where <code>&lt;message></code> is the passed message and <code>&lt;system-message></code> is the system message corresponding to the error code. <code>error_code</code> is a system error code as given by <code>errno</code>. </p>
+        </div>
+</div>
+<h3 id="custom-allocators">Custom Allocators</h3>
+<p>The {fmt} library supports custom dynamic memory allocators. A custom
+allocator class can be specified as a template argument to
+<a href="#basic_memory_buffer"><code>fmt::basic_memory_buffer</code></a>:</p>
+<pre class="highlight"><code>using custom_memory_buffer = 
+  fmt::basic_memory_buffer&lt;char, fmt::inline_buffer_size, custom_allocator&gt;;</code></pre>
+<p>It is also possible to write a formatting function that uses a custom
+allocator:</p>
+<pre class="highlight"><code>using custom_string =
+  std::basic_string&lt;char, std::char_traits&lt;char&gt;, custom_allocator&gt;;
+
+auto vformat(custom_allocator alloc, fmt::string_view fmt,
+             fmt::format_args args) -&gt; custom_string {
+  auto buf = custom_memory_buffer(alloc);
+  fmt::vformat_to(std::back_inserter(buf), fmt, args);
+  return custom_string(buf.data(), buf.size(), alloc);
+}
+
+template &lt;typename ...Args&gt;
+auto format(custom_allocator alloc, fmt::string_view fmt,
+            const Args&amp; ... args) -&gt; custom_string {
+  return vformat(alloc, fmt, fmt::make_format_args(args...));
+}</code></pre>
+<p>The allocator will be used for the output container only. Formatting
+functions normally don't do any allocations for built-in and string
+types except for non-default floating-point formatting that occasionally
+falls back on <code>sprintf</code>.</p>
+<h3 id="locale">Locale</h3>
+<p>All formatting is locale-independent by default. Use the <code>'L'</code> format
+specifier to insert the appropriate number separator characters from the
+locale:</p>
+<pre class="highlight"><code>#include &lt;fmt/format.h&gt;
+#include &lt;locale&gt;
+
+std::locale::global(std::locale("en_US.UTF-8"));
+auto s = fmt::format("{:L}", 1000000);  // s == "1,000,000"</code></pre>
+<p><code>fmt/format.h</code> provides the following overloads of formatting functions
+that take <code>std::locale</code> as a parameter. The locale type is a template
+parameter to avoid the expensive <code>&lt;locale&gt;</code> include.</p>
+<div class="docblock">
+<a id="format">
+<pre><code class="language-cpp decl"><div>template &lt;typename Locale, typename...&nbsp;T&gt;
+</div><div>auto format(const Locale& loc, format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;std::string;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="format_to">
+<pre><code class="language-cpp decl"><div>template &lt;typename OutputIt, typename Locale, typename...&nbsp;T&gt;
+</div><div>auto format_to(OutputIt out, const Locale& loc, format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;OutputIt;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="formatted_size">
+<pre><code class="language-cpp decl"><div>template &lt;typename Locale, typename...&nbsp;T&gt;
+</div><div>auto formatted_size(const Locale& loc, format_string&lt;T...> fmt, T&&... args) -&NoBreak;>&nbsp;size_t;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<p><a id="legacy-checks"></a></p>
+<h3 id="legacy-compile-time-checks">Legacy Compile-Time Checks</h3>
+<p><code>FMT_STRING</code> enables compile-time checks on older compilers. It requires
+C++14 or later and is a no-op in C++11.</p>
+<div class="docblock">
+<a id="FMT_STRING">
+<pre><code class="language-cpp decl"><div></div><div>FMT_STRING(s)</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Constructs a legacy compile-time format string from a string literal <code>s</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">// A compile-time error because 'd' is an invalid specifier for strings.
+std::string s = fmt::format(FMT_STRING("{:d}"), "foo");
+</code></pre> </p>
+        </div>
+</div>
+<p>To force the use of legacy compile-time checks, define the preprocessor
+variable <code>FMT_ENFORCE_COMPILE_STRING</code>. When set, functions accepting
+<code>FMT_STRING</code> will fail to compile with regular strings.</p>
+<p><a id="ranges-api"></a></p>
+<h2 id="range-and-tuple-formatting">Range and Tuple Formatting</h2>
+<p><code>fmt/ranges.h</code> provides formatting support for ranges and tuples:</p>
+<pre class="highlight"><code>#include &lt;fmt/ranges.h&gt;
+
+fmt::print("{}", std::tuple&lt;char, int&gt;{'a', 42});
+// Output: ('a', 42)</code></pre>
+<p>Using <code>fmt::join</code>, you can separate tuple elements with a custom separator:</p>
+<pre class="highlight"><code>#include &lt;fmt/ranges.h&gt;
+
+auto t = std::tuple&lt;int, char&gt;{1, 'a'};
+fmt::print("{}", fmt::join(t, ", "));
+// Output: 1, a</code></pre>
+<div class="docblock">
+<a id="join">
+<pre><code class="language-cpp decl"><div>template &lt;typename Range&gt;
+</div><div>auto join(Range&& r, string_view sep) -&NoBreak;>&nbsp;join_view&lt;decltype(detail::range_begin(r)), decltype(detail::range_end(r))>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns a view that formats <code>range</code> with elements separated by <code>sep</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">auto v = std::vector&lt;int>{1, 2, 3};
+fmt::print("{}", fmt::join(v, ", "));
+// Output: 1, 2, 3
+</code></pre> <code>fmt::join</code> applies passed format specifiers to the range elements: <pre><code class="language-cpp">fmt::print("{:02}", fmt::join(v, ", "));
+// Output: 01, 02, 03
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="join">
+<pre><code class="language-cpp decl"><div>template &lt;typename It, typename Sentinel&gt;
+</div><div>auto join(It begin, Sentinel end, string_view sep) -&NoBreak;>&nbsp;join_view&lt;It, Sentinel>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns a view that formats the iterator range <code>[begin, end)</code> with elements separated by <code>sep</code>. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="join">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto join(std::initializer_list&lt;T> list, string_view sep) -&NoBreak;>&nbsp;join_view&lt;const T*, const T*>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns an object that formats <code>std::initializer_list</code> with elements separated by <code>sep</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print("{}", fmt::join({1, 2, 3}, ", "));
+// Output: "1, 2, 3"
+</code></pre> </p>
+        </div>
+</div>
+<p><a id="chrono-api"></a></p>
+<h2 id="date-and-time-formatting">Date and Time Formatting</h2>
+<p><code>fmt/chrono.h</code> provides formatters for</p>
+<ul>
+<li><a href="https://en.cppreference.com/w/cpp/chrono/duration"><code>std::chrono::duration</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/chrono/time_point"><code>std::chrono::time_point</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/chrono/c/tm"><code>std::tm</code></a></li>
+</ul>
+<p>The format syntax is described in <a href="syntax.html#chrono-format-specifications">Chrono Format Specifications</a>.</p>
+<p><strong>Example</strong>:</p>
+<pre class="highlight"><code>#include &lt;fmt/chrono.h&gt;
+
+int main() {
+  auto now = std::chrono::system_clock::now();
+
+  fmt::print("The date is {:%Y-%m-%d}.\n", now);
+  // Output: The date is 2020-11-07.
+  // (with 2020-11-07 replaced by the current date)
+
+  using namespace std::literals::chrono_literals;
+
+  fmt::print("Default format: {} {}\n", 42s, 100ms);
+  // Output: Default format: 42s 100ms
+
+  fmt::print("strftime-like format: {:%H:%M:%S}\n", 3h + 15min + 30s);
+  // Output: strftime-like format: 03:15:30
+}</code></pre>
+<div class="docblock">
+<a id="gmtime">
+<pre><code class="language-cpp decl"><div></div><div>auto gmtime(std::time_t time) -&NoBreak;>&nbsp;std::tm;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Converts given time since epoch as <code>std::time_t</code> value into calendar time, expressed in Coordinated Universal Time (UTC). Unlike <code>std::gmtime</code>, this function is thread-safe on most platforms. </p>
+        </div>
+</div>
+<p><a id="std-api"></a></p>
+<h2 id="standard-library-types-formatting">Standard Library Types Formatting</h2>
+<p><code>fmt/std.h</code> provides formatters for:</p>
+<ul>
+<li><a href="https://en.cppreference.com/w/cpp/atomic/atomic"><code>std::atomic</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/atomic/atomic_flag"><code>std::atomic_flag</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/utility/bitset"><code>std::bitset</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/error/error_code"><code>std::error_code</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/error/exception"><code>std::exception</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/filesystem/path"><code>std::filesystem::path</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/utility/variant/monostate"><code>std::monostate</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/utility/optional"><code>std::optional</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/utility/source_location"><code>std::source_location</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/thread/thread/id"><code>std::thread::id</code></a></li>
+<li><a href="https://en.cppreference.com/w/cpp/utility/variant/variant"><code>std::variant</code></a></li>
+</ul>
+<div class="docblock">
+<a id="ptr">
+<pre><code class="language-cpp decl"><div>template &lt;typename T, typename Deleter&gt;
+</div><div>auto ptr(const std::unique_ptr&lt;T, Deleter>& p) -&NoBreak;>&nbsp;const void*;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="ptr">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto ptr(const std::shared_ptr&lt;T>& p) -&NoBreak;>&nbsp;const void*;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<h3 id="variants">Variants</h3>
+<p>A <code>std::variant</code> is only formattable if every variant alternative is
+formattable, and requires the <code>__cpp_lib_variant</code> <a href="https://en.cppreference.com/w/cpp/feature_test">library
+feature</a>.</p>
+<p><strong>Example</strong>:</p>
+<pre class="highlight"><code>#include &lt;fmt/std.h&gt;
+
+fmt::print("{}", std::variant&lt;char, float&gt;('x'));
+// Output: variant('x')
+
+fmt::print("{}", std::variant&lt;std::monostate, char&gt;());
+// Output: variant(monostate)</code></pre>
+<h2 id="bit-fields-and-packed-structs">Bit-Fields and Packed Structs</h2>
+<p>To format a bit-field or a field of a struct with <code>__attribute__((packed))</code>
+applied to it, you need to convert it to the underlying or compatible type via
+a cast or a unary <code>+</code> (<a href="https://www.godbolt.org/z/3qKKs6T5Y">godbolt</a>):</p>
+<pre><code class="language-c++">struct smol {
+  int bit : 1;
+};
+
+auto s = smol();
+fmt::print(&quot;{}&quot;, +s.bit);
+</code></pre>
+<p>This is a known limitation of "perfect" forwarding in C++.</p>
+<p><a id="compile-api"></a></p>
+<h2 id="format-string-compilation">Format String Compilation</h2>
+<p><code>fmt/compile.h</code> provides format string compilation and compile-time
+(<code>constexpr</code>) formatting enabled via the <code>FMT_COMPILE</code> macro or the <code>_cf</code>
+user-defined literal defined in namespace <code>fmt::literals</code>. Format strings
+marked with <code>FMT_COMPILE</code> or <code>_cf</code> are parsed, checked and converted into
+efficient formatting code at compile-time. This supports arguments of built-in
+and string types as well as user-defined types with <code>format</code> functions taking
+the format context type as a template parameter in their <code>formatter</code>
+specializations. For example:</p>
+<pre class="highlight"><code>template &lt;&gt; struct fmt::formatter&lt;point&gt; {
+  constexpr auto parse(format_parse_context&amp; ctx);
+
+  template &lt;typename FormatContext&gt;
+  auto format(const point&amp; p, FormatContext&amp; ctx) const;
+};</code></pre>
+<p>Format string compilation can generate more binary code compared to the
+default API and is only recommended in places where formatting is a
+performance bottleneck.</p>
+<div class="docblock">
+<a id="FMT_COMPILE">
+<pre><code class="language-cpp decl"><div></div><div>FMT_COMPILE(s)</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Converts a string literal <code>s</code> into a format string that will be parsed at compile time and converted into efficient formatting code. Requires C++17 <code>constexpr if</code> compiler support.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">// Converts 42 into std::string using the most efficient method and no
+// runtime format string processing.
+std::string s = fmt::format(FMT_COMPILE("{}"), 42);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="operator""_cf">
+<pre><code class="language-cpp decl"><div>template &lt;detail::fixed_string&nbsp;Str&gt;
+</div><div>constexpr auto operator""_cf();</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<p><a id="color-api"></a></p>
+<h2 id="terminal-colors-and-text-styles">Terminal Colors and Text Styles</h2>
+<p><code>fmt/color.h</code> provides support for terminal color and text style output.</p>
+<div class="docblock">
+<a id="print">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>void print(text_style ts, format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats a string and prints it to stdout using ANSI escape sequences to specify text formatting.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print(fmt::emphasis::bold | fg(fmt::color::red),
+           "Elapsed time: {0:.2f} seconds", 1.23);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="fg">
+<pre><code class="language-cpp decl"><div></div><div>auto fg(detail::color_type foreground) -&NoBreak;>&nbsp;text_style;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Creates a text style from the foreground (text) color. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="bg">
+<pre><code class="language-cpp decl"><div></div><div>auto bg(detail::color_type background) -&NoBreak;>&nbsp;text_style;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Creates a text style from the background color. </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="styled">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto styled(const T& value, text_style ts) -&NoBreak;>&nbsp;detail::styled_arg&lt;remove_cvref_t&lt;T>>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns an argument that will be formatted using ANSI escape sequences, to be used in a formatting function.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print("Elapsed time: {0:.2f} seconds",
+           fmt::styled(1.23, fmt::fg(fmt::color::green) |
+                             fmt::bg(fmt::color::blue)));
+</code></pre> </p>
+        </div>
+</div>
+<p><a id="os-api"></a></p>
+<h2 id="system-apis">System APIs</h2>
+<div class="docblock">
+<a id="ostream">
+<pre><code class="language-cpp decl"><div></div><div>class ostream;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>A fast buffered output stream for writing from a single thread. Writing from multiple threads without external synchronization may result in a data race. </p>
+    <div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void print(format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to the file. </p>
+        </div>
+</div>
+</div>
+</div>
+<div class="docblock">
+<a id="windows_error">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>auto windows_error(int error_code, string_view message, const T&... args) -&NoBreak;>&nbsp;std::system_error;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Constructs a <code>std::system_error</code> object with the description of the form <pre><code class="language-cpp">&lt;message>: &lt;system-message>
+</code></pre> where <code>&lt;message></code> is the formatted message and <code>&lt;system-message></code> is the system message corresponding to the error code. <code>error_code</code> is a Windows error code as given by <code>GetLastError</code>. If <code>error_code</code> is not a valid error code such as -1, the system message will look like "error -1".</p>
+<p><b>Example</b>: <pre><code class="language-cpp">// This throws a system_error with the description
+//   cannot open file 'madeup': The system cannot find the file
+</code></pre> specified. // or similar (system message may vary). const char *filename = "madeup"; LPOFSTRUCT of = LPOFSTRUCT(); HFILE file = OpenFile(filename, &of, OF_READ); if (file == HFILE_ERROR) { throw fmt::windows_error(GetLastError(), "cannot open file '{}'", filename); } </p>
+        </div>
+</div>
+<p><a id="ostream-api"></a></p>
+<h2 id="stdostream-support"><code>std::ostream</code> Support</h2>
+<p><code>fmt/ostream.h</code> provides <code>std::ostream</code> support including formatting of
+user-defined types that have an overloaded insertion operator
+(<code>operator&lt;&lt;</code>). In order to make a type formattable via <code>std::ostream</code>
+you should provide a <code>formatter</code> specialization inherited from
+<code>ostream_formatter</code>:</p>
+<pre class="highlight"><code>#include &lt;fmt/ostream.h&gt;
+
+struct date {
+  int year, month, day;
+
+  friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; os, const date&amp; d) {
+    return os &lt;&lt; d.year &lt;&lt; '-' &lt;&lt; d.month &lt;&lt; '-' &lt;&lt; d.day;
+  }
+};
+
+template &lt;&gt; struct fmt::formatter&lt;date&gt; : ostream_formatter {};
+
+std::string s = fmt::format("The date is {}", date{2012, 12, 9});
+// s == "The date is 2012-12-9"</code></pre>
+<div class="docblock">
+<a id="streamed">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>constexpr auto streamed(const T& value) -&NoBreak;>&nbsp;detail::streamed_view&lt;T>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Returns a view that formats <code>value</code> via an ostream <code>operator&lt;&lt;</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print("Current thread id: {}\n",
+           fmt::streamed(std::this_thread::get_id()));
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="print">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>void print(std::ostream& os, format_string&lt;T...> fmt, T&&... args);</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Prints formatted data to the stream <code>os</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::print(cerr, "Don't {}!", "panic");
+</code></pre> </p>
+        </div>
+</div>
+<p><a id="args-api"></a></p>
+<h2 id="dynamic-argument-lists">Dynamic Argument Lists</h2>
+<p>The header <code>fmt/args.h</code> provides <code>dynamic_format_arg_store</code>, a builder-like API
+that can be used to construct format argument lists dynamically.</p>
+<div class="docblock">
+<a id="dynamic_format_arg_store">
+<pre><code class="language-cpp decl"><div>template &lt;typename Context&gt;
+</div><div>class dynamic_format_arg_store;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>A dynamic list of formatting arguments with storage.</p>
+<p>It can be implicitly converted into <code>fmt::basic_format_args</code> for passing into type-erased formatting functions such as <code>fmt::vformat</code>. </p>
+    <div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void push_back(const T& arg);</div></code></pre>
+<div class="docblock-desc">
+<p>Adds an argument into the dynamic store for later passing to a formatting function.</p>
+<p>Note that custom types and string types (but not string views) are copied into the store dynamically allocating memory if necessary.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::dynamic_format_arg_store&lt;fmt::format_context> store;
+store.push_back(42);
+store.push_back("abc");
+store.push_back(1.5f);
+std::string result = fmt::vformat("{} and {} and {}", store);
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void push_back(std::reference_wrapper&lt;T> arg);</div></code></pre>
+<div class="docblock-desc">
+<p>Adds a reference to the argument into the dynamic store for later passing to a formatting function.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::dynamic_format_arg_store&lt;fmt::format_context> store;
+char band[] = "Rolling Stones";
+store.push_back(std::cref(band));
+band[9] = 'c'; // Changing str affects the output.
+std::string result = fmt::vformat("{}", store);
+// result == "Rolling Scones"
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void push_back(const detail::named_arg&lt;char_type, T>& arg);</div></code></pre>
+<div class="docblock-desc">
+<p>Adds named argument into the dynamic store for later passing to a formatting function. <code>std::reference_wrapper</code> is supported to avoid copying of the argument. The name is always copied into the store. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void clear();</div></code></pre>
+<div class="docblock-desc">
+<p>Erase all elements from the store. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>void reserve(size_t new_cap, size_t new_cap_named);</div></code></pre>
+<div class="docblock-desc">
+<p>Reserves space to store at least <code>new_cap</code> arguments including <code>new_cap_named</code> named arguments. </p>
+        </div>
+</div>
+<div class="docblock">
+<pre><code class="language-cpp decl"><div></div><div>size_t size();</div></code></pre>
+<div class="docblock-desc">
+<p>Returns the number of elements in the store. </p>
+        </div>
+</div>
+</div>
+</div>
+<p><a id="printf-api"></a></p>
+<h2 id="safe-printf">Safe <code>printf</code></h2>
+<p>The header <code>fmt/printf.h</code> provides <code>printf</code>-like formatting
+functionality. The following functions use <a href="https://pubs.opengroup.org/onlinepubs/009695399/functions/fprintf.html">printf format string
+syntax</a>
+with the POSIX extension for positional arguments. Unlike their standard
+counterparts, the <code>fmt</code> functions are type-safe and throw an exception
+if an argument type doesn't match its format specification.</p>
+<div class="docblock">
+<a id="printf">
+<pre><code class="language-cpp decl"><div>template &lt;typename...&nbsp;T&gt;
+</div><div>auto printf(string_view fmt, const T&... args) -&NoBreak;>&nbsp;int;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to <code>stdout</code>.</p>
+<p><b>Example</b>:</p>
+<p>fmt::printf("Elapsed time: %.2f seconds", 1.23); </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="fprintf">
+<pre><code class="language-cpp decl"><div>template &lt;typename S, typename...&nbsp;T, typename Char&gt;
+</div><div>auto fprintf(std::FILE* f, const S& fmt, const T&... args) -&NoBreak;>&nbsp;int;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and writes the output to <code>f</code>.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">fmt::fprintf(stderr, "Don't %s!", "panic");
+</code></pre> </p>
+        </div>
+</div>
+<div class="docblock">
+<a id="sprintf">
+<pre><code class="language-cpp decl"><div>template &lt;typename S, typename...&nbsp;T, typename Char&gt;
+</div><div>auto sprintf(const S& fmt, const T&... args) -&NoBreak;>&nbsp;std::basic_string&lt;Char>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Formats <code>args</code> according to specifications in <code>fmt</code> and returns the result as as string.</p>
+<p><b>Example</b>: <pre><code class="language-cpp">std::string message = fmt::sprintf("The answer is %d", 42);
+</code></pre> </p>
+        </div>
+</div>
+<p><a id="xchar-api"></a></p>
+<h2 id="wide-strings">Wide Strings</h2>
+<p>The optional header <code>fmt/xchar.h</code> provides support for <code>wchar_t</code> and
+exotic character types.</p>
+<div class="docblock">
+<a id="is_char">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>struct is_char;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="wstring_view">
+<pre><code class="language-cpp decl"><div></div><div>using wstring_view = basic_string_view&lt;wchar_t>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="wformat_context">
+<pre><code class="language-cpp decl"><div></div><div>using wformat_context = buffered_context&lt;wchar_t>;</div></code></pre>
+</a>
+<div class="docblock-desc">
+</div>
+</div>
+<div class="docblock">
+<a id="to_wstring">
+<pre><code class="language-cpp decl"><div>template &lt;typename T&gt;
+</div><div>auto to_wstring(const T& value) -&NoBreak;>&nbsp;std::wstring;</div></code></pre>
+</a>
+<div class="docblock-desc">
+<p>Converts <code>value</code> to <code>std::wstring</code> using the default format for type <code>T</code>. </p>
+        </div>
+</div>
+<h2 id="compatibility-with-c20-stdformat">Compatibility with C++20 <code>std::format</code></h2>
+<p>{fmt} implements nearly all of the <a href="https://en.cppreference.com/w/cpp/utility/format">C++20 formatting
+library</a> with the
+following differences:</p>
+<ul>
+<li>
+<p>Names are defined in the <code>fmt</code> namespace instead of <code>std</code> to avoid
+  collisions with standard library implementations.</p>
+</li>
+<li>
+<p>Width calculation doesn't use grapheme clusterization. The latter has
+  been implemented in a separate branch but hasn't been integrated yet.</p>
+</li>
+<li>
+<p>The default floating-point representation in {fmt} uses the smallest
+  precision that provides round-trip guarantees similarly to other languages
+  like Java and Python. <code>std::format</code> is currently specified in terms of
+  <code>std::to_chars</code> which tries to generate the smallest number of characters
+  (ignoring redundant digits and sign in exponent) and may procude more
+  decimal digits than necessary.</p>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.tabs", "navigation.top", "toc.integrate"], "search": "assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="assets/javascripts/bundle.081f42fc.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
+      
+        <script src="fmt.js"></script>
+      
+    
+  </body>
+</html>

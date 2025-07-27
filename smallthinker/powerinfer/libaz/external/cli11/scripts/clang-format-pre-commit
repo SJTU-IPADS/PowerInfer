@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+# To use:
+# ln -s scripts/clang-format.hook .git/hooks/pre-commit
+
+# Based loosely on https://github.com/andrewseidl/githook-clang-format
+
+format_file() {
+    file="${1}"
+    case "$file" in
+    *.hpp | *.cpp | .c | *.cc | *.cu | *.h )
+        if [ -f "${1}" ] ; then
+            clang-format -i -style=file -sort-includes "${1}"
+            if git diff-files --quiet -- "${1}" ; then
+                echo "Already nicely formatted: ${1}"
+            else
+                git add "${1}"
+                echo "Reformatting file: ${1}"
+            fi
+        fi
+        ;;
+    *)
+        ;;
+    esac
+}
+
+case "${1}" in
+  --about )
+    echo "Runs clang-format on source files"
+    ;;
+  * )
+    for file in `git diff-index --cached --name-only HEAD` ; do
+      format_file "${file}"
+    done
+    ;;
+esac
