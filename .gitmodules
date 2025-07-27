@@ -1,0 +1,21 @@
+[submodule "smallthinker/ggml/src/ggml-kompute/kompute"]
+	path = smallthinker/ggml/src/ggml-kompute/kompute
+	url = https://github.com/nomic-ai/kompute.git
+[submodule "smallthinker/powerinfer/third_part/perfetto"]
+	path = smallthinker/powerinfer/third_part/perfetto
+	url = https://github.com/google/perfetto.git
+[submodule "smallthinker/powerinfer/third_part/benchmark"]
+	path = smallthinker/powerinfer/third_part/benchmark
+	url = https://github.com/google/benchmark.git
+[submodule "smallthinker/powerinfer/third_part/googletest"]
+	path = smallthinker/powerinfer/third_part/googletest
+	url = https://github.com/google/googletest.git
+[submodule "smallthinker/powerinfer/third_part/libaio"]
+	path = smallthinker/powerinfer/third_part/libaio
+	url = https://github.com/crossbuild/libaio.git
+[submodule "smallthinker/powerinfer/third_part/liburing"]
+	path = smallthinker/powerinfer/third_part/liburing
+	url = https://github.com/axboe/liburing.git
+[submodule "smallthinker/powerinfer/third_part/fmt"]
+	path = smallthinker/powerinfer/third_part/fmt
+	url = https://github.com/fmtlib/fmt.git
