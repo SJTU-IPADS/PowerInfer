@@ -5,14 +5,22 @@
 
 ## Demo
 
+
+https://github.com/user-attachments/assets/cefd466e-3b1f-47a9-8dc3-f1cf5119045e
+
+
 ## Speed
 ### SmallThinker 21B 
-| Model                               | Memory(GiB)         | i9 14900 | 1+13 8ge4 | rk3588 (16G) | Raspberry PI 5 |
+| Model                         
+
+https://github.com/user-attachments/assets/37079e94-599b-4e7f-8000-0c095ebe0d59
+
+      | Memory(GiB)         | i9 14900 | 1+13 8ge4 | rk3588 (16G) | Raspberry PI 5 |
 |--------------------------------------|---------------------|----------|-----------|--------------|----------------|
 | SmallThinker 21B+sparse              | 11.47               | 30.19    | 23.03     | 10.84        | 6.61           |
-| SmallThinker 21B+sparse +limited memory | 84                | limit 8G | 20.30     | 15.50        | 8.56           |
+| SmallThinker 21B+sparse +limited memory | limit 8G         | 20.30     | 15.50        | 8.56     | -              |
 | Qwen3 30B A3B                        | 16.20               | 33.52    | 20.18     | 9.07         | -              |
-| Qwen3 30B A3Blimited memory          | 81.38               | limit 8G | 10.11     | 0.18         | 6.32           |
+| Qwen3 30B A3Blimited memory          | limit 8G            | 10.11     | 0.18         | 6.32     | -              |
 | Gemma 3n E2B                         | 1G, theoretically   | 36.88    | 27.06     | 12.50        | 6.66           |
 | Gemma 3n E4B                         | 2G, theoretically   | 21.93    | 16.58     | 7.37         | 4.01           |
 
@@ -31,11 +39,19 @@
 Note：i9 14900、1+13 8ge4 use 4 threads，others use the number of threads that  can achieve the maximum speed 
 
 ## Setup
-
-1. install clang-21 and mold：
+1. cd smallthinker before compiling
+```bash
+cd smallthinker
+```
+2. install clang-21 and mold：
 
 ```bash
 sudo apt install clang-21 mold
+```
+3. init submodule：
+
+```bash
+git submodule update --init --recursive
 ```
 
 ## Convert Model
@@ -140,8 +156,9 @@ python get_no_moe_weights_ffn.py /path/to/gguf_q4_0 /path/to/no_moe_gguf_q4_0
 ```bash
 EXPERT_BUNDLE_PATH=/path/to/bundle ./llama-cli -m /path/to/no_moe_gguf_q4_0 --no-cnv --temp 0.6 --top-k 20 --top-p 0.95 --samplers "temperature;top_k;top_p" -p "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nCalculate the integral of f(x) = sin(x) from 0 to 3pi/4.<|im_end|>\n<|im_start|>assistant" -t 4 -n 256 -ub 4
 ```
-### LM Head Sparsity: 
-1. The 4B model uses a sparse lm_head which may lead to some loss in precision. If you want to disable it, change the condition at src/llama-model.cpp:7580 to false.But the speed is slower.
+### Note: 
+1. The models use a sparse lm_head which may lead to some loss in precision. If you want to disable it, change the condition at src/llama-model.cpp:7580 to false.But the speed is slower.
+2. It may require root privileges when running in Termux when run the Memory-Efficient Version.
 
 
 ## Acknowledgements
