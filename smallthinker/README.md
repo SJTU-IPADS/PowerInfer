@@ -33,7 +33,6 @@ https://github.com/user-attachments/assets/cefd466e-3b1f-47a9-8dc3-f1cf5119045e
 
 
 Note：
-- i9 14900, 1+13 8ge4 use 4 threads, others use the number of threads that can achieve the maximum speed
 - sparse: refers to leveraging the sparsity induced by the ReLU activation function to skip certain computations during the UP/DOWN calculation of each expert based on the GATE output, as well as using a predictor to perform sparse computation when calculating the lm_head
 
 ## Setup
