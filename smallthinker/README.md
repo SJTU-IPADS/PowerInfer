@@ -1,5 +1,5 @@
 ## Intro
-- SmallThinker is a family of on-device native Mixture-of-Experts (MoE) language models specially designed for local deployment, co-developed by the IPADS and School of AI at Shanghai Jiao Tong University and Zenergize AI. Designed from the ground up for resource-constrained environments, SmallThinker brings powerful, private, and low-latency AI directly to your personal devices, without relying on the cloud.
+- SmallThinker ([SmallThinker-21BA3B-Instruct](https://huggingface.co/PowerInfer/SmallThinker-21BA3B-Instruct) and [SmallThinker-4BA0.6B-Instruct](https://huggingface.co/PowerInfer/SmallThinker-4BA0.6B-Instruct)) is a family of on-device native Mixture-of-Experts (MoE) language models specially designed for local deployment, co-developed by the IPADS and School of AI at Shanghai Jiao Tong University and Zenergize AI. Designed from the ground up for resource-constrained environments, SmallThinker brings powerful, private, and low-latency AI directly to your personal devices, without relying on the cloud.
 
 - This inference framework is specifically optimized for sparse model inference to achieve faster speeds, leveraging the router's pre-selection mechanism to enable efficient inference even in memory-constrained scenarios.
 
@@ -11,11 +11,7 @@ https://github.com/user-attachments/assets/cefd466e-3b1f-47a9-8dc3-f1cf5119045e
 
 ## Speed
 ### SmallThinker 21B 
-| Model                         
-
-https://github.com/user-attachments/assets/37079e94-599b-4e7f-8000-0c095ebe0d59
-
-      | Memory(GiB)         | i9 14900 | 1+13 8ge4 | rk3588 (16G) | Raspberry PI 5 |
+| Model                            | Memory(GiB)         | i9 14900 | 1+13 8ge4 | rk3588 (16G) | Raspberry PI 5 |
 |--------------------------------------|---------------------|----------|-----------|--------------|----------------|
 | SmallThinker 21B+sparse              | 11.47               | 30.19    | 23.03     | 10.84        | 6.61           |
 | SmallThinker 21B+sparse +limited memory | limit 8G         | 20.30     | 15.50        | 8.56     | -              |
