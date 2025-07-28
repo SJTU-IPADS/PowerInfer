@@ -208,10 +208,12 @@ class TensorNameMap:
 
         MODEL_TENSOR.FC_1: (
             "model.layers.{bid}.fc1",
+            "model.layers.{bid}.mlp.predictor.fc1",
         ),
 
         MODEL_TENSOR.FC_2: (
             "model.layers.{bid}.fc2",
+            "model.layers.{bid}.mlp.predictor.fc2",
         ),
     }
 
