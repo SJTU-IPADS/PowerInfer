@@ -150,13 +150,12 @@ GENERATE_EXPERT_BUNDLE=/path/to/bundle ./llama-cli -m /path/to/gguf_q4_0 --temp 
 ```bash
 python get_no_moe_weights_ffn.py /path/to/gguf_q4_0 /path/to/no_moe_gguf_q4_0
 ``` 
-3. Modify the value on line 22 (max_n_cached_matrices) of the file (powerinfer/moe_sparse_pipeline/moe_sparse_pipeline/config.hpp) according to the actual memory of your own machine, here are some recommended configuration for SmallThinker:
-
+3.Configure the environment variable `MAX_N_CACHED` based on the desired memory limitation. here are some recommended configuration for SmallThinker:
+- 21B model under 8GB limit: max_n_cached_matrices = 6144
+- 4B model under 1GB limit: max_n_cached_matrices = 768
 #### Run the Memory-Efficient Version：
-- 21B model under 8GB limit: max_n_cached_matrices = 3 * 64 * 32
-- 4B model under 1GB limit: max_n_cached_matrices = 3 * 32 * 8
 ```bash
-EXPERT_BUNDLE_PATH=/path/to/bundle ./llama-cli -m /path/to/no_moe_gguf_q4_0 --no-cnv --temp 0.6 --top-k 20 --top-p 0.95 --samplers "temperature;top_k;top_p" -p "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nCalculate the integral of f(x) = sin(x) from 0 to 3pi/4.<|im_end|>\n<|im_start|>assistant" -t 4 -n 256 -ub 4
+MAX_N_CACHED=768 EXPERT_BUNDLE_PATH=/path/to/bundle ./llama-cli -m /path/to/no_moe_gguf_q4_0 --no-cnv --temp 0.6 --top-k 20 --top-p 0.95 --samplers "temperature;top_k;top_p" -p "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nCalculate the integral of f(x) = sin(x) from 0 to 3pi/4.<|im_end|>\n<|im_start|>assistant" -t 4 -n 256 -ub 4
 ```
 ### Note: 
 1. The models use a sparse lm_head which may lead to some loss in precision. If you want to disable it, change the condition at src/llama-model.cpp:7580 to false.But the speed is slower.
