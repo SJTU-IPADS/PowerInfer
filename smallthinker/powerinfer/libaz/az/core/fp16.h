@@ -6,6 +6,7 @@
 
 #include "az/core/intrinsics.hpp"
 #include "stdint.h"
+#include <math.h>
 
 #if defined(__cplusplus)
 extern "C" {
