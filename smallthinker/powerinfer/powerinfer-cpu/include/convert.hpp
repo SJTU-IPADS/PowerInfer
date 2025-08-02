@@ -146,9 +146,97 @@ inline void quantize_row_q8_0(const float *__restrict__ x, void *__restrict__ vy
             _mm_storeu_si128((__m128i *)(y[i].qs + 16), ni4);
     #endif // __AVX2__
     }
+#elif defined(__SSSE3__)//SSSE3 does not provide a significant speedup over scalar operations in i9 14900
+    for (int i = 0; i < nb; i++) {
+        __m128 v0 = _mm_loadu_ps(x + 0);
+        __m128 v1 = _mm_loadu_ps(x + 4);
+        __m128 v2 = _mm_loadu_ps(x + 8);
+        __m128 v3 = _mm_loadu_ps(x + 12);
+        __m128 v4 = _mm_loadu_ps(x + 16);
+        __m128 v5 = _mm_loadu_ps(x + 20);
+        __m128 v6 = _mm_loadu_ps(x + 24);
+        __m128 v7 = _mm_loadu_ps(x + 28);
+        x += 32;
 
+      
+        const __m128 sign_mask = _mm_set1_ps(-0.0f);
+
+       
+        __m128 max_abs_0 = _mm_max_ps(_mm_andnot_ps(sign_mask, v0), _mm_andnot_ps(sign_mask, v1));
+        __m128 max_abs_1 = _mm_max_ps(_mm_andnot_ps(sign_mask, v2), _mm_andnot_ps(sign_mask, v3));
+        __m128 max_abs_2 = _mm_max_ps(_mm_andnot_ps(sign_mask, v4), _mm_andnot_ps(sign_mask, v5));
+        __m128 max_abs_3 = _mm_max_ps(_mm_andnot_ps(sign_mask, v6), _mm_andnot_ps(sign_mask, v7));
+
+        max_abs_0 = _mm_max_ps(max_abs_0, max_abs_1);
+        max_abs_2 = _mm_max_ps(max_abs_2, max_abs_3);
+        
+        __m128 max_abs = _mm_max_ps(max_abs_0, max_abs_2);
+
+        
+        max_abs = _mm_max_ps(max_abs, _mm_shuffle_ps(max_abs, max_abs, _MM_SHUFFLE(2, 3, 0, 1)));
+        max_abs = _mm_max_ps(max_abs, _mm_shuffle_ps(max_abs, max_abs, _MM_SHUFFLE(1, 0, 3, 2)));
+        const float max_scalar = _mm_cvtss_f32(max_abs);
+        
+       
+        const float d = max_scalar / 127.0f;
+        y[i].d = POWERINFER_FP32_TO_FP16(d);
+        const float id = (max_scalar != 0.0f) ? 127.0f / max_scalar : 0.0f;
+        const __m128 mul = _mm_set1_ps(id);
+
+       
+        v0 = _mm_mul_ps(v0, mul);
+        v1 = _mm_mul_ps(v1, mul);
+        v2 = _mm_mul_ps(v2, mul);
+        v3 = _mm_mul_ps(v3, mul);
+        v4 = _mm_mul_ps(v4, mul);
+        v5 = _mm_mul_ps(v5, mul);
+        v6 = _mm_mul_ps(v6, mul);
+        v7 = _mm_mul_ps(v7, mul);
+
+       
+        __m128i i0 = _mm_cvtps_epi32(v0);
+        __m128i i1 = _mm_cvtps_epi32(v1);
+        __m128i i2 = _mm_cvtps_epi32(v2);
+        __m128i i3 = _mm_cvtps_epi32(v3);
+        __m128i i4 = _mm_cvtps_epi32(v4);
+        __m128i i5 = _mm_cvtps_epi32(v5);
+        __m128i i6 = _mm_cvtps_epi32(v6);
+        __m128i i7 = _mm_cvtps_epi32(v7);
+
+        
+        __m128i p0 = _mm_packs_epi32(i0, i1);
+        __m128i p1 = _mm_packs_epi32(i2, i3);
+        __m128i p2 = _mm_packs_epi32(i4, i5);
+        __m128i p3 = _mm_packs_epi32(i6, i7);
+
+        
+        __m128i q0 = _mm_packs_epi16(p0, p1); 
+        __m128i q1 = _mm_packs_epi16(p2, p3); 
+
+       
+        _mm_storeu_si128((__m128i *)(y[i].qs + 0), q0);
+        _mm_storeu_si128((__m128i *)(y[i].qs + 16), q1);
+    }
 #else
-    POWERINFER_ABORT("unsupported platform");
+    for (int i = 0; i < nb; i++) {
+        float amax = 0.0f; // absolute max
+
+        for (int j = 0; j < QK8_0; j++) {
+            const float v = x[i*QK8_0 + j];
+            if(fabsf(v)>amax)amax=fabs(v);
+        }
+
+        const float d = amax / ((1 << 7) - 1);
+        const float id = d ? 1.0f/d : 0.0f;
+
+        y[i].d = POWERINFER_FP32_TO_FP16(d);
+
+        for (int j = 0; j < QK8_0; ++j) {
+            const float x0 = x[i*QK8_0 + j]*id;
+
+            y[i].qs[j] = roundf(x0);
+        }
+    }
 #endif
 }
 

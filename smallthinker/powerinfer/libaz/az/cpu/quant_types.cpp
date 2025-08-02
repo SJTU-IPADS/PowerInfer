@@ -187,7 +187,27 @@ void quantize_row_q8_0(block_q8_0 *out, const float *in, size_t n) {
 #endif  // __AVX2__
     }
 #else
-    abort();
+    for (int i = 0; i < nb; i++) {
+        float amax = 0.0f; // absolute max
+
+        for (size_t j = 0; j < block_q8_0::block_size; j++) {
+            const float v = in[i*block_q8_0::block_size + j];
+            if (amax < fabsf(v)) {
+                amax = fabsf(v);
+            }
+        }
+
+        const float d = amax / ((1 << 7) - 1);
+        const float id = d ? 1.0f/d : 0.0f;
+
+        out[i].d = AZ_FP32_TO_FP16(d);
+
+        for (size_t j = 0; j < block_q8_0::block_size; ++j) {
+            const float x0 = in[i*block_q8_0::block_size + j]*id;
+
+            out[i].qs[j] = roundf(x0);
+        }
+    }
 #endif
 }
 
