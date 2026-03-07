@@ -33,35 +33,35 @@ import re
 
 
 def normalize(obj):
-  """Normalize output object.
+    """Normalize output object.
 
-  Args:
-     obj: Google Test's JSON output object to normalize.
+    Args:
+       obj: Google Test's JSON output object to normalize.
 
-  Returns:
-     Normalized output without any references to transient information that may
-     change from run to run.
-  """
+    Returns:
+       Normalized output without any references to transient information that may
+       change from run to run.
+    """
 
-  def _normalize(key, value):
-    if key == 'time':
-      return re.sub(r'^\d+(\.\d+)?s$', '*', value)
-    elif key == 'timestamp':
-      return re.sub(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$', '*', value)
-    elif key == 'failure':
-      value = re.sub(r'^.*[/\\](.*:)\d+\n', '\\1*\n', value)
-      return re.sub(r'Stack trace:\n(.|\n)*', 'Stack trace:\n*', value)
-    elif key == 'message':
-      value = re.sub(r'^.*[/\\](.*:)\d+\n', '\\1*\n', value)
-      return re.sub(r'Stack trace:\n(.|\n)*', 'Stack trace:\n*', value)
-    elif key == 'file':
-      return re.sub(r'^.*[/\\](.*)', '\\1', value)
+    def _normalize(key, value):
+        if key == "time":
+            return re.sub(r"^\d+(\.\d+)?s$", "*", value)
+        elif key == "timestamp":
+            return re.sub(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", "*", value)
+        elif key == "failure":
+            value = re.sub(r"^.*[/\\](.*:)\d+\n", "\\1*\n", value)
+            return re.sub(r"Stack trace:\n(.|\n)*", "Stack trace:\n*", value)
+        elif key == "message":
+            value = re.sub(r"^.*[/\\](.*:)\d+\n", "\\1*\n", value)
+            return re.sub(r"Stack trace:\n(.|\n)*", "Stack trace:\n*", value)
+        elif key == "file":
+            return re.sub(r"^.*[/\\](.*)", "\\1", value)
+        else:
+            return normalize(value)
+
+    if isinstance(obj, dict):
+        return {k: _normalize(k, v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [normalize(x) for x in obj]
     else:
-      return normalize(value)
-
-  if isinstance(obj, dict):
-    return {k: _normalize(k, v) for k, v in obj.items()}
-  if isinstance(obj, list):
-    return [normalize(x) for x in obj]
-  else:
-    return obj
+        return obj

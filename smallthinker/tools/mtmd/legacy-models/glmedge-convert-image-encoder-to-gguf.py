@@ -11,11 +11,14 @@ TEXT = "clip.text"
 VISION = "clip.vision"
 from transformers import SiglipVisionModel, SiglipVisionConfig
 
+
 def k(raw_key: str, arch: str) -> str:
     return raw_key.format(arch=arch)
 
 
-def should_skip_tensor(name: str, has_text: bool, has_vision: bool, has_llava: bool) -> bool:
+def should_skip_tensor(
+    name: str, has_text: bool, has_vision: bool, has_llava: bool
+) -> bool:
     if name in (
         "logit_scale",
         "text_model.embeddings.position_ids",
@@ -34,7 +37,7 @@ def should_skip_tensor(name: str, has_text: bool, has_vision: bool, has_llava: b
         "vision_model.head.mlp.fc1.weight",
         "vision_model.head.mlp.fc1.bias",
         "vision_model.head.mlp.fc2.weight",
-        "vision_model.head.mlp.fc2.bias"
+        "vision_model.head.mlp.fc2.bias",
     ):
         return True
 
@@ -52,11 +55,25 @@ def get_tensor_name(name: str) -> str:
         return name
     if "mm_projector" in name:
         name = name.replace("model.mm_projector", "mm")
-        name = re.sub(r'mm\.mlp\.mlp', 'mm.model.mlp', name, count=1)
-        name = re.sub(r'mm\.peg\.peg', 'mm.model.peg', name, count=1)
+        name = re.sub(r"mm\.mlp\.mlp", "mm.model.mlp", name, count=1)
+        name = re.sub(r"mm\.peg\.peg", "mm.model.peg", name, count=1)
         return name
 
-    return name.replace("text_model", "t").replace("vision_model", "v").replace("encoder.layers", "blk").replace("embeddings.", "").replace("_proj", "").replace("self_attn.", "attn_").replace("layer_norm", "ln").replace("layernorm", "ln").replace("mlp.fc1", "ffn_down").replace("mlp.fc2", "ffn_up").replace("embedding", "embd").replace("final", "post").replace("layrnorm", "ln")
+    return (
+        name.replace("text_model", "t")
+        .replace("vision_model", "v")
+        .replace("encoder.layers", "blk")
+        .replace("embeddings.", "")
+        .replace("_proj", "")
+        .replace("self_attn.", "attn_")
+        .replace("layer_norm", "ln")
+        .replace("layernorm", "ln")
+        .replace("mlp.fc1", "ffn_down")
+        .replace("mlp.fc2", "ffn_up")
+        .replace("embedding", "embd")
+        .replace("final", "post")
+        .replace("layrnorm", "ln")
+    )
 
 
 def bytes_to_unicode():
@@ -86,41 +103,97 @@ def bytes_to_unicode():
 
 
 ap = argparse.ArgumentParser()
-ap.add_argument("-m", "--model-dir", help="Path to model directory cloned from HF Hub", required=True)
-ap.add_argument("--use-f32", action="store_true", default=False, help="Use f32 instead of f16")
-ap.add_argument("--text-only", action="store_true", required=False,
-                help="Save a text-only model. It can't be used to encode images")
-ap.add_argument("--vision-only", action="store_true", required=False,
-                help="Save a vision-only model. It can't be used to encode texts")
-ap.add_argument("--clip-model-is-vision", action="store_true", required=False,
-                help="The clip model is a pure vision model (ShareGPT4V vision extract for example)")
-ap.add_argument("--clip-model-is-openclip", action="store_true", required=False,
-                help="The clip model is from openclip (for ViT-SO400M type))")
-ap.add_argument("--llava-projector", help="Path to llava.projector file. If specified, save an image encoder for LLaVA models.")
-ap.add_argument("--projector-type", help="Type of projector. Possible values: mlp, ldp, ldpv2", choices=["mlp", "ldp", "ldpv2","adapter"], default="adapter")
-ap.add_argument("-o", "--output-dir", help="Directory to save GGUF files. Default is the original model directory", default=None)
+ap.add_argument(
+    "-m",
+    "--model-dir",
+    help="Path to model directory cloned from HF Hub",
+    required=True,
+)
+ap.add_argument(
+    "--use-f32", action="store_true", default=False, help="Use f32 instead of f16"
+)
+ap.add_argument(
+    "--text-only",
+    action="store_true",
+    required=False,
+    help="Save a text-only model. It can't be used to encode images",
+)
+ap.add_argument(
+    "--vision-only",
+    action="store_true",
+    required=False,
+    help="Save a vision-only model. It can't be used to encode texts",
+)
+ap.add_argument(
+    "--clip-model-is-vision",
+    action="store_true",
+    required=False,
+    help="The clip model is a pure vision model (ShareGPT4V vision extract for example)",
+)
+ap.add_argument(
+    "--clip-model-is-openclip",
+    action="store_true",
+    required=False,
+    help="The clip model is from openclip (for ViT-SO400M type))",
+)
+ap.add_argument(
+    "--llava-projector",
+    help="Path to llava.projector file. If specified, save an image encoder for LLaVA models.",
+)
+ap.add_argument(
+    "--projector-type",
+    help="Type of projector. Possible values: mlp, ldp, ldpv2",
+    choices=["mlp", "ldp", "ldpv2", "adapter"],
+    default="adapter",
+)
+ap.add_argument(
+    "-o",
+    "--output-dir",
+    help="Directory to save GGUF files. Default is the original model directory",
+    default=None,
+)
 # Example --image_mean 0.48145466 0.4578275 0.40821073 --image_std 0.26862954 0.26130258 0.27577711
 # Example --image_mean 0.5 0.5 0.5 --image_std 0.5 0.5 0.5
 default_image_mean = [0.5, 0.5, 0.5]
 default_image_std = [0.5, 0.5, 0.5]
-ap.add_argument('--image-mean', type=float, nargs='+', help='Mean of the images for normalization (overrides processor) ', default=None)
-ap.add_argument('--image-std', type=float, nargs='+', help='Standard deviation of the images for normalization (overrides processor)', default=None)
+ap.add_argument(
+    "--image-mean",
+    type=float,
+    nargs="+",
+    help="Mean of the images for normalization (overrides processor) ",
+    default=None,
+)
+ap.add_argument(
+    "--image-std",
+    type=float,
+    nargs="+",
+    help="Standard deviation of the images for normalization (overrides processor)",
+    default=None,
+)
 
 # with proper
 args = ap.parse_args()
 
 
 if args.text_only and args.vision_only:
-    print("--text-only and --image-only arguments cannot be specified at the same time.")
+    print(
+        "--text-only and --image-only arguments cannot be specified at the same time."
+    )
     exit(1)
 
 if args.use_f32:
-    print("WARNING: Weights for the convolution op is always saved in f16, as the convolution op in GGML does not support 32-bit kernel weights yet.")
+    print(
+        "WARNING: Weights for the convolution op is always saved in f16, as the convolution op in GGML does not support 32-bit kernel weights yet."
+    )
 
 # output in the same directory as the model if output_dir is None
 dir_model = args.model_dir
 
-if args.clip_model_is_vision or not os.path.exists(dir_model + "/vocab.json") or args.clip_model_is_openclip:
+if (
+    args.clip_model_is_vision
+    or not os.path.exists(dir_model + "/vocab.json")
+    or args.clip_model_is_openclip
+):
     vocab = None
     tokens = None
 else:
@@ -179,7 +252,11 @@ fout.add_bool("clip.has_text_encoder", has_text_encoder)
 fout.add_bool("clip.has_vision_encoder", has_vision_encoder)
 fout.add_bool("clip.has_glm_projector", has_glm_projector)
 fout.add_file_type(ftype)
-model_name = config["_name_or_path"] if "_name_or_path" in config else os.path.basename(dir_model)
+model_name = (
+    config["_name_or_path"]
+    if "_name_or_path" in config
+    else os.path.basename(dir_model)
+)
 fout.add_name(model_name)
 if has_glm_projector:
     fout.add_description("image encoder for glm4v")
@@ -194,7 +271,10 @@ if has_text_encoder:
     fout.add_uint32(k(KEY_CONTEXT_LENGTH, TEXT), t_hparams["max_position_embeddings"])
     fout.add_uint32(k(KEY_EMBEDDING_LENGTH, TEXT), t_hparams["hidden_size"])
     fout.add_uint32(k(KEY_FEED_FORWARD_LENGTH, TEXT), t_hparams["intermediate_size"])
-    fout.add_uint32("clip.text.projection_dim", t_hparams.get("projection_dim", config["projection_dim"]))
+    fout.add_uint32(
+        "clip.text.projection_dim",
+        t_hparams.get("projection_dim", config["projection_dim"]),
+    )
     fout.add_uint32(k(KEY_ATTENTION_HEAD_COUNT, TEXT), t_hparams["num_attention_heads"])
     fout.add_float32(k(KEY_ATTENTION_LAYERNORM_EPS, TEXT), t_hparams["layer_norm_eps"])
     fout.add_uint32(k(KEY_BLOCK_COUNT, TEXT), t_hparams["num_hidden_layers"])
@@ -207,7 +287,9 @@ if has_vision_encoder:
     fout.add_uint32(k(KEY_EMBEDDING_LENGTH, VISION), v_hparams["hidden_size"])
     fout.add_uint32(k(KEY_FEED_FORWARD_LENGTH, VISION), v_hparams["intermediate_size"])
     fout.add_uint32("clip.vision.projection_dim", 0)
-    fout.add_uint32(k(KEY_ATTENTION_HEAD_COUNT, VISION), v_hparams["num_attention_heads"])
+    fout.add_uint32(
+        k(KEY_ATTENTION_HEAD_COUNT, VISION), v_hparams["num_attention_heads"]
+    )
     fout.add_float32(k(KEY_ATTENTION_LAYERNORM_EPS, VISION), 1e-6)
     fout.add_uint32(k(KEY_BLOCK_COUNT, VISION), v_hparams["num_hidden_layers"])
 
@@ -230,14 +312,16 @@ if has_glm_projector:
         else:
             data = data.squeeze().numpy().astype(np.float32)
         if name.startswith("vision."):
-            name=name.replace("vision.","")
+            name = name.replace("vision.", "")
         fout.add_tensor(name, data)
         print(f"Projector {name} - {data.dtype} - shape = {data.shape}")
         # print(f"Projector {name} tensors added\n")
 
 state_dict = model.state_dict()  # pyright: ignore[reportAttributeAccessIssue]
 for name, data in state_dict.items():
-    if should_skip_tensor(name, has_text_encoder, has_vision_encoder, has_glm_projector):
+    if should_skip_tensor(
+        name, has_text_encoder, has_vision_encoder, has_glm_projector
+    ):
         # we don't need this
         print(f"skipping parameter: {name}")
         continue

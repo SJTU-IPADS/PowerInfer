@@ -47,7 +47,7 @@ def test_server_slots():
     server.server_slots = False
     server.start()
     res = server.make_request("GET", "/slots")
-    assert res.status_code == 501 # ERROR_TYPE_NOT_SUPPORTED
+    assert res.status_code == 501  # ERROR_TYPE_NOT_SUPPORTED
     assert "error" in res.body
     server.stop()
 
@@ -70,11 +70,15 @@ def test_load_split_model():
     server.model_hf_file = "tinyllamas/split/stories15M-q8_0-00001-of-00003.gguf"
     server.model_alias = "tinyllama-split"
     server.start()
-    res = server.make_request("POST", "/completion", data={
-        "n_predict": 16,
-        "prompt": "Hello",
-        "temperature": 0.0,
-    })
+    res = server.make_request(
+        "POST",
+        "/completion",
+        data={
+            "n_predict": 16,
+            "prompt": "Hello",
+            "temperature": 0.0,
+        },
+    )
     assert res.status_code == 200
     assert match_regex("(little|girl)+", res.body["content"])
 

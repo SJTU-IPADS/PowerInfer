@@ -84,7 +84,7 @@ class ServerProcess:
     draft_max: int | None = None
     no_webui: bool | None = None
     jinja: bool | None = None
-    reasoning_format: Literal['deepseek', 'none', 'nothink'] | None = None
+    reasoning_format: Literal["deepseek", "none", "nothink"] | None = None
     reasoning_budget: int | None = None
     chat_template: str | None = None
     chat_template_file: str | None = None
@@ -215,7 +215,11 @@ class ServerProcess:
             creationflags=flags,
             stdout=sys.stdout,
             stderr=sys.stdout,
-            env={**os.environ, "LLAMA_CACHE": "tmp"} if "LLAMA_CACHE" not in os.environ else None,
+            env=(
+                {**os.environ, "LLAMA_CACHE": "tmp"}
+                if "LLAMA_CACHE" not in os.environ
+                else None
+            ),
         )
         server_instances.add(self)
 
@@ -225,9 +229,15 @@ class ServerProcess:
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
             try:
-                response = self.make_request("GET", "/health", headers={
-                    "Authorization": f"Bearer {self.api_key}" if self.api_key else None
-                })
+                response = self.make_request(
+                    "GET",
+                    "/health",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {self.api_key}" if self.api_key else None
+                        )
+                    },
+                )
                 if response.status_code == 200:
                     self.ready = True
                     return  # server is ready
@@ -235,7 +245,9 @@ class ServerProcess:
                 pass
             # Check if process died
             if self.process.poll() is not None:
-                raise RuntimeError(f"Server process died with return code {self.process.returncode}")
+                raise RuntimeError(
+                    f"Server process died with return code {self.process.returncode}"
+                )
 
             print(f"Waiting for server to start...")
             time.sleep(0.5)
@@ -290,9 +302,9 @@ class ServerProcess:
             raise ValueError(f"Unimplemented method: {method}")
         for line_bytes in response.iter_lines():
             line = line_bytes.decode("utf-8")
-            if '[DONE]' in line:
+            if "[DONE]" in line:
                 break
-            elif line.startswith('data: '):
+            elif line.startswith("data: "):
                 data = json.loads(line[6:])
                 print("Partial response from server", json.dumps(data, indent=2))
                 yield data
@@ -305,7 +317,7 @@ class ServerProcess:
         headers: dict | None = None,
         timeout: float | None = None,
     ) -> dict:
-        stream = data.get('stream', False)
+        stream = data.get("stream", False)
         if stream:
             content: list[str] = []
             reasoning_content: list[str] = []
@@ -318,56 +330,75 @@ class ServerProcess:
             arguments_parts = 0
 
             for chunk in self.make_stream_request(method, path, data, headers):
-                assert len(chunk['choices']) == 1, f'Expected 1 choice, got {len(chunk["choices"])}'
-                choice = chunk['choices'][0]
-                if choice['delta'].get('content') is not None:
-                    assert len(choice['delta']['content']) > 0, f'Expected non empty content delta!'
-                    content.append(choice['delta']['content'])
+                assert (
+                    len(chunk["choices"]) == 1
+                ), f'Expected 1 choice, got {len(chunk["choices"])}'
+                choice = chunk["choices"][0]
+                if choice["delta"].get("content") is not None:
+                    assert (
+                        len(choice["delta"]["content"]) > 0
+                    ), f"Expected non empty content delta!"
+                    content.append(choice["delta"]["content"])
                     content_parts += 1
-                if choice['delta'].get('reasoning_content') is not None:
-                    assert len(choice['delta']['reasoning_content']) > 0, f'Expected non empty reasoning_content delta!'
-                    reasoning_content.append(choice['delta']['reasoning_content'])
+                if choice["delta"].get("reasoning_content") is not None:
+                    assert (
+                        len(choice["delta"]["reasoning_content"]) > 0
+                    ), f"Expected non empty reasoning_content delta!"
+                    reasoning_content.append(choice["delta"]["reasoning_content"])
                     reasoning_content_parts += 1
-                if choice['delta'].get('finish_reason') is not None:
-                    finish_reason = choice['delta']['finish_reason']
-                for tc in choice['delta'].get('tool_calls', []):
-                    if 'function' not in tc:
+                if choice["delta"].get("finish_reason") is not None:
+                    finish_reason = choice["delta"]["finish_reason"]
+                for tc in choice["delta"].get("tool_calls", []):
+                    if "function" not in tc:
                         raise ValueError(f"Expected function type, got {tc['type']}")
-                    if tc['index'] >= len(tool_calls):
-                        assert 'id' in tc
-                        assert tc.get('type') == 'function'
-                        assert 'function' in tc and 'name' in tc['function'] and len(tc['function']['name']) > 0, \
-                            f"Expected function call with name, got {tc.get('function')}"
-                        tool_calls.append(dict(
-                            id="",
-                            type="function",
-                            function=dict(
-                                name="",
-                                arguments="",
+                    if tc["index"] >= len(tool_calls):
+                        assert "id" in tc
+                        assert tc.get("type") == "function"
+                        assert (
+                            "function" in tc
+                            and "name" in tc["function"]
+                            and len(tc["function"]["name"]) > 0
+                        ), f"Expected function call with name, got {tc.get('function')}"
+                        tool_calls.append(
+                            dict(
+                                id="",
+                                type="function",
+                                function=dict(
+                                    name="",
+                                    arguments="",
+                                ),
                             )
-                        ))
-                    tool_call = tool_calls[tc['index']]
-                    if tc.get('id') is not None:
-                        tool_call['id'] = tc['id']
-                    fct = tc['function']
-                    assert 'id' not in fct, f"Function call should not have id: {fct}"
-                    if fct.get('name') is not None:
-                        tool_call['function']['name'] = tool_call['function'].get('name', '') + fct['name']
-                    if fct.get('arguments') is not None:
-                        tool_call['function']['arguments'] += fct['arguments']
+                        )
+                    tool_call = tool_calls[tc["index"]]
+                    if tc.get("id") is not None:
+                        tool_call["id"] = tc["id"]
+                    fct = tc["function"]
+                    assert "id" not in fct, f"Function call should not have id: {fct}"
+                    if fct.get("name") is not None:
+                        tool_call["function"]["name"] = (
+                            tool_call["function"].get("name", "") + fct["name"]
+                        )
+                    if fct.get("arguments") is not None:
+                        tool_call["function"]["arguments"] += fct["arguments"]
                         arguments_parts += 1
                     tool_call_parts += 1
 
-            print(f'Streamed response had {content_parts} content parts, {reasoning_content_parts} reasoning_content parts, {tool_call_parts} tool call parts incl. {arguments_parts} arguments parts')
+            print(
+                f"Streamed response had {content_parts} content parts, {reasoning_content_parts} reasoning_content parts, {tool_call_parts} tool call parts incl. {arguments_parts} arguments parts"
+            )
             result = dict(
                 choices=[
                     dict(
                         index=0,
                         finish_reason=finish_reason,
                         message=dict(
-                            role='assistant',
-                            content=''.join(content) if content else None,
-                            reasoning_content=''.join(reasoning_content) if reasoning_content else None,
+                            role="assistant",
+                            content="".join(content) if content else None,
+                            reasoning_content=(
+                                "".join(reasoning_content)
+                                if reasoning_content
+                                else None
+                            ),
                             tool_calls=tool_calls if tool_calls else None,
                         ),
                     )
@@ -377,9 +408,10 @@ class ServerProcess:
             return result
         else:
             response = self.make_request(method, path, data, headers, timeout=timeout)
-            assert response.status_code == 200, f"Server returned error: {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Server returned error: {response.status_code}"
             return response.body
-
 
 
 server_instances: Set[ServerProcess] = set()
@@ -485,7 +517,9 @@ class ServerPreset:
         return server
 
 
-def parallel_function_calls(function_list: List[Tuple[Callable[..., Any], Tuple[Any, ...]]]) -> List[Any]:
+def parallel_function_calls(
+    function_list: List[Tuple[Callable[..., Any], Tuple[Any, ...]]],
+) -> List[Any]:
     """
     Run multiple functions in parallel and return results in the same order as calls. Equivalent to Promise.all in JS.
 
@@ -542,8 +576,8 @@ def download_file(url: str, output_file_path: str | None = None) -> str:
 
     Returns the local path of the downloaded file.
     """
-    file_name = url.split('/').pop()
-    output_file = f'./tmp/{file_name}' if output_file_path is None else output_file_path
+    file_name = url.split("/").pop()
+    output_file = f"./tmp/{file_name}" if output_file_path is None else output_file_path
     if not os.path.exists(output_file):
         print(f"Downloading {url} to {output_file}")
         wget.download(url, out=output_file)

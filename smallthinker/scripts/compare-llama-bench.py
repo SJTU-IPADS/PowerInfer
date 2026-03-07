@@ -16,56 +16,166 @@ try:
     import git
     from tabulate import tabulate
 except ImportError as e:
-    print("the following Python libraries are required: GitPython, tabulate.") # noqa: NP100
+    print(
+        "the following Python libraries are required: GitPython, tabulate."
+    )  # noqa: NP100
     raise e
 
 logger = logging.getLogger("compare-llama-bench")
 
 # All llama-bench SQL fields
 DB_FIELDS = [
-    "build_commit", "build_number", "cpu_info",       "gpu_info",   "backends",     "model_filename",
-    "model_type",   "model_size",   "model_n_params", "n_batch",    "n_ubatch",     "n_threads",
-    "cpu_mask",     "cpu_strict",   "poll",           "type_k",     "type_v",       "n_gpu_layers",
-    "split_mode",   "main_gpu",     "no_kv_offload",  "flash_attn", "tensor_split", "tensor_buft_overrides",
+    "build_commit",
+    "build_number",
+    "cpu_info",
+    "gpu_info",
+    "backends",
+    "model_filename",
+    "model_type",
+    "model_size",
+    "model_n_params",
+    "n_batch",
+    "n_ubatch",
+    "n_threads",
+    "cpu_mask",
+    "cpu_strict",
+    "poll",
+    "type_k",
+    "type_v",
+    "n_gpu_layers",
+    "split_mode",
+    "main_gpu",
+    "no_kv_offload",
+    "flash_attn",
+    "tensor_split",
+    "tensor_buft_overrides",
     "defrag_thold",
-    "use_mmap",     "embeddings",   "no_op_offload",  "n_prompt",   "n_gen",        "n_depth",
-    "test_time",    "avg_ns",       "stddev_ns",      "avg_ts",     "stddev_ts",
+    "use_mmap",
+    "embeddings",
+    "no_op_offload",
+    "n_prompt",
+    "n_gen",
+    "n_depth",
+    "test_time",
+    "avg_ns",
+    "stddev_ns",
+    "avg_ts",
+    "stddev_ts",
 ]
 
 DB_TYPES = [
-    "TEXT",    "INTEGER", "TEXT",    "TEXT",    "TEXT",    "TEXT",
-    "TEXT",    "INTEGER", "INTEGER", "INTEGER", "INTEGER", "INTEGER",
-    "TEXT",    "INTEGER", "INTEGER", "TEXT",    "TEXT",    "INTEGER",
-    "TEXT",    "INTEGER", "INTEGER", "INTEGER", "TEXT",    "TEXT",
+    "TEXT",
+    "INTEGER",
+    "TEXT",
+    "TEXT",
+    "TEXT",
+    "TEXT",
+    "TEXT",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "TEXT",
+    "INTEGER",
+    "INTEGER",
+    "TEXT",
+    "TEXT",
+    "INTEGER",
+    "TEXT",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "TEXT",
+    "TEXT",
     "REAL",
-    "INTEGER", "INTEGER", "INTEGER", "INTEGER", "INTEGER", "INTEGER",
-    "TEXT",    "INTEGER", "INTEGER", "REAL",    "REAL",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "TEXT",
+    "INTEGER",
+    "INTEGER",
+    "REAL",
+    "REAL",
 ]
 assert len(DB_FIELDS) == len(DB_TYPES)
 
 # Properties by which to differentiate results per commit:
 KEY_PROPERTIES = [
-    "cpu_info", "gpu_info", "backends", "n_gpu_layers", "tensor_buft_overrides", "model_filename", "model_type",
-    "n_batch", "n_ubatch", "embeddings", "cpu_mask", "cpu_strict", "poll", "n_threads", "type_k", "type_v",
-    "use_mmap", "no_kv_offload", "split_mode", "main_gpu", "tensor_split", "flash_attn", "n_prompt", "n_gen", "n_depth"
+    "cpu_info",
+    "gpu_info",
+    "backends",
+    "n_gpu_layers",
+    "tensor_buft_overrides",
+    "model_filename",
+    "model_type",
+    "n_batch",
+    "n_ubatch",
+    "embeddings",
+    "cpu_mask",
+    "cpu_strict",
+    "poll",
+    "n_threads",
+    "type_k",
+    "type_v",
+    "use_mmap",
+    "no_kv_offload",
+    "split_mode",
+    "main_gpu",
+    "tensor_split",
+    "flash_attn",
+    "n_prompt",
+    "n_gen",
+    "n_depth",
 ]
 
 # Properties that are boolean and are converted to Yes/No for the table:
-BOOL_PROPERTIES = ["embeddings", "cpu_strict", "use_mmap", "no_kv_offload", "flash_attn"]
+BOOL_PROPERTIES = [
+    "embeddings",
+    "cpu_strict",
+    "use_mmap",
+    "no_kv_offload",
+    "flash_attn",
+]
 
 # Header names for the table:
 PRETTY_NAMES = {
-    "cpu_info": "CPU", "gpu_info": "GPU", "backends": "Backends", "n_gpu_layers": "GPU layers",
-    "tensor_buft_overrides": "Tensor overrides", "model_filename": "File", "model_type": "Model", "model_size": "Model size [GiB]",
-    "model_n_params": "Num. of par.", "n_batch": "Batch size", "n_ubatch": "Microbatch size", "embeddings": "Embeddings",
-    "cpu_mask": "CPU mask", "cpu_strict": "CPU strict", "poll": "Poll", "n_threads": "Threads", "type_k": "K type", "type_v": "V type",
-    "use_mmap": "Use mmap", "no_kv_offload": "NKVO", "split_mode": "Split mode", "main_gpu": "Main GPU", "tensor_split": "Tensor split",
+    "cpu_info": "CPU",
+    "gpu_info": "GPU",
+    "backends": "Backends",
+    "n_gpu_layers": "GPU layers",
+    "tensor_buft_overrides": "Tensor overrides",
+    "model_filename": "File",
+    "model_type": "Model",
+    "model_size": "Model size [GiB]",
+    "model_n_params": "Num. of par.",
+    "n_batch": "Batch size",
+    "n_ubatch": "Microbatch size",
+    "embeddings": "Embeddings",
+    "cpu_mask": "CPU mask",
+    "cpu_strict": "CPU strict",
+    "poll": "Poll",
+    "n_threads": "Threads",
+    "type_k": "K type",
+    "type_v": "V type",
+    "use_mmap": "Use mmap",
+    "no_kv_offload": "NKVO",
+    "split_mode": "Split mode",
+    "main_gpu": "Main GPU",
+    "tensor_split": "Tensor split",
     "flash_attn": "FlashAttention",
 }
 
 DEFAULT_SHOW = ["model_type"]  # Always show these properties by default.
 DEFAULT_HIDE = ["model_filename"]  # Always hide these properties by default.
-GPU_NAME_STRIP = ["NVIDIA GeForce ", "Tesla ", "AMD Radeon "]  # Strip prefixes for smaller tables.
+GPU_NAME_STRIP = [
+    "NVIDIA GeForce ",
+    "Tesla ",
+    "AMD Radeon ",
+]  # Strip prefixes for smaller tables.
 MODEL_SUFFIX_REPLACE = {" - Small": "_S", " - Medium": "_M", " - Large": "_L"}
 
 DESCRIPTION = """Creates tables from llama-bench data written to multiple JSON/CSV files, a single JSONL file or SQLite database. Example usage (Linux):
@@ -82,7 +192,8 @@ Performance numbers from multiple runs per commit are averaged WITHOUT being wei
 """
 
 parser = argparse.ArgumentParser(
-    description=DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
+    description=DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter
+)
 help_b = (
     "The baseline commit to compare performance to. "
     "Accepts either a branch name, tag name, or commit hash. "
@@ -119,7 +230,11 @@ help_s = (
     "If the columns are manually specified, then the results for each unique combination of the "
     "specified values are averaged WITHOUT weighing by the --repetitions parameter of llama-bench."
 )
-parser.add_argument("--check", action="store_true", help="check if all required Python libraries are installed")
+parser.add_argument(
+    "--check",
+    action="store_true",
+    help="check if all required Python libraries are installed",
+)
 parser.add_argument("-s", "--show", help=help_s)
 parser.add_argument("--verbose", action="store_true", help="increase output verbosity")
 
@@ -179,11 +294,11 @@ class LlamaBenchData:
         seen_hexsha8 = set()
         while heap:
             depth, current_commit = heapq.heappop(heap)
-            current_hexsha8 = commit.hexsha[:self.build_len]
+            current_hexsha8 = commit.hexsha[: self.build_len]
             if current_hexsha8 in self.builds:
                 return current_hexsha8
             for parent in commit.parents:
-                parent_hexsha8 = parent.hexsha[:self.build_len]
+                parent_hexsha8 = parent.hexsha[: self.build_len]
                 if parent_hexsha8 not in seen_hexsha8:
                     seen_hexsha8.add(parent_hexsha8)
                     heapq.heappush(heap, (depth + 1, parent))
@@ -192,13 +307,13 @@ class LlamaBenchData:
     def get_all_parent_hexsha8s(self, commit: git.Commit) -> Sequence[str]:
         """Helper method to recursively get hexsha8 values for all parents of a commit."""
         unvisited = [commit]
-        visited   = []
+        visited = []
 
         while unvisited:
             current_commit = unvisited.pop(0)
-            visited.append(current_commit.hexsha[:self.build_len])
+            visited.append(current_commit.hexsha[: self.build_len])
             for parent in current_commit.parents:
-                if parent.hexsha[:self.build_len] not in visited:
+                if parent.hexsha[: self.build_len] not in visited:
                     unvisited.append(parent)
 
         return visited
@@ -208,10 +323,10 @@ class LlamaBenchData:
         if self.repo is None:
             return hexsha8
         for h in self.repo.heads:
-            if h.commit.hexsha[:self.build_len] == hexsha8:
+            if h.commit.hexsha[: self.build_len] == hexsha8:
                 return h.name
         for t in self.repo.tags:
-            if t.commit.hexsha[:self.build_len] == hexsha8:
+            if t.commit.hexsha[: self.build_len] == hexsha8:
                 return t.name
         return hexsha8
 
@@ -221,20 +336,24 @@ class LlamaBenchData:
             return None
         for h in self.repo.heads:
             if h.name == name:
-                return h.commit.hexsha[:self.build_len]
+                return h.commit.hexsha[: self.build_len]
         for t in self.repo.tags:
             if t.name == name:
-                return t.commit.hexsha[:self.build_len]
+                return t.commit.hexsha[: self.build_len]
         for c in self.repo.iter_commits("--all"):
-            if c.hexsha[:self.build_len] == name[:self.build_len]:
-                return c.hexsha[:self.build_len]
+            if c.hexsha[: self.build_len] == name[: self.build_len]:
+                return c.hexsha[: self.build_len]
         return None
 
-    def builds_timestamp(self, reverse: bool = False) -> Union[Iterator[tuple], Sequence[tuple]]:
+    def builds_timestamp(
+        self, reverse: bool = False
+    ) -> Union[Iterator[tuple], Sequence[tuple]]:
         """Helper method that gets rows of (build_commit, test_time) sorted by the latter."""
         return []
 
-    def get_rows(self, properties: list[str], hexsha8_baseline: str, hexsha8_compare: str) -> Sequence[tuple]:
+    def get_rows(
+        self, properties: list[str], hexsha8_baseline: str, hexsha8_compare: str
+    ) -> Sequence[tuple]:
         """
         Helper method that gets table rows for some list of properties.
         Rows are created by combining those where all provided properties are equal.
@@ -252,37 +371,71 @@ class LlamaBenchDataSQLite3(LlamaBenchData):
         super().__init__()
         self.connection = sqlite3.connect(":memory:")
         self.cursor = self.connection.cursor()
-        self.cursor.execute(f"CREATE TABLE test({', '.join(' '.join(x) for x in zip(DB_FIELDS, DB_TYPES))});")
+        self.cursor.execute(
+            f"CREATE TABLE test({', '.join(' '.join(x) for x in zip(DB_FIELDS, DB_TYPES))});"
+        )
 
     def _builds_init(self):
         if self.connection:
-            self.build_len_min = self.cursor.execute("SELECT MIN(LENGTH(build_commit)) from test;").fetchone()[0]
-            self.build_len_max = self.cursor.execute("SELECT MAX(LENGTH(build_commit)) from test;").fetchone()[0]
+            self.build_len_min = self.cursor.execute(
+                "SELECT MIN(LENGTH(build_commit)) from test;"
+            ).fetchone()[0]
+            self.build_len_max = self.cursor.execute(
+                "SELECT MAX(LENGTH(build_commit)) from test;"
+            ).fetchone()[0]
 
             if self.build_len_min != self.build_len_max:
-                logger.warning("Data contains commit hashes of differing lengths. It's possible that the wrong commits will be compared. "
-                               "Try purging the the database of old commits.")
-                self.cursor.execute(f"UPDATE test SET build_commit = SUBSTRING(build_commit, 1, {self.build_len_min});")
+                logger.warning(
+                    "Data contains commit hashes of differing lengths. It's possible that the wrong commits will be compared. "
+                    "Try purging the the database of old commits."
+                )
+                self.cursor.execute(
+                    f"UPDATE test SET build_commit = SUBSTRING(build_commit, 1, {self.build_len_min});"
+                )
 
-            builds = self.cursor.execute("SELECT DISTINCT build_commit FROM test;").fetchall()
-            self.builds = list(map(lambda b: b[0], builds))  # list[tuple[str]] -> list[str]
+            builds = self.cursor.execute(
+                "SELECT DISTINCT build_commit FROM test;"
+            ).fetchall()
+            self.builds = list(
+                map(lambda b: b[0], builds)
+            )  # list[tuple[str]] -> list[str]
         super()._builds_init()
 
-    def builds_timestamp(self, reverse: bool = False) -> Union[Iterator[tuple], Sequence[tuple]]:
+    def builds_timestamp(
+        self, reverse: bool = False
+    ) -> Union[Iterator[tuple], Sequence[tuple]]:
         data = self.cursor.execute(
-            "SELECT build_commit, test_time FROM test ORDER BY test_time;").fetchall()
+            "SELECT build_commit, test_time FROM test ORDER BY test_time;"
+        ).fetchall()
         return reversed(data) if reverse else data
 
-    def get_rows(self, properties: list[str], hexsha8_baseline: str, hexsha8_compare: str) -> Sequence[tuple]:
+    def get_rows(
+        self, properties: list[str], hexsha8_baseline: str, hexsha8_compare: str
+    ) -> Sequence[tuple]:
         select_string = ", ".join(
-            [f"tb.{p}" for p in properties] + ["tb.n_prompt", "tb.n_gen", "tb.n_depth", "AVG(tb.avg_ts)", "AVG(tc.avg_ts)"])
-        equal_string = " AND ".join(
-            [f"tb.{p} = tc.{p}" for p in KEY_PROPERTIES] + [
-                f"tb.build_commit = '{hexsha8_baseline}'", f"tc.build_commit = '{hexsha8_compare}'"]
+            [f"tb.{p}" for p in properties]
+            + [
+                "tb.n_prompt",
+                "tb.n_gen",
+                "tb.n_depth",
+                "AVG(tb.avg_ts)",
+                "AVG(tc.avg_ts)",
+            ]
         )
-        group_order_string = ", ".join([f"tb.{p}" for p in properties] + ["tb.n_gen", "tb.n_prompt", "tb.n_depth"])
-        query = (f"SELECT {select_string} FROM test tb JOIN test tc ON {equal_string} "
-                 f"GROUP BY {group_order_string} ORDER BY {group_order_string};")
+        equal_string = " AND ".join(
+            [f"tb.{p} = tc.{p}" for p in KEY_PROPERTIES]
+            + [
+                f"tb.build_commit = '{hexsha8_baseline}'",
+                f"tc.build_commit = '{hexsha8_compare}'",
+            ]
+        )
+        group_order_string = ", ".join(
+            [f"tb.{p}" for p in properties] + ["tb.n_gen", "tb.n_prompt", "tb.n_depth"]
+        )
+        query = (
+            f"SELECT {select_string} FROM test tb JOIN test tc ON {equal_string} "
+            f"GROUP BY {group_order_string} ORDER BY {group_order_string};"
+        )
         return self.cursor.execute(query).fetchall()
 
 
@@ -302,7 +455,9 @@ class LlamaBenchDataSQLite3File(LlamaBenchDataSQLite3):
 
         try:
             if cursor.execute("PRAGMA schema_version;").fetchone()[0] == 0:
-                raise sqlite3.DatabaseError("The provided input file does not exist or is empty.")
+                raise sqlite3.DatabaseError(
+                    "The provided input file does not exist or is empty."
+                )
         except sqlite3.DatabaseError as e:
             logger.debug(f'"{data_file}" is not a valid SQLite3 file.', exc_info=e)
             cursor = None
@@ -322,10 +477,15 @@ class LlamaBenchDataJSONL(LlamaBenchDataSQLite3):
                 for k in parsed.keys() - set(DB_FIELDS):
                     del parsed[k]
 
-                if (missing_keys := self._check_keys(parsed.keys())):
-                    raise RuntimeError(f"Missing required data key(s) at line {i + 1}: {', '.join(missing_keys)}")
+                if missing_keys := self._check_keys(parsed.keys()):
+                    raise RuntimeError(
+                        f"Missing required data key(s) at line {i + 1}: {', '.join(missing_keys)}"
+                    )
 
-                self.cursor.execute(f"INSERT INTO test({', '.join(parsed.keys())}) VALUES({', '.join('?' * len(parsed))});", tuple(parsed.values()))
+                self.cursor.execute(
+                    f"INSERT INTO test({', '.join(parsed.keys())}) VALUES({', '.join('?' * len(parsed))});",
+                    tuple(parsed.values()),
+                )
 
         self._builds_init()
 
@@ -355,10 +515,15 @@ class LlamaBenchDataJSON(LlamaBenchDataSQLite3):
                     for k in entry.keys() - set(DB_FIELDS):
                         del entry[k]
 
-                    if (missing_keys := self._check_keys(entry.keys())):
-                        raise RuntimeError(f"Missing required data key(s) at entry {i + 1}: {', '.join(missing_keys)}")
+                    if missing_keys := self._check_keys(entry.keys()):
+                        raise RuntimeError(
+                            f"Missing required data key(s) at entry {i + 1}: {', '.join(missing_keys)}"
+                        )
 
-                    self.cursor.execute(f"INSERT INTO test({', '.join(entry.keys())}) VALUES({', '.join('?' * len(entry))});", tuple(entry.values()))
+                    self.cursor.execute(
+                        f"INSERT INTO test({', '.join(entry.keys())}) VALUES({', '.join('?' * len(entry))});",
+                        tuple(entry.values()),
+                    )
 
         self._builds_init()
 
@@ -390,10 +555,15 @@ class LlamaBenchDataCSV(LlamaBenchDataSQLite3):
                     for k in keys - set(DB_FIELDS):
                         del parsed[k]
 
-                    if (missing_keys := self._check_keys(keys)):
-                        raise RuntimeError(f"Missing required data key(s) at line {i + 1}: {', '.join(missing_keys)}")
+                    if missing_keys := self._check_keys(keys):
+                        raise RuntimeError(
+                            f"Missing required data key(s) at line {i + 1}: {', '.join(missing_keys)}"
+                        )
 
-                    self.cursor.execute(f"INSERT INTO test({', '.join(parsed.keys())}) VALUES({', '.join('?' * len(parsed))});", tuple(parsed.values()))
+                    self.cursor.execute(
+                        f"INSERT INTO test({', '.join(parsed.keys())}) VALUES({', '.join('?' * len(parsed))});",
+                        tuple(parsed.values()),
+                    )
 
         self._builds_init()
 
@@ -451,15 +621,21 @@ if known_args.baseline is not None:
         sys.exit(1)
 # Otherwise, search for the most recent parent of master for which there is data:
 elif bench_data.repo is not None:
-    hexsha8_baseline = bench_data.find_parent_in_data(bench_data.repo.heads.master.commit)
+    hexsha8_baseline = bench_data.find_parent_in_data(
+        bench_data.repo.heads.master.commit
+    )
 
     if hexsha8_baseline is None:
-        logger.error("No baseline was provided and did not find data for any master branch commits.\n")
+        logger.error(
+            "No baseline was provided and did not find data for any master branch commits.\n"
+        )
         parser.print_help()
         sys.exit(1)
 else:
-    logger.error("No baseline was provided and the current working directory "
-                 "is not part of a git repository from which a baseline could be inferred.\n")
+    logger.error(
+        "No baseline was provided and the current working directory "
+        "is not part of a git repository from which a baseline could be inferred.\n"
+    )
     parser.print_help()
     sys.exit(1)
 
@@ -481,19 +657,25 @@ if known_args.compare is not None:
 # Otherwise, search for the commit for llama-bench was most recently run
 # and that is not a parent of master:
 elif bench_data.repo is not None:
-    hexsha8s_master = bench_data.get_all_parent_hexsha8s(bench_data.repo.heads.master.commit)
-    for (hexsha8, _) in bench_data.builds_timestamp(reverse=True):
+    hexsha8s_master = bench_data.get_all_parent_hexsha8s(
+        bench_data.repo.heads.master.commit
+    )
+    for hexsha8, _ in bench_data.builds_timestamp(reverse=True):
         if hexsha8 not in hexsha8s_master:
             hexsha8_compare = hexsha8
             break
 
     if hexsha8_compare is None:
-        logger.error("No compare target was provided and did not find data for any non-master commits.\n")
+        logger.error(
+            "No compare target was provided and did not find data for any non-master commits.\n"
+        )
         parser.print_help()
         sys.exit(1)
 else:
-    logger.error("No compare target was provided and the current working directory "
-                 "is not part of a git repository from which a compare target could be inferred.\n")
+    logger.error(
+        "No compare target was provided and the current working directory "
+        "is not part of a git repository from which a compare target could be inferred.\n"
+    )
     parser.print_help()
     sys.exit(1)
 
@@ -505,7 +687,9 @@ if known_args.show is not None:
     show = known_args.show.split(",")
     unknown_cols = []
     for prop in show:
-        if prop not in KEY_PROPERTIES[:-3]:  # Last three values are n_prompt, n_gen, n_depth.
+        if (
+            prop not in KEY_PROPERTIES[:-3]
+        ):  # Last three values are n_prompt, n_gen, n_depth.
             unknown_cols.append(prop)
     if unknown_cols:
         logger.error(f"Unknown values for --show: {', '.join(unknown_cols)}")
@@ -547,14 +731,16 @@ else:
     rows_show = bench_data.get_rows(show, hexsha8_baseline, hexsha8_compare)
 
 if not rows_show:
-    logger.error(f"No comparable data was found between {name_baseline} and {name_compare}.\n")
+    logger.error(
+        f"No comparable data was found between {name_baseline} and {name_compare}.\n"
+    )
     sys.exit(1)
 
 table = []
 for row in rows_show:
     n_prompt = int(row[-5])
-    n_gen    = int(row[-4])
-    n_depth  = int(row[-3])
+    n_gen = int(row[-4])
+    n_depth = int(row[-3])
     if n_prompt != 0 and n_gen == 0:
         test_name = f"pp{n_prompt}"
     elif n_prompt == 0 and n_gen != 0:
@@ -565,7 +751,12 @@ for row in rows_show:
         test_name = f"{test_name}@d{n_depth}"
     #           Regular columns    test name    avg t/s values              Speedup
     #            VVVVVVVVVVVVV     VVVVVVVVV    VVVVVVVVVVVVVV              VVVVVVV
-    table.append(list(row[:-5]) + [test_name] + list(row[-2:]) + [float(row[-1]) / float(row[-2])])
+    table.append(
+        list(row[:-5])
+        + [test_name]
+        + list(row[-2:])
+        + [float(row[-1]) / float(row[-2])]
+    )
 
 # Some a-posteriori fixes to make the table contents prettier:
 for bool_property in BOOL_PROPERTIES:
@@ -576,14 +767,14 @@ for bool_property in BOOL_PROPERTIES:
 
 if "model_type" in show:
     ip = show.index("model_type")
-    for (old, new) in MODEL_SUFFIX_REPLACE.items():
+    for old, new in MODEL_SUFFIX_REPLACE.items():
         for row_table in table:
             row_table[ip] = row_table[ip].replace(old, new)
 
 if "model_size" in show:
     ip = show.index("model_size")
     for row_table in table:
-        row_table[ip] = float(row_table[ip]) / 1024 ** 3
+        row_table[ip] = float(row_table[ip]) / 1024**3
 
 if "gpu_info" in show:
     ip = show.index("gpu_info")
@@ -597,12 +788,11 @@ if "gpu_info" in show:
         if len(gpu_names) >= 2 and all_names_the_same:
             row_table[ip] = f"{num_gpus}x {gpu_names[0]}"
 
-headers  = [PRETTY_NAMES[p] for p in show]
+headers = [PRETTY_NAMES[p] for p in show]
 headers += ["Test", f"t/s {name_baseline}", f"t/s {name_compare}", "Speedup"]
 
-print(tabulate( # noqa: NP100
-    table,
-    headers=headers,
-    floatfmt=".2f",
-    tablefmt=known_args.output
-))
+print(
+    tabulate(  # noqa: NP100
+        table, headers=headers, floatfmt=".2f", tablefmt=known_args.output
+    )
+)

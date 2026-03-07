@@ -9,7 +9,7 @@ def sha256sum(file):
     b = bytearray(block_size)
     file_hash = hashlib.sha256()
     mv = memoryview(b)
-    with open(file, 'rb', buffering=0) as f:
+    with open(file, "rb", buffering=0) as f:
         while True:
             n = f.readinto(mv)
             if not n:
@@ -65,15 +65,22 @@ for line in hash_list:
         file_missing = "X"
 
     # Add the results to the array
-    results.append({
-        "filename": filename,
-        "valid checksum": valid_checksum,
-        "file missing": file_missing
-    })
+    results.append(
+        {
+            "filename": filename,
+            "valid checksum": valid_checksum,
+            "file missing": file_missing,
+        }
+    )
 
 
 # Print column headers for results table
-print("\n" + "filename".ljust(40) + "valid checksum".center(20) + "file missing".center(20))
+print(
+    "\n"
+    + "filename".ljust(40)
+    + "valid checksum".center(20)
+    + "file missing".center(20)
+)
 print("-" * 80)
 
 # Output the results as a table

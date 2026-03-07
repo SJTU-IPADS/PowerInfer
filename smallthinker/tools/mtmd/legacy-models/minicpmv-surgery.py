@@ -8,7 +8,12 @@ ap.add_argument("-m", "--model", help="Path to MiniCPM-V model")
 args = ap.parse_args()
 
 # find the model part that includes the the multimodal projector weights
-model = AutoModel.from_pretrained(args.model, trust_remote_code=True, local_files_only=True, torch_dtype=torch.bfloat16)
+model = AutoModel.from_pretrained(
+    args.model,
+    trust_remote_code=True,
+    local_files_only=True,
+    torch_dtype=torch.bfloat16,
+)
 checkpoint = model.state_dict()
 
 # get a list of mm tensor names
@@ -34,7 +39,7 @@ config.auto_map = {
     "AutoModel": "modeling_minicpm.MiniCPMModel",
     "AutoModelForCausalLM": "modeling_minicpm.MiniCPMForCausalLM",
     "AutoModelForSeq2SeqLM": "modeling_minicpm.MiniCPMForCausalLM",
-    "AutoModelForSequenceClassification": "modeling_minicpm.MiniCPMForSequenceClassification"
+    "AutoModelForSequenceClassification": "modeling_minicpm.MiniCPMForSequenceClassification",
 }
 model.llm.save_pretrained(f"{args.model}/model")
 tok = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
@@ -42,4 +47,6 @@ tok.save_pretrained(f"{args.model}/model")
 
 print("Done!")
 print(f"Now you can convert {args.model} to a regular LLaMA GGUF file.")
-print(f"Also, use {args.model}/minicpmv.projector to prepare a minicpmv-encoder.gguf file.")
+print(
+    f"Also, use {args.model}/minicpmv.projector to prepare a minicpmv-encoder.gguf file."
+)

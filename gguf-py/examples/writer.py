@@ -36,5 +36,5 @@ def writer_example() -> None:
     gguf_writer.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     writer_example()

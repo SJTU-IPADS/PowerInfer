@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" PyTorch Siglip model. """
+"""PyTorch Siglip model."""
 # Copied from  HuggingFaceM4/siglip-so400m-14-980-flash-attn2-navit and add tgt_sizes
 
 
@@ -36,6 +36,7 @@ from transformers.utils import (
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
+
 
 class SiglipVisionConfig(PretrainedConfig):
     r"""
@@ -107,12 +108,14 @@ class SiglipVisionConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.hidden_act = hidden_act
 
+
 _CHECKPOINT_FOR_DOC = "google/siglip-base-patch16-224"
 
 SIGLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "google/siglip-base-patch16-224",
     # See all SigLIP models at https://huggingface.co/models?filter=siglip
 ]
+
 
 # Copied from transformers.models.llama.modeling_llama._get_unpad_data
 def _get_unpad_data(attention_mask):
@@ -177,7 +180,11 @@ def _trunc_normal_(tensor, mean, std, a, b):
 
 
 def trunc_normal_tf_(
-    tensor: torch.Tensor, mean: float = 0.0, std: float = 1.0, a: float = -2.0, b: float = 2.0
+    tensor: torch.Tensor,
+    mean: float = 0.0,
+    std: float = 1.0,
+    a: float = -2.0,
+    b: float = 2.0,
 ):
     """Fills the input Tensor with values drawn from a truncated
     normal distribution. The values are effectively drawn from the
@@ -233,6 +240,7 @@ def lecun_normal_(tensor):
 def default_flax_embed_init(tensor):
     variance_scaling_(tensor, mode="fan_in", distribution="normal")
 
+
 class SiglipVisionEmbeddings(nn.Module):
     def __init__(self, config: SiglipVisionConfig):
         super().__init__()
@@ -253,6 +261,7 @@ class SiglipVisionEmbeddings(nn.Module):
         self.num_patches = self.num_patches_per_side**2
         self.num_positions = self.num_patches
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
+
 
 class SiglipAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
@@ -277,6 +286,7 @@ class SiglipAttention(nn.Module):
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)
 
+
 # Copied from transformers.models.clip.modeling_clip.CLIPMLP with CLIP->Siglip
 class SiglipMLP(nn.Module):
     def __init__(self, config):
@@ -293,12 +303,11 @@ class SiglipEncoderLayer(nn.Module):
         super().__init__()
         self.embed_dim = config.hidden_size
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
-        self.self_attn = (
-            SiglipAttention(config)
-        )
+        self.self_attn = SiglipAttention(config)
         self.layer_norm1 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
         self.mlp = SiglipMLP(config)
         self.layer_norm2 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+
 
 class SiglipPreTrainedModel(PreTrainedModel):
     """
@@ -383,8 +392,11 @@ class SiglipEncoder(nn.Module):
     def __init__(self, config: SiglipVisionConfig):
         super().__init__()
         self.config = config
-        self.layers = nn.ModuleList([SiglipEncoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layers = nn.ModuleList(
+            [SiglipEncoderLayer(config) for _ in range(config.num_hidden_layers)]
+        )
         self.gradient_checkpointing = False
+
 
 class SiglipVisionTransformer(SiglipPreTrainedModel):
     config_class = SiglipVisionConfig
@@ -407,13 +419,17 @@ class SiglipVisionTransformer(SiglipPreTrainedModel):
     def get_input_embeddings(self) -> nn.Module:
         return self.embeddings.patch_embedding
 
+
 import argparse
 import json
 import re
 
 import numpy as np
 from gguf import *
-from transformers.models.idefics2.modeling_idefics2 import Idefics2VisionTransformer, Idefics2VisionConfig
+from transformers.models.idefics2.modeling_idefics2 import (
+    Idefics2VisionTransformer,
+    Idefics2VisionConfig,
+)
 
 TEXT = "clip.text"
 VISION = "clip.vision"
@@ -423,7 +439,9 @@ def add_key_str(raw_key: str, arch: str) -> str:
     return raw_key.format(arch=arch)
 
 
-def should_skip_tensor(name: str, has_text: bool, has_vision: bool, has_minicpmv: bool) -> bool:
+def should_skip_tensor(
+    name: str, has_text: bool, has_vision: bool, has_minicpmv: bool
+) -> bool:
     if name in (
         "logit_scale",
         "text_model.embeddings.position_ids",
@@ -448,11 +466,25 @@ def get_tensor_name(name: str) -> str:
         return name
     if "mm_projector" in name:
         name = name.replace("model.mm_projector", "mm")
-        name = re.sub(r'mm\.mlp\.mlp', 'mm.model.mlp', name, count=1)
-        name = re.sub(r'mm\.peg\.peg', 'mm.model.peg', name, count=1)
+        name = re.sub(r"mm\.mlp\.mlp", "mm.model.mlp", name, count=1)
+        name = re.sub(r"mm\.peg\.peg", "mm.model.peg", name, count=1)
         return name
 
-    return name.replace("text_model", "t").replace("vision_model", "v").replace("encoder.layers", "blk").replace("embeddings.", "").replace("_proj", "").replace("self_attn.", "attn_").replace("layer_norm", "ln").replace("layernorm", "ln").replace("mlp.fc1", "ffn_down").replace("mlp.fc2", "ffn_up").replace("embedding", "embd").replace("final", "post").replace("layrnorm", "ln")
+    return (
+        name.replace("text_model", "t")
+        .replace("vision_model", "v")
+        .replace("encoder.layers", "blk")
+        .replace("embeddings.", "")
+        .replace("_proj", "")
+        .replace("self_attn.", "attn_")
+        .replace("layer_norm", "ln")
+        .replace("layernorm", "ln")
+        .replace("mlp.fc1", "ffn_down")
+        .replace("mlp.fc2", "ffn_up")
+        .replace("embedding", "embd")
+        .replace("final", "post")
+        .replace("layrnorm", "ln")
+    )
 
 
 def bytes_to_unicode():
@@ -482,42 +514,103 @@ def bytes_to_unicode():
 
 
 ap = argparse.ArgumentParser()
-ap.add_argument("-m", "--model-dir", help="Path to model directory cloned from HF Hub", required=True)
-ap.add_argument("--use-f32", action="store_true", default=False, help="Use f32 instead of f16")
-ap.add_argument("--text-only", action="store_true", required=False,
-                help="Save a text-only model. It can't be used to encode images")
-ap.add_argument("--vision-only", action="store_true", required=False,
-                help="Save a vision-only model. It can't be used to encode texts")
-ap.add_argument("--clip-model-is-vision", action="store_true", required=False,
-                help="The clip model is a pure vision model (ShareGPT4V vision extract for example)")
-ap.add_argument("--clip-model-is-openclip", action="store_true", required=False,
-                help="The clip model is from openclip (for ViT-SO400M type))")
-ap.add_argument("--minicpmv-projector", help="Path to minicpmv.projector file. If specified, save an image encoder for MiniCPM-V models.")
-ap.add_argument("--projector-type", help="Type of projector. Possible values: mlp, ldp, ldpv2", choices=["mlp", "ldp", "ldpv2"], default="mlp")
-ap.add_argument("-o", "--output-dir", help="Directory to save GGUF files. Default is the original model directory", default=None)
+ap.add_argument(
+    "-m",
+    "--model-dir",
+    help="Path to model directory cloned from HF Hub",
+    required=True,
+)
+ap.add_argument(
+    "--use-f32", action="store_true", default=False, help="Use f32 instead of f16"
+)
+ap.add_argument(
+    "--text-only",
+    action="store_true",
+    required=False,
+    help="Save a text-only model. It can't be used to encode images",
+)
+ap.add_argument(
+    "--vision-only",
+    action="store_true",
+    required=False,
+    help="Save a vision-only model. It can't be used to encode texts",
+)
+ap.add_argument(
+    "--clip-model-is-vision",
+    action="store_true",
+    required=False,
+    help="The clip model is a pure vision model (ShareGPT4V vision extract for example)",
+)
+ap.add_argument(
+    "--clip-model-is-openclip",
+    action="store_true",
+    required=False,
+    help="The clip model is from openclip (for ViT-SO400M type))",
+)
+ap.add_argument(
+    "--minicpmv-projector",
+    help="Path to minicpmv.projector file. If specified, save an image encoder for MiniCPM-V models.",
+)
+ap.add_argument(
+    "--projector-type",
+    help="Type of projector. Possible values: mlp, ldp, ldpv2",
+    choices=["mlp", "ldp", "ldpv2"],
+    default="mlp",
+)
+ap.add_argument(
+    "-o",
+    "--output-dir",
+    help="Directory to save GGUF files. Default is the original model directory",
+    default=None,
+)
 # Example --image_mean 0.48145466 0.4578275 0.40821073 --image_std 0.26862954 0.26130258 0.27577711
 # Example --image_mean 0.5 0.5 0.5 --image_std 0.5 0.5 0.5
 default_image_mean = [0.48145466, 0.4578275, 0.40821073]
 default_image_std = [0.26862954, 0.26130258, 0.27577711]
-ap.add_argument('--image-mean', type=float, nargs='+', help='Mean of the images for normalization (overrides processor) ', default=None)
-ap.add_argument('--image-std', type=float, nargs='+', help='Standard deviation of the images for normalization (overrides processor)', default=None)
-ap.add_argument('--minicpmv_version', type=int, help='minicpmv_version: MiniCPM-V-2 use 1; MiniCPM-V-2.5 use 2; MiniCPM-V-2.6 use 3; MiniCPM-o-2.6 use 4', default=2)
+ap.add_argument(
+    "--image-mean",
+    type=float,
+    nargs="+",
+    help="Mean of the images for normalization (overrides processor) ",
+    default=None,
+)
+ap.add_argument(
+    "--image-std",
+    type=float,
+    nargs="+",
+    help="Standard deviation of the images for normalization (overrides processor)",
+    default=None,
+)
+ap.add_argument(
+    "--minicpmv_version",
+    type=int,
+    help="minicpmv_version: MiniCPM-V-2 use 1; MiniCPM-V-2.5 use 2; MiniCPM-V-2.6 use 3; MiniCPM-o-2.6 use 4",
+    default=2,
+)
 
 # with proper
 args = ap.parse_args()
 
 
 if args.text_only and args.vision_only:
-    print("--text-only and --image-only arguments cannot be specified at the same time.")
+    print(
+        "--text-only and --image-only arguments cannot be specified at the same time."
+    )
     exit(1)
 
 if args.use_f32:
-    print("WARNING: Weights for the convolution op is always saved in f16, as the convolution op in GGML does not support 32-bit kernel weights yet.")
+    print(
+        "WARNING: Weights for the convolution op is always saved in f16, as the convolution op in GGML does not support 32-bit kernel weights yet."
+    )
 
 # output in the same directory as the model if output_dir is None
 dir_model = args.model_dir
 
-if args.clip_model_is_vision or not os.path.exists(dir_model + "/vocab.json") or args.clip_model_is_openclip:
+if (
+    args.clip_model_is_vision
+    or not os.path.exists(dir_model + "/vocab.json")
+    or args.clip_model_is_openclip
+):
     vocab = None
     tokens = None
 else:
@@ -560,14 +653,14 @@ elif minicpmv_version == 4:
     block_count = 27
 
 default_vision_config = {
-        "hidden_size": 1152,
-        "image_size": 980,
-        "intermediate_size": 4304,
-        "model_type": "idefics2",
-        "num_attention_heads": 16,
-        "num_hidden_layers": 27,
-        "patch_size": 14,
-    }
+    "hidden_size": 1152,
+    "image_size": 980,
+    "intermediate_size": 4304,
+    "model_type": "idefics2",
+    "num_attention_heads": 16,
+    "num_hidden_layers": 27,
+    "patch_size": 14,
+}
 
 vision_config = Idefics2VisionConfig(**default_vision_config)
 model = Idefics2VisionTransformer(vision_config)
@@ -637,16 +730,27 @@ if has_vision_encoder:
     fout.add_uint32(add_key_str(KEY_BLOCK_COUNT, VISION), block_count)
 
     if processor is not None:
-        image_mean = processor.image_processor.image_mean if args.image_mean is None or args.image_mean == default_image_mean else args.image_mean
-        image_std = processor.image_processor.image_std if args.image_std is None or args.image_std == default_image_std else args.image_std
+        image_mean = (
+            processor.image_processor.image_mean
+            if args.image_mean is None or args.image_mean == default_image_mean
+            else args.image_mean
+        )
+        image_std = (
+            processor.image_processor.image_std
+            if args.image_std is None or args.image_std == default_image_std
+            else args.image_std
+        )
     else:
-        image_mean = args.image_mean if args.image_mean is not None else default_image_mean
+        image_mean = (
+            args.image_mean if args.image_mean is not None else default_image_mean
+        )
         image_std = args.image_std if args.image_std is not None else default_image_std
     fout.add_array("clip.vision.image_mean", image_mean)
     fout.add_array("clip.vision.image_std", image_std)
 
 use_gelu = True
 fout.add_bool("clip.use_gelu", use_gelu)
+
 
 def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     """
@@ -656,17 +760,18 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     """
     assert embed_dim % 2 == 0
     omega = np.arange(embed_dim // 2, dtype=np.float32)
-    omega /= embed_dim / 2.
-    omega = 1. / 10000 ** omega  # (D/2,)
+    omega /= embed_dim / 2.0
+    omega = 1.0 / 10000**omega  # (D/2,)
 
     pos = pos.reshape(-1)  # (M,)
-    out = np.einsum('m,d->md', pos, omega)  # (M, D/2), outer product
+    out = np.einsum("m,d->md", pos, omega)  # (M, D/2), outer product
 
     emb_sin = np.sin(out)  # (M, D/2)
     emb_cos = np.cos(out)  # (M, D/2)
 
     emb = np.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
     return emb
+
 
 def get_2d_sincos_pos_embed_from_grid(embed_dim, grid):
     assert embed_dim % 2 == 0
@@ -702,15 +807,20 @@ def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
         pos_embed = np.concatenate([np.zeros([1, embed_dim]), pos_embed], axis=0)
     return pos_embed
 
+
 def _replace_name_resampler(s, v):
     if re.match("resampler.pos_embed", s):
         return {
             s: v,
-            re.sub("pos_embed", "pos_embed_k", s): torch.from_numpy(get_2d_sincos_pos_embed(emb_dim, (70, 70))),
+            re.sub("pos_embed", "pos_embed_k", s): torch.from_numpy(
+                get_2d_sincos_pos_embed(emb_dim, (70, 70))
+            ),
         }
     if re.match("resampler.proj", s):
         return {
-            re.sub("proj", "pos_embed_k", s): torch.from_numpy(get_2d_sincos_pos_embed(emb_dim, (70, 70))),
+            re.sub("proj", "pos_embed_k", s): torch.from_numpy(
+                get_2d_sincos_pos_embed(emb_dim, (70, 70))
+            ),
             re.sub("proj", "proj.weight", s): v.transpose(-1, -2).contiguous(),
         }
     if re.match("resampler.attn.in_proj_.*", s):
@@ -720,6 +830,7 @@ def _replace_name_resampler(s, v):
             re.sub("attn.in_proj_", "attn.v.", s): v.chunk(3, dim=0)[2],
         }
     return {s: v}
+
 
 if has_minicpmv_projector:
     projector = torch.load(args.minicpmv_projector)
@@ -755,6 +866,7 @@ if has_minicpmv_projector:
 
     print("Projector tensors added\n")
 
+
 def _replace_name(s, v):
     s = "vision_model." + s
     if re.match("vision_model.embeddings.position_embedding", s):
@@ -762,6 +874,7 @@ def _replace_name(s, v):
         return {s: v}
 
     return {s: v}
+
 
 state_dict = model.state_dict()
 new_state_dict = {}
@@ -771,7 +884,9 @@ for k, v in state_dict.items():
         new_state_dict[nk] = nv
 state_dict = new_state_dict
 for name, data in state_dict.items():
-    if should_skip_tensor(name, has_text_encoder, has_vision_encoder, has_minicpmv_projector):
+    if should_skip_tensor(
+        name, has_text_encoder, has_vision_encoder, has_minicpmv_projector
+    ):
         # we don't need this
         print(f"skipping parameter: {name}")
         continue
