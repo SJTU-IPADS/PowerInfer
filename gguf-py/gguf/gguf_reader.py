@@ -214,7 +214,7 @@ class GGUFReader:
                 offs += curr_size
             return offs - orig_offs, aparts, data_idxs, types
         # We can't deal with this one.
-        raise ValueError("Unknown/unhandled field type {gtype}")
+        raise ValueError(f"Unknown/unhandled field type {gtype}")
 
     def _get_tensor(self, orig_offs: int) -> ReaderField:
         offs = orig_offs
