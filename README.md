@@ -4,6 +4,9 @@
 PowerInfer is a CPU/GPU LLM inference engine leveraging **activation locality** for your device.
 
 <a href="https://trendshift.io/repositories/6186" target="_blank"><img src="https://trendshift.io/api/badge/repositories/6186" alt="SJTU-IPADS%2FPowerInfer | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+  <a href="https://gitcgr.com/Tiiny-AI/PowerInfer">
+    <img src="https://gitcgr.com/badge/Tiiny-AI/PowerInfer.svg" alt="gitcgr" />
+  </a>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
