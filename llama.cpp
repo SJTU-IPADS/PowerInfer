@@ -2863,6 +2863,9 @@ struct llama_gpu_split_loader {
             }
         }
 
+        ggml_tensor * up = model->layers[0].ffn_up;
+        printf("\n>>> %ld, %ld\n", up->ne[0], up->ne[1]);
+
         const int64_t t_mlp_us = ggml_time_us() - t_start_mlp_us;
         LLAMA_LOG_INFO(" done (%.2f ms)\n", t_mlp_us / 1000.0);
 
