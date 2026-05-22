@@ -52,13 +52,20 @@ extern "C" HOST_API float ggml_lookup_fp16_to_fp32(ggml_fp16_t f);
     }
 #else
     #include <immintrin.h>
-
+    #include "az/core/fp16.h"
     #ifdef _MSC_VER
         inline float       ggml_compute_fp16_to_fp32(const ggml_fp16_t x) { return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(x))); }
         inline ggml_fp16_t ggml_compute_fp32_to_fp16(const float x)       { return _mm_extract_epi16(_mm_cvtps_ph(_mm_set_ss(x), 0), 0);   }
-    #else // NOT _MSC_VER
+    #elif defined(__F16C__) // NOT _MSC_VER
         inline float       ggml_compute_fp16_to_fp32(const ggml_fp16_t x) { return _cvtsh_ss(x); }
         inline ggml_fp16_t ggml_compute_fp32_to_fp16(const float x)       { return _cvtss_sh(x, 0); }
+    #else 
+        inline float       ggml_compute_fp16_to_fp32(const ggml_fp16_t x) {
+            az_fp16_t tmp;
+            tmp.value=x; 
+            return az_compute_fp16_to_fp32(tmp); 
+        }
+        inline ggml_fp16_t ggml_compute_fp32_to_fp16(const float x)       { return (ggml_fp16_t)az_compute_fp32_to_fp16(x).value; }
     #endif // _MSC_VER
 #endif
 
