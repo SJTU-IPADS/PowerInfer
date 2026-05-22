@@ -1205,7 +1205,7 @@ def main(args_in: list[str] | None = None) -> None:
     parser.add_argument("--bigendian",   action="store_true",    help="model is executed on big endian machine")
     parser.add_argument("--vocabtype",   choices=["spm", "bpe"], help="vocab format (default: spm)", default="spm")
     parser.add_argument("model",         type=Path,              help="directory containing model file, or model file itself (*.pth, *.pt, *.bin, *.safetensors)")
-    parser.add_argument("sparse_predictor",     type=Path,              help="predictors for sparse FFN inference")
+    parser.add_argument("sparse_predictor",     type=Path,       help="predictors for sparse FFN inference", nargs='?')
 
     args = parser.parse_args(args_in)
 
@@ -1230,9 +1230,10 @@ def main(args_in: list[str] | None = None) -> None:
     if not args.vocab_only:
         model_plus = load_some_model(args.model)
         params = Params.load(model_plus)
-        mlp_predictor_plus = load_predictor_model(args.sparse_predictor)
-        params.predictor_params = PredictorParams.load(mlp_predictor_plus)
-        model_plus = merge_multifile_models([model_plus, mlp_predictor_plus])
+        if args.sparse_predictor:
+            mlp_predictor_plus = load_predictor_model(args.sparse_predictor)
+            params.predictor_params = PredictorParams.load(mlp_predictor_plus)
+            model_plus = merge_multifile_models([model_plus, mlp_predictor_plus])
     else:
         model_plus = ModelPlus(model = {}, paths = [args.model / 'dummy'], format = 'none', vocab = None)
         params = Params.load(model_plus)
