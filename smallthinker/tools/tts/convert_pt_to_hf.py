@@ -12,7 +12,7 @@ import re
 from safetensors.torch import save_file
 
 # default
-model_path = './model.pt';
+model_path = "./model.pt"
 
 # read from CLI
 if len(sys.argv) > 1:
@@ -23,18 +23,18 @@ path_dst = os.path.dirname(model_path)
 
 print(f"Loading model from {model_path}")
 
-model = torch.load(model_path, map_location='cpu')
+model = torch.load(model_path, map_location="cpu")
 
-#print(model)
+# print(model)
 
 # print all keys
 for key in model.keys():
     print(key)
-    if key == 'hyper_parameters':
-        #print(model[key])
+    if key == "hyper_parameters":
+        # print(model[key])
         # dump as json pretty
         print(json.dumps(model[key], indent=4))
-    #if key != 'state_dict' and key != 'optimizer_states':
+    # if key != 'state_dict' and key != 'optimizer_states':
     #    print(model[key])
 
 # Check if the loaded model is a state_dict or a model instance
@@ -48,8 +48,9 @@ print("State dictionary keys:")
 for key in state_dict.keys():
     print(key)
 
+
 # Ensure the state_dict is flat and contains only torch.Tensor objects
-def flatten_state_dict(state_dict, parent_key='', sep='.'):
+def flatten_state_dict(state_dict, parent_key="", sep="."):
     items = []
     items_new = []
 
@@ -65,22 +66,24 @@ def flatten_state_dict(state_dict, parent_key='', sep='.'):
 
     for key, value in list(items):
         # keep only what we need for inference
-        if not key.startswith('state_dict.feature_extractor.encodec.quantizer.') and \
-           not key.startswith('state_dict.backbone.') and \
-           not key.startswith('state_dict.head.out'):
-               print('Skipping key: ', key)
-               continue
+        if (
+            not key.startswith("state_dict.feature_extractor.encodec.quantizer.")
+            and not key.startswith("state_dict.backbone.")
+            and not key.startswith("state_dict.head.out")
+        ):
+            print("Skipping key: ", key)
+            continue
 
         new_key = key
 
-        new_key = new_key.replace('state_dict.', '')
-        new_key = new_key.replace('pos_net', 'posnet')
+        new_key = new_key.replace("state_dict.", "")
+        new_key = new_key.replace("pos_net", "posnet")
 
         # check if matches "backbone.posnet.%d.bias" or "backbone.posnet.%d.weight"
         if new_key.startswith("backbone.posnet."):
             match = re.match(r"backbone\.posnet\.(\d+)\.(bias|weight)", new_key)
             if match:
-               new_key = f"backbone.posnet.{match.group(1)}.norm.{match.group(2)}"
+                new_key = f"backbone.posnet.{match.group(1)}.norm.{match.group(2)}"
 
         # "feature_extractor.encodec.quantizer.vq.layers.0._codebook.embed" -> "backbone.embedding.weight"
         if new_key == "feature_extractor.encodec.quantizer.vq.layers.0._codebook.embed":
@@ -100,7 +103,15 @@ def flatten_state_dict(state_dict, parent_key='', sep='.'):
             new_key = new_key.replace("gamma", "gamma.weight")
 
         # convert from 1D [768] to 2D [768, 1] so that ggml_add can broadcast the bias
-        if (new_key.endswith("norm.weight") or new_key.endswith("norm1.weight") or new_key.endswith("norm2.weight") or new_key.endswith(".bias")) and (new_key.startswith("backbone.posnet") or new_key.startswith("backbone.embed.bias")):
+        if (
+            new_key.endswith("norm.weight")
+            or new_key.endswith("norm1.weight")
+            or new_key.endswith("norm2.weight")
+            or new_key.endswith(".bias")
+        ) and (
+            new_key.startswith("backbone.posnet")
+            or new_key.startswith("backbone.embed.bias")
+        ):
             value = value.unsqueeze(1)
 
         if new_key.endswith("dwconv.bias"):
@@ -111,8 +122,8 @@ def flatten_state_dict(state_dict, parent_key='', sep='.'):
 
         size_total_mb += size_mb
 
-        #print(key, '->', new_key, ': ', value)
-        #print(key, '->', new_key)
+        # print(key, '->', new_key, ': ', value)
+        # print(key, '->', new_key)
 
         items_new.append((new_key, value))
 
@@ -120,11 +131,12 @@ def flatten_state_dict(state_dict, parent_key='', sep='.'):
 
     return dict(items_new)
 
+
 flattened_state_dict = flatten_state_dict(state_dict)
 
 
 # Convert the model to the safetensors format
-output_path = path_dst + '/model.safetensors'
+output_path = path_dst + "/model.safetensors"
 save_file(flattened_state_dict, output_path)
 
 print(f"Model has been successfully converted and saved to {output_path}")
@@ -133,27 +145,20 @@ print(f"Model has been successfully converted and saved to {output_path}")
 total_size = os.path.getsize(output_path)
 
 # Create the weight map
-weight_map = {
-    "model.safetensors": ["*"]  # Assuming all weights are in one file
-}
+weight_map = {"model.safetensors": ["*"]}  # Assuming all weights are in one file
 
 # Create metadata for the index.json file
-metadata = {
-    "total_size": total_size,
-    "weight_map": weight_map
-}
+metadata = {"total_size": total_size, "weight_map": weight_map}
 
 # Save the metadata to index.json
-index_path = path_dst + '/index.json'
-with open(index_path, 'w') as f:
+index_path = path_dst + "/index.json"
+with open(index_path, "w") as f:
     json.dump(metadata, f, indent=4)
 
 print(f"Metadata has been saved to {index_path}")
 
 config = {
-    "architectures": [
-        "WavTokenizerDec"
-    ],
+    "architectures": ["WavTokenizerDec"],
     "hidden_size": 1282,
     "n_embd_features": 512,
     "n_ff": 2304,
@@ -162,19 +167,13 @@ config = {
     "layer_norm_epsilon": 1e-6,
     "group_norm_epsilon": 1e-6,
     "group_norm_groups": 32,
-    "max_position_embeddings": 8192, # ?
+    "max_position_embeddings": 8192,  # ?
     "n_layer": 12,
-    "posnet": {
-        "n_embd": 768,
-        "n_layer": 6
-    },
-    "convnext": {
-        "n_embd": 768,
-        "n_layer": 12
-    },
+    "posnet": {"n_embd": 768, "n_layer": 6},
+    "convnext": {"n_embd": 768, "n_layer": 12},
 }
 
-with open(path_dst + '/config.json', 'w') as f:
+with open(path_dst + "/config.json", "w") as f:
     json.dump(config, f, indent=4)
 
 print(f"Config has been saved to {path_dst + 'config.json'}")

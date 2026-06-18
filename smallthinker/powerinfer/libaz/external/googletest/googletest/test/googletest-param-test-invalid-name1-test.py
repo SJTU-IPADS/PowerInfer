@@ -32,32 +32,32 @@
 
 from googletest.test import gtest_test_utils
 
-binary_name = 'googletest-param-test-invalid-name1-test_'
+binary_name = "googletest-param-test-invalid-name1-test_"
 COMMAND = gtest_test_utils.GetTestExecutablePath(binary_name)
 
 
 def Assert(condition):
-  if not condition:
-    raise AssertionError
+    if not condition:
+        raise AssertionError
 
 
 def TestExitCodeAndOutput(command):
-  """Runs the given command and verifies its exit code and output."""
+    """Runs the given command and verifies its exit code and output."""
 
-  err = 'Parameterized test name \'"InvalidWithQuotes"\' is invalid'
+    err = "Parameterized test name '\"InvalidWithQuotes\"' is invalid"
 
-  p = gtest_test_utils.Subprocess(command)
-  Assert(p.terminated_by_signal)
+    p = gtest_test_utils.Subprocess(command)
+    Assert(p.terminated_by_signal)
 
-  # Verify the output message contains appropriate output
-  Assert(err in p.output)
+    # Verify the output message contains appropriate output
+    Assert(err in p.output)
 
 
 class GTestParamTestInvalidName1Test(gtest_test_utils.TestCase):
 
-  def testExitCodeAndOutput(self):
-    TestExitCodeAndOutput(COMMAND)
+    def testExitCodeAndOutput(self):
+        TestExitCodeAndOutput(COMMAND)
 
 
-if __name__ == '__main__':
-  gtest_test_utils.Main()
+if __name__ == "__main__":
+    gtest_test_utils.Main()

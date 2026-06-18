@@ -15,7 +15,9 @@ def k(raw_key: str, arch: str) -> str:
     return raw_key.format(arch=arch)
 
 
-def should_skip_tensor(name: str, has_text: bool, has_vision: bool, has_llava: bool) -> bool:
+def should_skip_tensor(
+    name: str, has_text: bool, has_vision: bool, has_llava: bool
+) -> bool:
     if name in (
         "logit_scale",
         "text_model.embeddings.position_ids",
@@ -23,7 +25,11 @@ def should_skip_tensor(name: str, has_text: bool, has_vision: bool, has_llava: b
     ):
         return True
 
-    if has_llava and name in ["visual_projection.weight", "vision_model.post_layernorm.weight", "vision_model.post_layernorm.bias"]:
+    if has_llava and name in [
+        "visual_projection.weight",
+        "vision_model.post_layernorm.weight",
+        "vision_model.post_layernorm.bias",
+    ]:
         return True
 
     if name.startswith("v") and not has_vision:
@@ -42,7 +48,21 @@ def get_tensor_name(name: str) -> str:
     if "mm_projector" in name:
         return name.replace("model.mm_projector", "mm")
 
-    return name.replace("text_model", "t").replace("vision_model", "v").replace("encoder.layers", "blk").replace("embeddings.", "").replace("_proj", "").replace("self_attn.", "attn_").replace("layer_norm", "ln").replace("layernorm", "ln").replace("mlp.fc1", "ffn_down").replace("mlp.fc2", "ffn_up").replace("embedding", "embd").replace("final", "post").replace("layrnorm", "ln")
+    return (
+        name.replace("text_model", "t")
+        .replace("vision_model", "v")
+        .replace("encoder.layers", "blk")
+        .replace("embeddings.", "")
+        .replace("_proj", "")
+        .replace("self_attn.", "attn_")
+        .replace("layer_norm", "ln")
+        .replace("layernorm", "ln")
+        .replace("mlp.fc1", "ffn_down")
+        .replace("mlp.fc2", "ffn_up")
+        .replace("embedding", "embd")
+        .replace("final", "post")
+        .replace("layrnorm", "ln")
+    )
 
 
 def bytes_to_unicode():
@@ -72,26 +92,61 @@ def bytes_to_unicode():
 
 
 ap = argparse.ArgumentParser(prog="convert_hf_to_gguf.py")
-ap.add_argument("-m", "--model-dir", help="Path to model directory cloned from HF Hub", required=True)
-ap.add_argument("--use-f32", action="store_true", default=False, help="Use f32 instead of f16")
-ap.add_argument("--text-only", action="store_true", required=False,
-                help="Save a text-only model. It can't be used to encode images")
-ap.add_argument("--vision-only", action="store_true", required=False,
-                help="Save a vision-only model. It can't be used to encode texts")
-ap.add_argument("--llava-projector", help="Path to llava.projector file. If specified, save an image encoder for LLaVA models.")
-ap.add_argument("--image-mean", nargs=3, type=float, required=False, help="Override image mean values")
-ap.add_argument("--image-std", nargs=3, type=float, required=False, help="Override image std values")
-ap.add_argument("-o", "--output-dir", help="Directory to save GGUF files. Default is the original model directory", default=None)
+ap.add_argument(
+    "-m",
+    "--model-dir",
+    help="Path to model directory cloned from HF Hub",
+    required=True,
+)
+ap.add_argument(
+    "--use-f32", action="store_true", default=False, help="Use f32 instead of f16"
+)
+ap.add_argument(
+    "--text-only",
+    action="store_true",
+    required=False,
+    help="Save a text-only model. It can't be used to encode images",
+)
+ap.add_argument(
+    "--vision-only",
+    action="store_true",
+    required=False,
+    help="Save a vision-only model. It can't be used to encode texts",
+)
+ap.add_argument(
+    "--llava-projector",
+    help="Path to llava.projector file. If specified, save an image encoder for LLaVA models.",
+)
+ap.add_argument(
+    "--image-mean",
+    nargs=3,
+    type=float,
+    required=False,
+    help="Override image mean values",
+)
+ap.add_argument(
+    "--image-std", nargs=3, type=float, required=False, help="Override image std values"
+)
+ap.add_argument(
+    "-o",
+    "--output-dir",
+    help="Directory to save GGUF files. Default is the original model directory",
+    default=None,
+)
 
 args = ap.parse_args()
 
 
 if args.text_only and args.vision_only:
-    print("--text-only and --image-only arguments cannot be specified at the same time.")
+    print(
+        "--text-only and --image-only arguments cannot be specified at the same time."
+    )
     exit(1)
 
 if args.use_f32:
-    print("WARNING: Weights for the convolution op is always saved in f16, as the convolution op in GGML does not support 32-bit kernel weights yet.")
+    print(
+        "WARNING: Weights for the convolution op is always saved in f16, as the convolution op in GGML does not support 32-bit kernel weights yet."
+    )
 
 # output in the same directory as the model if output_dir is None
 dir_model = args.model_dir
@@ -148,7 +203,11 @@ fout.add_bool("clip.has_text_encoder", has_text_encoder)
 fout.add_bool("clip.has_vision_encoder", has_vision_encoder)
 fout.add_bool("clip.has_llava_projector", has_llava_projector)
 fout.add_file_type(ftype)
-model_name = config["_name_or_path"] if "_name_or_path" in config else os.path.basename(dir_model)
+model_name = (
+    config["_name_or_path"]
+    if "_name_or_path" in config
+    else os.path.basename(dir_model)
+)
 fout.add_name(model_name)
 if args.text_only:
     fout.add_description("text-only CLIP model")
@@ -164,7 +223,10 @@ if has_text_encoder:
     fout.add_uint32(k(KEY_CONTEXT_LENGTH, TEXT), t_hparams["max_position_embeddings"])
     fout.add_uint32(k(KEY_EMBEDDING_LENGTH, TEXT), t_hparams["hidden_size"])
     fout.add_uint32(k(KEY_FEED_FORWARD_LENGTH, TEXT), t_hparams["intermediate_size"])
-    fout.add_uint32("clip.text.projection_dim", t_hparams.get("projection_dim", config["projection_dim"]))
+    fout.add_uint32(
+        "clip.text.projection_dim",
+        t_hparams.get("projection_dim", config["projection_dim"]),
+    )
     fout.add_uint32(k(KEY_ATTENTION_HEAD_COUNT, TEXT), t_hparams["num_attention_heads"])
     fout.add_float32(k(KEY_ATTENTION_LAYERNORM_EPS, TEXT), t_hparams["layer_norm_eps"])
     fout.add_uint32(k(KEY_BLOCK_COUNT, TEXT), t_hparams["num_hidden_layers"])
@@ -176,14 +238,33 @@ if has_vision_encoder:
     fout.add_uint32("clip.vision.patch_size", v_hparams["patch_size"])
     fout.add_uint32(k(KEY_EMBEDDING_LENGTH, VISION), v_hparams["hidden_size"])
     fout.add_uint32(k(KEY_FEED_FORWARD_LENGTH, VISION), v_hparams["intermediate_size"])
-    fout.add_uint32("clip.vision.projection_dim", v_hparams.get("projection_dim", config["projection_dim"]))
-    fout.add_uint32(k(KEY_ATTENTION_HEAD_COUNT, VISION), v_hparams["num_attention_heads"])
-    fout.add_float32(k(KEY_ATTENTION_LAYERNORM_EPS, VISION), v_hparams["layer_norm_eps"])
-    block_count = v_hparams["num_hidden_layers"] - 1 if has_llava_projector else v_hparams["num_hidden_layers"]
+    fout.add_uint32(
+        "clip.vision.projection_dim",
+        v_hparams.get("projection_dim", config["projection_dim"]),
+    )
+    fout.add_uint32(
+        k(KEY_ATTENTION_HEAD_COUNT, VISION), v_hparams["num_attention_heads"]
+    )
+    fout.add_float32(
+        k(KEY_ATTENTION_LAYERNORM_EPS, VISION), v_hparams["layer_norm_eps"]
+    )
+    block_count = (
+        v_hparams["num_hidden_layers"] - 1
+        if has_llava_projector
+        else v_hparams["num_hidden_layers"]
+    )
     fout.add_uint32(k(KEY_BLOCK_COUNT, VISION), block_count)
 
-    image_mean = processor.image_processor.image_mean if args.image_mean is None else args.image_mean
-    image_std = processor.image_processor.image_std if args.image_std is None else args.image_std
+    image_mean = (
+        processor.image_processor.image_mean
+        if args.image_mean is None
+        else args.image_mean
+    )
+    image_std = (
+        processor.image_processor.image_std
+        if args.image_std is None
+        else args.image_std
+    )
     fout.add_array("clip.vision.image_mean", image_mean)
     fout.add_array("clip.vision.image_std", image_std)
 
@@ -207,7 +288,9 @@ if has_llava_projector:
 
 state_dict = model.state_dict()
 for name, data in state_dict.items():
-    if should_skip_tensor(name, has_text_encoder, has_vision_encoder, has_llava_projector):
+    if should_skip_tensor(
+        name, has_text_encoder, has_vision_encoder, has_llava_projector
+    ):
         # we don't need this
         print(f"skipping parameter: {name}")
         continue

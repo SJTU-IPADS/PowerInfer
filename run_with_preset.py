@@ -8,29 +8,115 @@ import sys
 import yaml
 
 CLI_ARGS_MAIN_PERPLEXITY = [
-    "batch-size", "cfg-negative-prompt", "cfg-scale", "chunks", "color", "ctx-size", "escape",
-    "export", "file", "frequency-penalty", "grammar", "grammar-file", "hellaswag",
-    "hellaswag-tasks", "ignore-eos", "in-prefix", "in-prefix-bos", "in-suffix", "instruct",
-    "interactive", "interactive-first", "keep", "logdir", "logit-bias", "lora", "lora-base",
-    "low-vram", "main-gpu", "memory-f32", "mirostat", "mirostat-ent", "mirostat-lr", "mlock",
-    "model", "multiline-input", "n-gpu-layers", "n-predict", "no-mmap", "no-mul-mat-q",
-    "np-penalize-nl", "numa", "ppl-output-type", "ppl-stride", "presence-penalty", "prompt",
-    "prompt-cache", "prompt-cache-all", "prompt-cache-ro", "random-prompt", "repeat-last-n",
-    "repeat-penalty", "reverse-prompt", "rope-freq-base", "rope-freq-scale", "rope-scale", "seed",
-    "simple-io", "tensor-split", "threads", "temp", "tfs", "top-k", "top-p", "typical",
-    "verbose-prompt"
+    "batch-size",
+    "cfg-negative-prompt",
+    "cfg-scale",
+    "chunks",
+    "color",
+    "ctx-size",
+    "escape",
+    "export",
+    "file",
+    "frequency-penalty",
+    "grammar",
+    "grammar-file",
+    "hellaswag",
+    "hellaswag-tasks",
+    "ignore-eos",
+    "in-prefix",
+    "in-prefix-bos",
+    "in-suffix",
+    "instruct",
+    "interactive",
+    "interactive-first",
+    "keep",
+    "logdir",
+    "logit-bias",
+    "lora",
+    "lora-base",
+    "low-vram",
+    "main-gpu",
+    "memory-f32",
+    "mirostat",
+    "mirostat-ent",
+    "mirostat-lr",
+    "mlock",
+    "model",
+    "multiline-input",
+    "n-gpu-layers",
+    "n-predict",
+    "no-mmap",
+    "no-mul-mat-q",
+    "np-penalize-nl",
+    "numa",
+    "ppl-output-type",
+    "ppl-stride",
+    "presence-penalty",
+    "prompt",
+    "prompt-cache",
+    "prompt-cache-all",
+    "prompt-cache-ro",
+    "random-prompt",
+    "repeat-last-n",
+    "repeat-penalty",
+    "reverse-prompt",
+    "rope-freq-base",
+    "rope-freq-scale",
+    "rope-scale",
+    "seed",
+    "simple-io",
+    "tensor-split",
+    "threads",
+    "temp",
+    "tfs",
+    "top-k",
+    "top-p",
+    "typical",
+    "verbose-prompt",
 ]
 
 CLI_ARGS_LLAMA_BENCH = [
-    "batch-size", "memory-f32", "low-vram", "model", "mul-mat-q", "n-gen", "n-gpu-layers",
-    "n-prompt", "output", "repetitions", "tensor-split", "threads", "verbose"
+    "batch-size",
+    "memory-f32",
+    "low-vram",
+    "model",
+    "mul-mat-q",
+    "n-gen",
+    "n-gpu-layers",
+    "n-prompt",
+    "output",
+    "repetitions",
+    "tensor-split",
+    "threads",
+    "verbose",
 ]
 
 CLI_ARGS_SERVER = [
-    "alias", "batch-size", "ctx-size", "embedding", "host", "memory-f32", "lora", "lora-base",
-    "low-vram", "main-gpu", "mlock", "model", "n-gpu-layers", "n-probs", "no-mmap", "no-mul-mat-q",
-    "numa", "path", "port", "rope-freq-base", "timeout", "rope-freq-scale", "tensor-split",
-    "threads", "verbose"
+    "alias",
+    "batch-size",
+    "ctx-size",
+    "embedding",
+    "host",
+    "memory-f32",
+    "lora",
+    "lora-base",
+    "low-vram",
+    "main-gpu",
+    "mlock",
+    "model",
+    "n-gpu-layers",
+    "n-probs",
+    "no-mmap",
+    "no-mul-mat-q",
+    "numa",
+    "path",
+    "port",
+    "rope-freq-base",
+    "timeout",
+    "rope-freq-scale",
+    "tensor-split",
+    "threads",
+    "verbose",
 ]
 
 description = """Run llama.cpp binaries with presets from YAML file(s).
@@ -47,15 +133,24 @@ Formatting considerations:
 - To define a tensor split, pass a list of floats.
 """
 usage = "run_with_preset.py [-h] [yaml_files ...] [--<ARG_NAME> <ARG_VALUE> ...]"
-epilog = ("  --<ARG_NAME> specify additional CLI ars to be passed to the binary (override all preset files). "
-          "Unknown args will be ignored.")
+epilog = (
+    "  --<ARG_NAME> specify additional CLI ars to be passed to the binary (override all preset files). "
+    "Unknown args will be ignored."
+)
 
 parser = argparse.ArgumentParser(
-    description=description, usage=usage, epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+    description=description,
+    usage=usage,
+    epilog=epilog,
+    formatter_class=argparse.RawTextHelpFormatter,
+)
 parser.add_argument("-bin", "--binary", help="The binary to run.")
-parser.add_argument("yaml_files", nargs="*",
-                    help="Arbitrary number of YAML files from which to read preset values. "
-                    "If two files specify the same values the later one will be used.")
+parser.add_argument(
+    "yaml_files",
+    nargs="*",
+    help="Arbitrary number of YAML files from which to read preset values. "
+    "If two files specify the same values the later one will be used.",
+)
 
 known_args, unknown_args = parser.parse_known_args()
 

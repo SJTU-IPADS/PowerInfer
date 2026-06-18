@@ -13,16 +13,33 @@ import warnings
 
 import numpy as np
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QLineEdit, QFileDialog, QTableWidget,
-    QTableWidgetItem, QComboBox, QMessageBox, QTabWidget,
-    QTextEdit, QFormLayout,
-    QHeaderView, QDialog, QDialogButtonBox
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QLineEdit,
+    QFileDialog,
+    QTableWidget,
+    QTableWidgetItem,
+    QComboBox,
+    QMessageBox,
+    QTabWidget,
+    QTextEdit,
+    QFormLayout,
+    QHeaderView,
+    QDialog,
+    QDialogButtonBox,
 )
 from PySide6.QtCore import Qt
 
 # Necessary to load the local gguf package
-if "NO_LOCAL_GGUF" not in os.environ and (Path(__file__).parent.parent.parent.parent / 'gguf-py').exists():
+if (
+    "NO_LOCAL_GGUF" not in os.environ
+    and (Path(__file__).parent.parent.parent.parent / "gguf-py").exists()
+):
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import gguf
@@ -43,7 +60,7 @@ KEY_TO_ENUM_TYPE = {
 TOKENIZER_LINKED_KEYS = [
     gguf.Keys.Tokenizer.LIST,
     gguf.Keys.Tokenizer.TOKEN_TYPE,
-    gguf.Keys.Tokenizer.SCORES
+    gguf.Keys.Tokenizer.SCORES,
 ]
 
 
@@ -79,7 +96,9 @@ class TokenizerEditorDialog(QDialog):
         # Add page controls
         self.page_size = 100  # Show 100 items per page
         self.current_page = 0
-        self.total_pages = max(1, (len(self.tokens) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.tokens) + self.page_size - 1) // self.page_size
+        )
 
         self.page_label = QLabel(f"Page 1 of {self.total_pages}")
         filter_layout.addWidget(self.page_label)
@@ -98,10 +117,18 @@ class TokenizerEditorDialog(QDialog):
         self.tokens_table = QTableWidget()
         self.tokens_table.setColumnCount(4)
         self.tokens_table.setHorizontalHeaderLabels(["Index", "Token", "Type", "Score"])
-        self.tokens_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.tokens_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.tokens_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.tokens_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.tokens_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.tokens_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
+        self.tokens_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.tokens_table.horizontalHeader().setSectionResizeMode(
+            3, QHeaderView.ResizeMode.ResizeToContents
+        )
 
         layout.addWidget(self.tokens_table)
 
@@ -121,7 +148,9 @@ class TokenizerEditorDialog(QDialog):
         layout.addLayout(controls_layout)
 
         # Buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -147,7 +176,9 @@ class TokenizerEditorDialog(QDialog):
                     self.filtered_indices.append(i)
 
         # Reset to first page and reload
-        self.total_pages = max(1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size
+        )
         self.current_page = 0
         self.page_label.setText(f"Page 1 of {self.total_pages}")
         self.load_page()
@@ -156,14 +187,18 @@ class TokenizerEditorDialog(QDialog):
         """Go to the previous page of results."""
         if self.current_page > 0:
             self.current_page -= 1
-            self.page_label.setText(f"Page {self.current_page + 1} of {self.total_pages}")
+            self.page_label.setText(
+                f"Page {self.current_page + 1} of {self.total_pages}"
+            )
             self.load_page()
 
     def next_page(self):
         """Go to the next page of results."""
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
-            self.page_label.setText(f"Page {self.current_page + 1} of {self.total_pages}")
+            self.page_label.setText(
+                f"Page {self.current_page + 1} of {self.total_pages}"
+            )
             self.load_page()
 
     def load_page(self):
@@ -182,7 +217,9 @@ class TokenizerEditorDialog(QDialog):
 
             # Index
             index_item = QTableWidgetItem(str(orig_idx))
-            index_item.setData(Qt.ItemDataRole.UserRole, orig_idx)  # Store original index
+            index_item.setData(
+                Qt.ItemDataRole.UserRole, orig_idx
+            )  # Store original index
             index_item.setFlags(index_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.tokens_table.setItem(row, 0, index_item)
 
@@ -191,7 +228,9 @@ class TokenizerEditorDialog(QDialog):
             self.tokens_table.setItem(row, 1, token_item)
 
             # Token Type
-            token_type = self.token_types[orig_idx] if orig_idx < len(self.token_types) else 0
+            token_type = (
+                self.token_types[orig_idx] if orig_idx < len(self.token_types) else 0
+            )
             try:
                 enum_val = TokenType(token_type)
                 display_text = f"{enum_val.name} ({token_type})"
@@ -223,7 +262,9 @@ class TokenizerEditorDialog(QDialog):
 
     def edit_token_type(self, row, orig_idx):
         """Edit a token type using a dialog with a dropdown of all enum options."""
-        current_value = self.token_types[orig_idx] if orig_idx < len(self.token_types) else 0
+        current_value = (
+            self.token_types[orig_idx] if orig_idx < len(self.token_types) else 0
+        )
 
         # Create a dialog with enum options
         dialog = QDialog(self)
@@ -244,7 +285,9 @@ class TokenizerEditorDialog(QDialog):
 
         layout.addWidget(combo)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
@@ -279,7 +322,9 @@ class TokenizerEditorDialog(QDialog):
             self.filtered_indices.append(orig_idx)
 
         # Update pagination
-        self.total_pages = max(1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size
+        )
 
         # Go to the last page to show the new item
         self.current_page = self.total_pages - 1
@@ -325,7 +370,9 @@ class TokenizerEditorDialog(QDialog):
                 self.filtered_indices.append(i)
 
         # Update pagination
-        self.total_pages = max(1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size
+        )
         self.current_page = min(self.current_page, self.total_pages - 1)
         self.page_label.setText(f"Page {self.current_page + 1} of {self.total_pages}")
 
@@ -379,7 +426,9 @@ class ArrayEditorDialog(QDialog):
         # Add page controls for large arrays
         self.page_size = 100  # Show 100 items per page
         self.current_page = 0
-        self.total_pages = max(1, (len(array_values) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(array_values) + self.page_size - 1) // self.page_size
+        )
 
         self.page_label = QLabel(f"Page 1 of {self.total_pages}")
         filter_layout.addWidget(self.page_label)
@@ -401,14 +450,24 @@ class ArrayEditorDialog(QDialog):
         if self.enum_type is not None:
             self.items_table.setColumnCount(3)
             self.items_table.setHorizontalHeaderLabels(["Index", "Value", "Actions"])
-            self.items_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            self.items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-            self.items_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            self.items_table.horizontalHeader().setSectionResizeMode(
+                0, QHeaderView.ResizeMode.ResizeToContents
+            )
+            self.items_table.horizontalHeader().setSectionResizeMode(
+                1, QHeaderView.ResizeMode.Stretch
+            )
+            self.items_table.horizontalHeader().setSectionResizeMode(
+                2, QHeaderView.ResizeMode.ResizeToContents
+            )
         else:
             self.items_table.setColumnCount(2)
             self.items_table.setHorizontalHeaderLabels(["Index", "Value"])
-            self.items_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            self.items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            self.items_table.horizontalHeader().setSectionResizeMode(
+                0, QHeaderView.ResizeMode.ResizeToContents
+            )
+            self.items_table.horizontalHeader().setSectionResizeMode(
+                1, QHeaderView.ResizeMode.Stretch
+            )
 
         layout.addWidget(self.items_table)
 
@@ -434,7 +493,9 @@ class ArrayEditorDialog(QDialog):
         layout.addLayout(controls_layout)
 
         # Buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -473,7 +534,9 @@ class ArrayEditorDialog(QDialog):
                         self.filtered_indices.append(i)
 
         # Reset to first page and reload
-        self.total_pages = max(1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size
+        )
         self.current_page = 0
         self.page_label.setText(f"Page 1 of {self.total_pages}")
         self.load_page()
@@ -482,14 +545,18 @@ class ArrayEditorDialog(QDialog):
         """Go to the previous page of results."""
         if self.current_page > 0:
             self.current_page -= 1
-            self.page_label.setText(f"Page {self.current_page + 1} of {self.total_pages}")
+            self.page_label.setText(
+                f"Page {self.current_page + 1} of {self.total_pages}"
+            )
             self.load_page()
 
     def next_page(self):
         """Go to the next page of results."""
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
-            self.page_label.setText(f"Page {self.current_page + 1} of {self.total_pages}")
+            self.page_label.setText(
+                f"Page {self.current_page + 1} of {self.total_pages}"
+            )
             self.load_page()
 
     def load_page(self):
@@ -509,7 +576,9 @@ class ArrayEditorDialog(QDialog):
 
             # Index
             index_item = QTableWidgetItem(str(orig_idx))
-            index_item.setData(Qt.ItemDataRole.UserRole, orig_idx)  # Store original index
+            index_item.setData(
+                Qt.ItemDataRole.UserRole, orig_idx
+            )  # Store original index
             index_item.setFlags(index_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.items_table.setItem(row, 0, index_item)
 
@@ -556,7 +625,12 @@ class ArrayEditorDialog(QDialog):
         # Get the original index from the table item
         orig_item = self.items_table.item(row, 0)
         new_item = self.items_table.item(row, 1)
-        if orig_item and new_item and self.enum_type and self.edit_enum_value(row, self.enum_type):
+        if (
+            orig_item
+            and new_item
+            and self.enum_type
+            and self.edit_enum_value(row, self.enum_type)
+        ):
             orig_idx = orig_item.data(Qt.ItemDataRole.UserRole)
             new_value = new_item.data(Qt.ItemDataRole.UserRole)
             # Update the stored value in the array
@@ -573,7 +647,9 @@ class ArrayEditorDialog(QDialog):
             selected_rows.add(item.row())
 
         if not selected_rows:
-            QMessageBox.information(self, "No Selection", "Please select at least one row to edit.")
+            QMessageBox.information(
+                self, "No Selection", "Please select at least one row to edit."
+            )
             return
 
         # Create a dialog with enum options
@@ -589,7 +665,9 @@ class ArrayEditorDialog(QDialog):
 
         layout.addWidget(combo)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
@@ -631,7 +709,9 @@ class ArrayEditorDialog(QDialog):
         self.filtered_indices.append(orig_idx)
 
         # Update pagination
-        self.total_pages = max(1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size
+        )
 
         # Go to the last page to show the new item
         self.current_page = self.total_pages - 1
@@ -685,7 +765,9 @@ class ArrayEditorDialog(QDialog):
                         self.filtered_indices.append(i)
 
         # Update pagination
-        self.total_pages = max(1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size)
+        self.total_pages = max(
+            1, (len(self.filtered_indices) + self.page_size - 1) // self.page_size
+        )
         self.current_page = min(self.current_page, self.total_pages - 1)
         self.page_label.setText(f"Page {self.current_page + 1} of {self.total_pages}")
 
@@ -726,7 +808,9 @@ class ArrayEditorDialog(QDialog):
 
         layout.addWidget(combo)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
@@ -776,7 +860,9 @@ class AddMetadataDialog(QDialog):
 
         layout.addLayout(form_layout)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -802,7 +888,7 @@ class AddMetadataDialog(QDialog):
         elif value_type == GGUFValueType.FLOAT32:
             value = np.float32(float(value_text))
         elif value_type == GGUFValueType.BOOL:
-            value = value_text.lower() in ('true', 'yes', '1')
+            value = value_text.lower() in ("true", "yes", "1")
         elif value_type == GGUFValueType.STRING:
             value = value_text
         else:
@@ -860,11 +946,21 @@ class GGUFEditorWindow(QMainWindow):
         # Metadata table
         self.metadata_table = QTableWidget()
         self.metadata_table.setColumnCount(4)
-        self.metadata_table.setHorizontalHeaderLabels(["Key", "Type", "Value", "Actions"])
-        self.metadata_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.metadata_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.metadata_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self.metadata_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.metadata_table.setHorizontalHeaderLabels(
+            ["Key", "Type", "Value", "Actions"]
+        )
+        self.metadata_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
+        self.metadata_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.metadata_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.Stretch
+        )
+        self.metadata_table.horizontalHeader().setSectionResizeMode(
+            3, QHeaderView.ResizeMode.ResizeToContents
+        )
         metadata_layout.addWidget(self.metadata_table)
 
         # Metadata controls
@@ -884,12 +980,24 @@ class GGUFEditorWindow(QMainWindow):
 
         self.tensors_table = QTableWidget()
         self.tensors_table.setColumnCount(5)
-        self.tensors_table.setHorizontalHeaderLabels(["Name", "Type", "Shape", "Elements", "Size (bytes)"])
-        self.tensors_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.tensors_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.tensors_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.tensors_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.tensors_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.tensors_table.setHorizontalHeaderLabels(
+            ["Name", "Type", "Shape", "Elements", "Size (bytes)"]
+        )
+        self.tensors_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
+        self.tensors_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.tensors_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.tensors_table.horizontalHeader().setSectionResizeMode(
+            3, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.tensors_table.horizontalHeader().setSectionResizeMode(
+            4, QHeaderView.ResizeMode.ResizeToContents
+        )
         tensors_layout.addWidget(self.tensors_table)
 
         # Add tabs to tab widget
@@ -907,7 +1015,7 @@ class GGUFEditorWindow(QMainWindow):
             self.statusBar().showMessage(f"Loading {file_path}...")
             QApplication.processEvents()
 
-            self.reader = GGUFReader(file_path, 'r')
+            self.reader = GGUFReader(file_path, "r")
             self.current_file = file_path
             self.file_path_edit.setText(file_path)
 
@@ -944,7 +1052,7 @@ class GGUFEditorWindow(QMainWindow):
         # Disconnect to prevent triggering during loading
         if self.on_metadata_changed_is_connected:
             with warnings.catch_warnings():
-                warnings.filterwarnings('ignore')
+                warnings.filterwarnings("ignore")
                 self.metadata_table.itemChanged.disconnect(self.on_metadata_changed)
             self.on_metadata_changed_is_connected = False
 
@@ -966,7 +1074,7 @@ class GGUFEditorWindow(QMainWindow):
                 enum_type = self.get_enum_for_key(key)
                 if enum_type is not None and field.types[-1] == GGUFValueType.INT32:
                     element_type = enum_type.__name__
-                type_str = '[' * nest_count + element_type + ']' * nest_count
+                type_str = "[" * nest_count + element_type + "]" * nest_count
             else:
                 type_str = str(field.types[0].name)
                 # Check if this is an enum field
@@ -1037,11 +1145,16 @@ class GGUFEditorWindow(QMainWindow):
 
         if curr_type == GGUFValueType.STRING:
             for element_pos in range(total_elements):
-                value_string = str(bytes(field.parts[-1 - (total_elements - element_pos - 1) * 2]), encoding='utf-8')
+                value_string = str(
+                    bytes(field.parts[-1 - (total_elements - element_pos - 1) * 2]),
+                    encoding="utf-8",
+                )
                 array_values.append(value_string)
         elif self.reader and curr_type in self.reader.gguf_scalar_to_np:
             for element_pos in range(total_elements):
-                array_values.append(field.parts[-1 - (total_elements - element_pos - 1)][0])
+                array_values.append(
+                    field.parts[-1 - (total_elements - element_pos - 1)][0]
+                )
 
         return array_values
 
@@ -1066,7 +1179,7 @@ class GGUFEditorWindow(QMainWindow):
         if len(field.types) == 1:
             curr_type = field.types[0]
             if curr_type == GGUFValueType.STRING:
-                return str(bytes(field.parts[-1]), encoding='utf-8')
+                return str(bytes(field.parts[-1]), encoding="utf-8")
             elif self.reader and curr_type in self.reader.gguf_scalar_to_np:
                 value = field.parts[-1][0]
                 # Check if this field has an enum type
@@ -1085,7 +1198,9 @@ class GGUFEditorWindow(QMainWindow):
             if enum_type is not None:
                 array_elements = []
                 for i in range(render_element):
-                    array_elements.append(self.format_enum_value(array_values[i], enum_type))
+                    array_elements.append(
+                        self.format_enum_value(array_values[i], enum_type)
+                    )
             else:
                 array_elements = [str(array_values[i]) for i in range(render_element)]
 
@@ -1158,9 +1273,9 @@ class GGUFEditorWindow(QMainWindow):
                     converted_value = enum_val.value
                 except (KeyError, AttributeError):
                     # Check if it's a number or "NAME (value)" format
-                    if '(' in new_value and ')' in new_value:
+                    if "(" in new_value and ")" in new_value:
                         # Extract the value from "NAME (value)" format
-                        value_part = new_value.split('(')[1].split(')')[0].strip()
+                        value_part = new_value.split("(")[1].split(")")[0].strip()
                         converted_value = int(value_part)
                     else:
                         # Try to convert directly to int
@@ -1184,7 +1299,8 @@ class GGUFEditorWindow(QMainWindow):
                     self,
                     f"Invalid Enum Value ({e})",
                     f"'{new_value}' is not a valid {enum_type.__name__} value.\n"
-                    f"Valid values are: {', '.join(v.name for v in enum_type)}")
+                    f"Valid values are: {', '.join(v.name for v in enum_type)}",
+                )
 
                 # Revert to original value
                 original_value = self.format_field_value(field)
@@ -1208,7 +1324,7 @@ class GGUFEditorWindow(QMainWindow):
             elif value_type == GGUFValueType.FLOAT32:
                 converted_value = np.float32(float(new_value))
             elif value_type == GGUFValueType.BOOL:
-                converted_value = new_value.lower() in ('true', 'yes', '1')
+                converted_value = new_value.lower() in ("true", "yes", "1")
             elif value_type == GGUFValueType.STRING:
                 converted_value = new_value
             else:
@@ -1221,7 +1337,11 @@ class GGUFEditorWindow(QMainWindow):
 
             self.statusBar().showMessage(f"Changed {key} to {new_value}")
         except ValueError:
-            QMessageBox.warning(self, "Invalid Value", f"The value '{new_value}' is not valid for type {value_type.name}")
+            QMessageBox.warning(
+                self,
+                "Invalid Value",
+                f"The value '{new_value}' is not valid for type {value_type.name}",
+            )
 
             # Revert to original value
             original_value = self.format_field_value(field)
@@ -1233,9 +1353,11 @@ class GGUFEditorWindow(QMainWindow):
         row = button.property("row")
 
         reply = QMessageBox.question(
-            self, "Confirm Removal",
+            self,
+            "Confirm Removal",
             f"Are you sure you want to remove the metadata key '{key}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -1287,7 +1409,9 @@ class GGUFEditorWindow(QMainWindow):
 
         layout.addWidget(combo)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
@@ -1337,7 +1461,10 @@ class GGUFEditorWindow(QMainWindow):
             new_values = dialog.get_array_values()
 
             # Store the change
-            self.metadata_changes[key] = (GGUFValueType.ARRAY, (element_type, new_values))
+            self.metadata_changes[key] = (
+                GGUFValueType.ARRAY,
+                (element_type, new_values),
+            )
             self.modified = True
 
             # Update display
@@ -1364,7 +1491,9 @@ class GGUFEditorWindow(QMainWindow):
 
         # Extract values from each field
         tokens = self.extract_array_values(tokens_field) if tokens_field else []
-        token_types = self.extract_array_values(token_types_field) if token_types_field else []
+        token_types = (
+            self.extract_array_values(token_types_field) if token_types_field else []
+        )
         scores = self.extract_array_values(scores_field) if scores_field else []
 
         # Apply any pending changes
@@ -1384,26 +1513,28 @@ class GGUFEditorWindow(QMainWindow):
             if tokens_field:
                 self.metadata_changes[gguf.Keys.Tokenizer.LIST] = (
                     GGUFValueType.ARRAY,
-                    (tokens_field.types[1], new_tokens)
+                    (tokens_field.types[1], new_tokens),
                 )
 
             if token_types_field:
                 self.metadata_changes[gguf.Keys.Tokenizer.TOKEN_TYPE] = (
                     GGUFValueType.ARRAY,
-                    (token_types_field.types[1], new_token_types)
+                    (token_types_field.types[1], new_token_types),
                 )
 
             if scores_field:
                 self.metadata_changes[gguf.Keys.Tokenizer.SCORES] = (
                     GGUFValueType.ARRAY,
-                    (scores_field.types[1], new_scores)
+                    (scores_field.types[1], new_scores),
                 )
 
             self.modified = True
 
             # Update display for all three fields
             self.update_tokenizer_display(gguf.Keys.Tokenizer.LIST, new_tokens)
-            self.update_tokenizer_display(gguf.Keys.Tokenizer.TOKEN_TYPE, new_token_types)
+            self.update_tokenizer_display(
+                gguf.Keys.Tokenizer.TOKEN_TYPE, new_token_types
+            )
             self.update_tokenizer_display(gguf.Keys.Tokenizer.SCORES, new_scores)
 
             self.statusBar().showMessage("Updated tokenizer data")
@@ -1432,7 +1563,9 @@ class GGUFEditorWindow(QMainWindow):
             for row in range(self.metadata_table.rowCount()):
                 orig_item = self.metadata_table.item(row, 0)
                 if orig_item and orig_item.text() == key:
-                    QMessageBox.warning(self, "Duplicate Key", f"Key '{key}' already exists")
+                    QMessageBox.warning(
+                        self, "Duplicate Key", f"Key '{key}' already exists"
+                    )
                     return
 
             # Add to table
@@ -1478,7 +1611,11 @@ class GGUFEditorWindow(QMainWindow):
             QMessageBox.warning(self, "No File Open", "Please open a GGUF file first")
             return
 
-        if not self.modified and not self.metadata_changes and not self.metadata_to_remove:
+        if (
+            not self.modified
+            and not self.metadata_changes
+            and not self.metadata_to_remove
+        ):
             QMessageBox.information(self, "No Changes", "No changes to save")
             return
 
@@ -1494,7 +1631,7 @@ class GGUFEditorWindow(QMainWindow):
             QApplication.processEvents()
 
             # Get architecture and endianness from the original file
-            arch = 'unknown'
+            arch = "unknown"
             field = self.reader.get_field(gguf.Keys.General.ARCHITECTURE)
             if field:
                 arch = field.contents()
@@ -1513,7 +1650,10 @@ class GGUFEditorWindow(QMainWindow):
             # Copy metadata with changes
             for field in self.reader.fields.values():
                 # Skip virtual fields and fields written by GGUFWriter
-                if field.name == gguf.Keys.General.ARCHITECTURE or field.name.startswith('GGUF.'):
+                if (
+                    field.name == gguf.Keys.General.ARCHITECTURE
+                    or field.name.startswith("GGUF.")
+                ):
                     continue
 
                 # Skip fields marked for removal
@@ -1535,7 +1675,9 @@ class GGUFEditorWindow(QMainWindow):
                         sub_type = field.types[-1]
 
                 if value is not None:
-                    writer.add_key_value(field.name, value, value_type, sub_type=sub_type)
+                    writer.add_key_value(
+                        field.name, value, value_type, sub_type=sub_type
+                    )
 
             # Add new metadata
             for key, (value_type, value) in self.metadata_changes.items():
@@ -1552,7 +1694,12 @@ class GGUFEditorWindow(QMainWindow):
 
             # Add tensors (including data)
             for tensor in self.reader.tensors:
-                writer.add_tensor(tensor.name, tensor.data, raw_shape=tensor.data.shape, raw_dtype=tensor.tensor_type)
+                writer.add_tensor(
+                    tensor.name,
+                    tensor.data,
+                    raw_shape=tensor.data.shape,
+                    raw_dtype=tensor.tensor_type,
+                )
 
             # Write header and metadata
             writer.open_output_file(Path(file_path))
@@ -1568,13 +1715,15 @@ class GGUFEditorWindow(QMainWindow):
 
             # Ask if user wants to open the new file
             reply = QMessageBox.question(
-                self, "Open Saved File",
+                self,
+                "Open Saved File",
                 "Would you like to open the newly saved file?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
             )
 
             if reply == QMessageBox.StandardButton.Yes:
-                self.reader = GGUFReader(file_path, 'r')
+                self.reader = GGUFReader(file_path, "r")
                 self.current_file = file_path
                 self.file_path_edit.setText(file_path)
 
@@ -1592,8 +1741,12 @@ class GGUFEditorWindow(QMainWindow):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="GUI GGUF Editor")
-    parser.add_argument("model_path", nargs="?", help="path to GGUF model file to load at startup")
-    parser.add_argument("--verbose", action="store_true", help="increase output verbosity")
+    parser.add_argument(
+        "model_path", nargs="?", help="path to GGUF model file to load at startup"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="increase output verbosity"
+    )
 
     args = parser.parse_args()
 
@@ -1605,17 +1758,18 @@ def main() -> None:
 
     # Load model if specified
     if args.model_path:
-        if os.path.isfile(args.model_path) and args.model_path.endswith('.gguf'):
+        if os.path.isfile(args.model_path) and args.model_path.endswith(".gguf"):
             window.load_file(args.model_path)
         else:
             logger.error(f"Invalid model path: {args.model_path}")
             QMessageBox.warning(
                 window,
                 "Invalid Model Path",
-                f"The specified file does not exist or is not a GGUF file: {args.model_path}")
+                f"The specified file does not exist or is not a GGUF file: {args.model_path}",
+            )
 
     sys.exit(app.exec())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

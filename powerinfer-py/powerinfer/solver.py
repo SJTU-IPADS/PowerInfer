@@ -7,6 +7,7 @@ from cvxopt import matrix
 import torch
 import pickle
 
+
 def solve_gpu_split(
     activation_path: str,
     neuron: int,
@@ -63,7 +64,9 @@ def solve_gpu_split(
         lst = [0] * (neuron * layer + layer)
         for j in range(neuron):
             lst[i * neuron + j] = 1
-        lst[neuron * layer + i] = -1000000  # Arbitrary large negative number as an upper bound
+        lst[neuron * layer + i] = (
+            -1000000
+        )  # Arbitrary large negative number as an upper bound
         coeff.append(lst)
         h.append(0)
 
@@ -78,13 +81,15 @@ def solve_gpu_split(
     B = set()
 
     # Solving the ILP problem
-    (status, x) = ilp(c, G, h, None, None, B, I, options={'tm_lim' : 30000}) # with 30s timeout
+    (status, x) = ilp(
+        c, G, h, None, None, B, I, options={"tm_lim": 30000}
+    )  # with 30s timeout
     print(f"ILP Status: {status}")
     ans = list(x)
     print(f"Total Activation Units: {sum(ans)}")
 
     aligned_lst = []
     for i in range(layer):
-        aligned_lst.append(sum(ans[i * neuron:i * neuron + neuron] * batch))
+        aligned_lst.append(sum(ans[i * neuron : i * neuron + neuron] * batch))
 
     return aligned_lst

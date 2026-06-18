@@ -35,86 +35,86 @@ import os
 from googletest.test import gtest_test_utils
 
 
-IS_WINDOWS = os.name == 'nt'
-IS_LINUX = os.name == 'posix' and os.uname()[0] == 'Linux'
+IS_WINDOWS = os.name == "nt"
+IS_LINUX = os.name == "posix" and os.uname()[0] == "Linux"
 
-COMMAND = gtest_test_utils.GetTestExecutablePath('googletest-env-var-test_')
+COMMAND = gtest_test_utils.GetTestExecutablePath("googletest-env-var-test_")
 
 environ = os.environ.copy()
 
 
 def AssertEq(expected, actual):
-  if expected != actual:
-    print('Expected: %s' % (expected,))
-    print('  Actual: %s' % (actual,))
-    raise AssertionError
+    if expected != actual:
+        print("Expected: %s" % (expected,))
+        print("  Actual: %s" % (actual,))
+        raise AssertionError
 
 
 def SetEnvVar(env_var, value):
-  """Sets the env variable to 'value'; unsets it when 'value' is None."""
+    """Sets the env variable to 'value'; unsets it when 'value' is None."""
 
-  if value is not None:
-    environ[env_var] = value
-  elif env_var in environ:
-    del environ[env_var]
+    if value is not None:
+        environ[env_var] = value
+    elif env_var in environ:
+        del environ[env_var]
 
 
 def GetFlag(flag):
-  """Runs googletest-env-var-test_ and returns its output."""
+    """Runs googletest-env-var-test_ and returns its output."""
 
-  args = [COMMAND]
-  if flag is not None:
-    args += [flag]
-  return gtest_test_utils.Subprocess(args, env=environ).output
+    args = [COMMAND]
+    if flag is not None:
+        args += [flag]
+    return gtest_test_utils.Subprocess(args, env=environ).output
 
 
 def TestFlag(flag, test_val, default_val):
-  """Verifies that the given flag is affected by the corresponding env var."""
+    """Verifies that the given flag is affected by the corresponding env var."""
 
-  env_var = 'GTEST_' + flag.upper()
-  SetEnvVar(env_var, test_val)
-  AssertEq(test_val, GetFlag(flag))
-  SetEnvVar(env_var, None)
-  AssertEq(default_val, GetFlag(flag))
+    env_var = "GTEST_" + flag.upper()
+    SetEnvVar(env_var, test_val)
+    AssertEq(test_val, GetFlag(flag))
+    SetEnvVar(env_var, None)
+    AssertEq(default_val, GetFlag(flag))
 
 
 class GTestEnvVarTest(gtest_test_utils.TestCase):
 
-  def testEnvVarAffectsFlag(self):
-    """Tests that environment variable should affect the corresponding flag."""
+    def testEnvVarAffectsFlag(self):
+        """Tests that environment variable should affect the corresponding flag."""
 
-    TestFlag('break_on_failure', '1', '0')
-    TestFlag('color', 'yes', 'auto')
-    SetEnvVar('TESTBRIDGE_TEST_RUNNER_FAIL_FAST', None)  # For 'fail_fast' test
-    TestFlag('fail_fast', '1', '0')
-    TestFlag('filter', 'FooTest.Bar', '*')
-    SetEnvVar('XML_OUTPUT_FILE', None)  # For 'output' test
-    TestFlag('output', 'xml:tmp/foo.xml', '')
-    TestFlag('brief', '1', '0')
-    TestFlag('print_time', '0', '1')
-    TestFlag('repeat', '999', '1')
-    TestFlag('throw_on_failure', '1', '0')
-    TestFlag('death_test_style', 'threadsafe', 'fast')
-    TestFlag('catch_exceptions', '0', '1')
+        TestFlag("break_on_failure", "1", "0")
+        TestFlag("color", "yes", "auto")
+        SetEnvVar("TESTBRIDGE_TEST_RUNNER_FAIL_FAST", None)  # For 'fail_fast' test
+        TestFlag("fail_fast", "1", "0")
+        TestFlag("filter", "FooTest.Bar", "*")
+        SetEnvVar("XML_OUTPUT_FILE", None)  # For 'output' test
+        TestFlag("output", "xml:tmp/foo.xml", "")
+        TestFlag("brief", "1", "0")
+        TestFlag("print_time", "0", "1")
+        TestFlag("repeat", "999", "1")
+        TestFlag("throw_on_failure", "1", "0")
+        TestFlag("death_test_style", "threadsafe", "fast")
+        TestFlag("catch_exceptions", "0", "1")
 
-    if IS_LINUX:
-      TestFlag('death_test_use_fork', '1', '0')
-      TestFlag('stack_trace_depth', '0', '100')
+        if IS_LINUX:
+            TestFlag("death_test_use_fork", "1", "0")
+            TestFlag("stack_trace_depth", "0", "100")
 
-  def testXmlOutputFile(self):
-    """Tests that $XML_OUTPUT_FILE affects the output flag."""
+    def testXmlOutputFile(self):
+        """Tests that $XML_OUTPUT_FILE affects the output flag."""
 
-    SetEnvVar('GTEST_OUTPUT', None)
-    SetEnvVar('XML_OUTPUT_FILE', 'tmp/bar.xml')
-    AssertEq('xml:tmp/bar.xml', GetFlag('output'))
+        SetEnvVar("GTEST_OUTPUT", None)
+        SetEnvVar("XML_OUTPUT_FILE", "tmp/bar.xml")
+        AssertEq("xml:tmp/bar.xml", GetFlag("output"))
 
-  def testXmlOutputFileOverride(self):
-    """Tests that $XML_OUTPUT_FILE is overridden by $GTEST_OUTPUT."""
+    def testXmlOutputFileOverride(self):
+        """Tests that $XML_OUTPUT_FILE is overridden by $GTEST_OUTPUT."""
 
-    SetEnvVar('GTEST_OUTPUT', 'xml:tmp/foo.xml')
-    SetEnvVar('XML_OUTPUT_FILE', 'tmp/bar.xml')
-    AssertEq('xml:tmp/foo.xml', GetFlag('output'))
+        SetEnvVar("GTEST_OUTPUT", "xml:tmp/foo.xml")
+        SetEnvVar("XML_OUTPUT_FILE", "tmp/bar.xml")
+        AssertEq("xml:tmp/foo.xml", GetFlag("output"))
 
 
-if __name__ == '__main__':
-  gtest_test_utils.Main()
+if __name__ == "__main__":
+    gtest_test_utils.Main()

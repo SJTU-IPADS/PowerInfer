@@ -90,7 +90,10 @@ class Model(ABC):
         self.hparams = Model.load_hparams(self.dir_model)
         self.model_arch = self._get_model_architecture()
         self.gguf_writer = gguf.GGUFWriter(
-            fname_out, gguf.MODEL_ARCH_NAMES[self.model_arch], endianess=self.endianess, use_temp_file = False
+            fname_out,
+            gguf.MODEL_ARCH_NAMES[self.model_arch],
+            endianess=self.endianess,
+            use_temp_file=False,
         )
 
     def set_vocab(self):
@@ -517,6 +520,7 @@ class FalconModel(Model):
 
             self.gguf_writer.add_tensor(new_name, data)
 
+
 class OptModel(Model):
     def set_gguf_parameters(self, params: PredictorParams):
         self.gguf_writer.add_name("opt")
@@ -527,20 +531,20 @@ class OptModel(Model):
         self.gguf_writer.add_head_count(self.hparams["num_attention_heads"])
         # self.gguf_writer.add_vocab_size(self.hparams["vocab_size"])
         self.gguf_writer.add_file_type(self.ftype)
-        
+
         if params.sparse_threshold is not None:
             self.gguf_writer.add_sparse_threshold(params.sparse_threshold)
 
     def write_tensors(self):
         for name, data_torch in self.get_tensors():
             old_dtype = data_torch.dtype
-            
+
             # convert any unsupported data types to float32
             if data_torch.dtype not in (torch.float16, torch.float32):
                 data_torch = data_torch.to(torch.float32)
-                
+
             data = data_torch.squeeze().numpy()
-            
+
             # map tensor names
             new_name = self._translate_tensor_key(name)
             if new_name is None:
@@ -552,8 +556,8 @@ class OptModel(Model):
             if "ffn_down" in new_name:
                 new_name = new_name.replace("ffn_down", "ffn_down_t")
                 data = data.T
-            
-            n_dims = len(data.shape)    
+
+            n_dims = len(data.shape)
             data_dtype = data.dtype
 
             # if f32 desired, convert any float16 to float32
@@ -570,10 +574,11 @@ class OptModel(Model):
                 and n_dims == 2
             ):
                 data = data.astype(np.float16)
-                
+
             print(f"{new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype}")
-            
+
             self.gguf_writer.add_tensor(new_name, data)
+
 
 @dataclass
 class PredictorParams:
@@ -583,12 +588,12 @@ class PredictorParams:
     def loadPredictorJson(config_path: Path) -> PredictorParams:
         config = json.load(open(config_path))
         return PredictorParams(
-            sparse_threshold = config.get("sparse_threshold"),
+            sparse_threshold=config.get("sparse_threshold"),
         )
 
     @staticmethod
     def load(model_instance: Model) -> PredictorParams:
-        config_path   = model_instance.dir_mlp_pred  / "config.json"
+        config_path = model_instance.dir_mlp_pred / "config.json"
 
         if config_path.exists():
             params = PredictorParams.loadPredictorJson(config_path)
@@ -596,6 +601,7 @@ class PredictorParams:
             params = PredictorParams()
 
         return params
+
 
 ###### CONVERSION LOGIC ######
 

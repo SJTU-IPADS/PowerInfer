@@ -32,32 +32,32 @@
 
 from googletest.test import gtest_test_utils
 
-binary_name = 'googletest-param-test-invalid-name2-test_'
+binary_name = "googletest-param-test-invalid-name2-test_"
 COMMAND = gtest_test_utils.GetTestExecutablePath(binary_name)
 
 
 def Assert(condition):
-  if not condition:
-    raise AssertionError
+    if not condition:
+        raise AssertionError
 
 
 def TestExitCodeAndOutput(command):
-  """Runs the given command and verifies its exit code and output."""
+    """Runs the given command and verifies its exit code and output."""
 
-  err = "Duplicate parameterized test name 'a'"
+    err = "Duplicate parameterized test name 'a'"
 
-  p = gtest_test_utils.Subprocess(command)
-  Assert(p.terminated_by_signal)
+    p = gtest_test_utils.Subprocess(command)
+    Assert(p.terminated_by_signal)
 
-  # Check for appropriate output
-  Assert(err in p.output)
+    # Check for appropriate output
+    Assert(err in p.output)
 
 
 class GTestParamTestInvalidName2Test(gtest_test_utils.TestCase):
 
-  def testExitCodeAndOutput(self):
-    TestExitCodeAndOutput(COMMAND)
+    def testExitCodeAndOutput(self):
+        TestExitCodeAndOutput(COMMAND)
 
 
-if __name__ == '__main__':
-  gtest_test_utils.Main()
+if __name__ == "__main__":
+    gtest_test_utils.Main()

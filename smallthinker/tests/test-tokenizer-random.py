@@ -30,25 +30,44 @@ class LibLlama:
 
     DEFAULT_PATH_LLAMA_H = "./include/llama.h"
     DEFAULT_PATH_INCLUDES = ["./ggml/include/", "./include/"]
-    DEFAULT_PATH_LIBLLAMA = "./build/src/libllama.so"  # CMakeLists.txt: BUILD_SHARED_LIBS ON
+    DEFAULT_PATH_LIBLLAMA = (
+        "./build/src/libllama.so"  # CMakeLists.txt: BUILD_SHARED_LIBS ON
+    )
 
-    def __init__(self, path_llama_h: str | None = None, path_includes: list[str] = [], path_libllama: str | None = None):
+    def __init__(
+        self,
+        path_llama_h: str | None = None,
+        path_includes: list[str] = [],
+        path_libllama: str | None = None,
+    ):
         path_llama_h = path_llama_h or self.DEFAULT_PATH_LLAMA_H
         path_includes = path_includes or self.DEFAULT_PATH_INCLUDES
         path_libllama = path_libllama or self.DEFAULT_PATH_LIBLLAMA
-        (self.ffi, self.lib) = self._load_libllama_cffi(path_llama_h, path_includes, path_libllama)
+        (self.ffi, self.lib) = self._load_libllama_cffi(
+            path_llama_h, path_includes, path_libllama
+        )
         self.lib.llama_backend_init()
 
-    def _load_libllama_cffi(self, path_llama_h: str, path_includes: list[str], path_libllama: str) -> tuple[cffi.FFI, Any]:
-        cmd = ["gcc", "-O0", "-E", "-P", "-D__restrict=", "-D__attribute__(x)=", "-D__asm__(x)="]
+    def _load_libllama_cffi(
+        self, path_llama_h: str, path_includes: list[str], path_libllama: str
+    ) -> tuple[cffi.FFI, Any]:
+        cmd = [
+            "gcc",
+            "-O0",
+            "-E",
+            "-P",
+            "-D__restrict=",
+            "-D__attribute__(x)=",
+            "-D__asm__(x)=",
+        ]
         cmd += ["-I" + path for path in path_includes] + [path_llama_h]
         res = subprocess.run(cmd, stdout=subprocess.PIPE)
-        assert (res.returncode == 0)
+        assert res.returncode == 0
         source = res.stdout.decode()
         ffi = cffi.FFI()
         if True:  # workarounds for pycparser
             source = "typedef struct { } __builtin_va_list;" + "\n" + source
-            source = source.replace("sizeof (int)",    str(ffi.sizeof("int")))
+            source = source.replace("sizeof (int)", str(ffi.sizeof("int")))
             source = source.replace("sizeof (void *)", str(ffi.sizeof("void*")))
             source = source.replace("sizeof (size_t)", str(ffi.sizeof("size_t")))
             source = source.replace("sizeof(int32_t)", str(ffi.sizeof("int32_t")))
@@ -83,7 +102,9 @@ class LibLlamaModel:
             cparams = libllama.context_default_params(**cparams)
         self.ctx = self.lib.llama_new_context_with_model(self.model, cparams)
         if not self.ctx:
-            raise RuntimeError("error: failed to create context for model '%s'" % path_model)
+            raise RuntimeError(
+                "error: failed to create context for model '%s'" % path_model
+            )
         n_tokens_max = self.lib.llama_n_ctx(self.ctx)
         self.token_ids = self.ffi.new("llama_token[]", n_tokens_max)
         self.text_buff = self.ffi.new("uint8_t[]", 1024)
@@ -97,24 +118,67 @@ class LibLlamaModel:
         self.model = None
         self.lib = None
 
-    def tokenize(self, text: str, add_special: bool = False, parse_special: bool = False) -> list[int]:
+    def tokenize(
+        self, text: str, add_special: bool = False, parse_special: bool = False
+    ) -> list[int]:
         encoded_text: bytes = text.encode("utf-8")
-        num = self.lib.llama_tokenize(self.model, encoded_text, len(encoded_text), self.token_ids, len(self.token_ids), add_special, parse_special)
+        num = self.lib.llama_tokenize(
+            self.model,
+            encoded_text,
+            len(encoded_text),
+            self.token_ids,
+            len(self.token_ids),
+            add_special,
+            parse_special,
+        )
         while num < 0 and len(self.token_ids) < (16 << 20):
             self.token_ids = self.ffi.new("llama_token[]", -2 * num)
-            num = self.lib.llama_tokenize(self.model, encoded_text, len(encoded_text), self.token_ids, len(self.token_ids), add_special, parse_special)
+            num = self.lib.llama_tokenize(
+                self.model,
+                encoded_text,
+                len(encoded_text),
+                self.token_ids,
+                len(self.token_ids),
+                add_special,
+                parse_special,
+            )
         return list(self.token_ids[0:num])
 
-    def detokenize(self, ids: list[int], remove_special: bool = False, unparse_special: bool = False) -> str:
+    def detokenize(
+        self,
+        ids: list[int],
+        remove_special: bool = False,
+        unparse_special: bool = False,
+    ) -> str:
         if len(self.token_ids) < len(ids):
             self.token_ids = self.ffi.new("llama_token[]", 2 * len(ids))
         for i, id in enumerate(ids):
             self.token_ids[i] = id
-        num = self.lib.llama_detokenize(self.model, self.token_ids, len(ids), self.text_buff, len(self.text_buff), remove_special, unparse_special)
+        num = self.lib.llama_detokenize(
+            self.model,
+            self.token_ids,
+            len(ids),
+            self.text_buff,
+            len(self.text_buff),
+            remove_special,
+            unparse_special,
+        )
         while num < 0 and len(self.text_buff) < (16 << 20):
             self.text_buff = self.ffi.new("uint8_t[]", -2 * num)
-            num = self.lib.llama_detokenize(self.model, self.token_ids, len(ids), self.text_buff, len(self.text_buff), remove_special, unparse_special)
-        return str(cast(Buffer, self.ffi.buffer(self.text_buff, num)), encoding="utf-8", errors="replace")  # replace errors with '\uFFFD'
+            num = self.lib.llama_detokenize(
+                self.model,
+                self.token_ids,
+                len(ids),
+                self.text_buff,
+                len(self.text_buff),
+                remove_special,
+                unparse_special,
+            )
+        return str(
+            cast(Buffer, self.ffi.buffer(self.text_buff, num)),
+            encoding="utf-8",
+            errors="replace",
+        )  # replace errors with '\uFFFD'
 
 
 class Tokenizer:
@@ -126,7 +190,7 @@ class Tokenizer:
         raise NotImplementedError
 
 
-class TokenizerGroundtruth (Tokenizer):
+class TokenizerGroundtruth(Tokenizer):
 
     def __init__(self, dir_tokenizer: str):
         self.model: PreTrainedTokenizer = AutoTokenizer.from_pretrained(dir_tokenizer)
@@ -143,7 +207,9 @@ class TokenizerGroundtruth (Tokenizer):
         self.vocab = list(sorted(self.vocab))
         # tokens and lists
         self.special_tokens = list(self.model.all_special_tokens)
-        self.added_tokens   = self.model.batch_decode(self.model.added_tokens_encoder.values(), skip_special_tokens=False)
+        self.added_tokens = self.model.batch_decode(
+            self.model.added_tokens_encoder.values(), skip_special_tokens=False
+        )
         self.bos_token = self.model.bos_token
         self.eos_token = self.model.eos_token
 
@@ -154,14 +220,19 @@ class TokenizerGroundtruth (Tokenizer):
         return self.model.decode(ids, skip_special_tokens=False)
 
 
-class TokenizerLlamaCpp (Tokenizer):
+class TokenizerLlamaCpp(Tokenizer):
 
     libllama: LibLlama | None = None
 
     def __init__(self, vocab_file: str):
         if not self.libllama:
             self.libllama = LibLlama()
-        self.model = LibLlamaModel(self.libllama, vocab_file, mparams=dict(vocab_only=True), cparams=dict(n_ctx=4096))
+        self.model = LibLlamaModel(
+            self.libllama,
+            vocab_file,
+            mparams=dict(vocab_only=True),
+            cparams=dict(n_ctx=4096),
+        )
 
     def encode(self, text: str) -> list[int]:
         return self.model.tokenize(text, add_special=True, parse_special=True)
@@ -219,30 +290,30 @@ def generator_custom_text() -> Iterator[str]:
 def generator_custom_text_edge_cases() -> Iterator[str]:
     """Edge cases found while debugging"""
     yield from [
-        '\x1f-a',     # unicode_ranges_control, {0x00001C, 0x00001F}
-        '¼-a',        # unicode_ranges_digit, 0x00BC
-        '½-a',        # unicode_ranges_digit, 0x00BD
-        '¾-a',        # unicode_ranges_digit, 0x00BE
-        'a 〇b',      # unicode_ranges_digit, 0x3007
-        'Ⅵ-a',       # unicode_ranges_digit, {0x00002150, 0x0000218F} // Number Forms
-        '\uFEFF//',   # unicode_ranges_control, 0xFEFF (BOM)
-        'Cửa Việt',   # llama-3, ignore_merges = true
-        '<s>a',       # Phi-3 fail
-        '<unk><|endoftext|><s>',  # Phi-3 fail
-        'a\na',            # bert fail
-        '"`',              # falcon
-        ' \u2e4e',         # falcon
-        '\n\x0b  ',        # falcon
-        'a\xa0\xa0\x00b',  # jina-v2-es
-        'one <mask>',      # jina-v2-es  <mask> lstrip=true
-        'a </s> b',        # rstrip phi-3
-        'a <mask> b',      # lstrip jina-v2
-        '\xa0aC',          # deepseek
-        '\u2029 \uA3E4',   # deepseek-llm
+        "\x1f-a",  # unicode_ranges_control, {0x00001C, 0x00001F}
+        "¼-a",  # unicode_ranges_digit, 0x00BC
+        "½-a",  # unicode_ranges_digit, 0x00BD
+        "¾-a",  # unicode_ranges_digit, 0x00BE
+        "a 〇b",  # unicode_ranges_digit, 0x3007
+        "Ⅵ-a",  # unicode_ranges_digit, {0x00002150, 0x0000218F} // Number Forms
+        "\ufeff//",  # unicode_ranges_control, 0xFEFF (BOM)
+        "Cửa Việt",  # llama-3, ignore_merges = true
+        "<s>a",  # Phi-3 fail
+        "<unk><|endoftext|><s>",  # Phi-3 fail
+        "a\na",  # bert fail
+        '"`',  # falcon
+        " \u2e4e",  # falcon
+        "\n\x0b  ",  # falcon
+        "a\xa0\xa0\x00b",  # jina-v2-es
+        "one <mask>",  # jina-v2-es  <mask> lstrip=true
+        "a </s> b",  # rstrip phi-3
+        "a <mask> b",  # lstrip jina-v2
+        "\xa0aC",  # deepseek
+        "\u2029 \ua3e4",  # deepseek-llm
         "a ?",
-        'å',               # mpt
-        '\U000ac517',      # utf-8 encode error, falcon
-        '\U000522f4',      # utf-8 encode error, starcoder
+        "å",  # mpt
+        "\U000ac517",  # utf-8 encode error, falcon
+        "\U000522f4",  # utf-8 encode error, starcoder
         "<s><s><unk><s>a<s>b<s>c<unk>d<unk></s>",
         "<s> <s> <unk><s>a<s>b<s>c<unk>d<unk></s>",
     ]
@@ -289,20 +360,30 @@ def generator_added_lr_strip(tokenizer: TokenizerGroundtruth) -> Iterator[str]:
                 yield "a" + lstrip + token + rstrip + "z"
 
 
-def generator_random_added_tokens(tokenizer: TokenizerGroundtruth, iterations=100) -> Iterator[str]:
+def generator_random_added_tokens(
+    tokenizer: TokenizerGroundtruth, iterations=100
+) -> Iterator[str]:
     separations = [" ", "\n", "\t", "-", "!", "one", "1", "<s>", "</s>"]
-    all_tokens  = list(sorted(set(tokenizer.special_tokens + tokenizer.added_tokens + separations)))
+    all_tokens = list(
+        sorted(set(tokenizer.special_tokens + tokenizer.added_tokens + separations))
+    )
     rand = random.Random()
     for m in range(iterations):
         rand.seed(m)
         words = rand.choices(all_tokens, k=500)
         if words and words[0] == tokenizer.bos_token:  # skip spam warning of double BOS
-            while len(words) > 1 and words[1] == tokenizer.bos_token:  # leave one starting BOS
+            while (
+                len(words) > 1 and words[1] == tokenizer.bos_token
+            ):  # leave one starting BOS
                 words.pop(0)
             if tokenizer.add_bos_token:  # drop all starting BOS
                 words.pop(0)
-        if words and words[-1] == tokenizer.eos_token:  # skip spam warning of double EOS
-            while len(words) > 1 and words[-2] == tokenizer.eos_token:  # leave one trailing EOS
+        if (
+            words and words[-1] == tokenizer.eos_token
+        ):  # skip spam warning of double EOS
+            while (
+                len(words) > 1 and words[-2] == tokenizer.eos_token
+            ):  # leave one trailing EOS
                 words.pop(-1)
             if tokenizer.add_bos_token:  # drop all trailing EOS
                 words.pop(-1)
@@ -314,13 +395,19 @@ def generator_random_chars(iterations=100) -> Iterator[str]:
 
     NUM_WORDS = 400
     WHITESPACES = list(" " * 20 + "\n" * 5 + "\r\n" * 5 + "\t" * 5)
-    CHARS = list(sorted(set("""
+    CHARS = list(
+        sorted(
+            set(
+                """
         ABCDEFGHIJKLMNOPQRSTUVWXYZ
         abcdefghijklmnopqrstuvwxyz
         ÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÄËÏÖÜ
         áéíóúàèìòùâêîôûäëïöü
         .-,*/-+ª!"·$%&/()=?¿[]{}<>\\|@#~½¬~;:_
-    """)))
+    """
+            )
+        )
+    )
 
     rand = random.Random()
     for m in range(iterations):
@@ -344,7 +431,11 @@ def generator_unicodes() -> Iterator[str]:
             return False
         # if cpt == 0x2029:  # deepseek-llm
         #    return False
-        if unicodedata.category(chr(cpt)) in ("Cn", "Cs", "Co"):  # undefined, surrogates, private
+        if unicodedata.category(chr(cpt)) in (
+            "Cn",
+            "Cs",
+            "Co",
+        ):  # undefined, surrogates, private
             return False
         return True
 
@@ -373,7 +464,9 @@ def generator_random_unicodes(iterations=100) -> Iterator[str]:
         yield "".join(text)
 
 
-def generator_random_vocab_chars(tokenizer: TokenizerGroundtruth, iterations=100) -> Iterator[str]:
+def generator_random_vocab_chars(
+    tokenizer: TokenizerGroundtruth, iterations=100
+) -> Iterator[str]:
     """Brute force random text with vocab characters"""
 
     vocab_chars = set()
@@ -388,7 +481,9 @@ def generator_random_vocab_chars(tokenizer: TokenizerGroundtruth, iterations=100
         yield "".join(text)
 
 
-def generator_random_vocab_words(tokenizer: TokenizerGroundtruth, iterations=100) -> Iterator[str]:
+def generator_random_vocab_words(
+    tokenizer: TokenizerGroundtruth, iterations=100
+) -> Iterator[str]:
     """Brute force random text from vocab words"""
 
     vocab = [w.strip() for w in tokenizer.vocab]
@@ -407,7 +502,11 @@ def generator_random_vocab_words(tokenizer: TokenizerGroundtruth, iterations=100
         yield "".join(text)
 
 
-def compare_tokenizers(tokenizer1: TokenizerGroundtruth, tokenizer2: TokenizerLlamaCpp, generator: Iterator[str]):
+def compare_tokenizers(
+    tokenizer1: TokenizerGroundtruth,
+    tokenizer2: TokenizerLlamaCpp,
+    generator: Iterator[str],
+):
 
     def find_first_mismatch(ids1: list[int] | str, ids2: list[int] | str):
         for i, (a, b) in enumerate(zip(ids1, ids2)):
@@ -423,10 +522,10 @@ def compare_tokenizers(tokenizer1: TokenizerGroundtruth, tokenizer2: TokenizerLl
         # equal to source text?
         if tokenizer1.add_bos_token:  # remove BOS
             if text2.startswith(tokenizer1.bos_token):
-                text2 = text2[len(tokenizer1.bos_token):]
+                text2 = text2[len(tokenizer1.bos_token) :]
         if tokenizer1.add_eos_token:  # remove EOS
             if text2.endswith(tokenizer1.eos_token):
-                text2 = text2[:-len(tokenizer1.eos_token)]
+                text2 = text2[: -len(tokenizer1.eos_token)]
         return text == text2
 
     t_encode1 = 0
@@ -477,17 +576,23 @@ def compare_tokenizers(tokenizer1: TokenizerGroundtruth, tokenizer2: TokenizerLl
             break
 
     t_total = time.perf_counter() - t_start
-    logger.info(f"{generator.__qualname__}: end,  {t_encode1=:.3f} {t_encode2=:.3f}  {t_decode1=:.3f} {t_decode2=:.3f}  {t_total=:.3f}")
+    logger.info(
+        f"{generator.__qualname__}: end,  {t_encode1=:.3f} {t_encode2=:.3f}  {t_decode1=:.3f} {t_decode2=:.3f}  {t_total=:.3f}"
+    )
 
 
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser()
     parser.add_argument("vocab_file", type=str, help="path to vocab 'gguf' file")
-    parser.add_argument("dir_tokenizer", type=str, help="directory containing 'tokenizer.model' file")
-    parser.add_argument("--verbose", action="store_true", help="increase output verbosity")
+    parser.add_argument(
+        "dir_tokenizer", type=str, help="directory containing 'tokenizer.model' file"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="increase output verbosity"
+    )
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level = logging.DEBUG if args.verbose else logging.INFO)
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     logger.info(f"VOCABFILE: '{args.vocab_file}'")
 
     tokenizer1 = TokenizerGroundtruth(args.dir_tokenizer)
@@ -514,47 +619,47 @@ if __name__ == "__main__":
 
     if True:
         logging.basicConfig(
-            level    = logging.DEBUG,
-            format   = "%(asctime)s.%(msecs)03d %(name)s %(levelname)s %(message)s",
-            datefmt  = "%Y-%m-%d %H:%M:%S",
-            filename = logger.name + ".log",
-            filemode = "a"
+            level=logging.DEBUG,
+            format="%(asctime)s.%(msecs)03d %(name)s %(levelname)s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+            filename=logger.name + ".log",
+            filemode="a",
         )
     logging.basicConfig(
-        level    = logging.DEBUG,
-        format   = "%(levelname)s %(message)s",
+        level=logging.DEBUG,
+        format="%(levelname)s %(message)s",
     )
 
-    path_tokenizers   = Path("./models/tokenizers/")
+    path_tokenizers = Path("./models/tokenizers/")
     path_vocab_format = "./models/ggml-vocab-%s.gguf"
 
     tokenizers = [
-        "llama-spm",      # SPM
-        "phi-3",          # SPM
-        "gemma",          # SPM
-        "gemma-2",        # SPM
-        "baichuan",       # SPM
-        "bert-bge",       # WPM
-        "jina-v2-en",     # WPM
-        "llama-bpe",      # BPE
-        "phi-2",          # BPE
-        "deepseek-llm",   # BPE
-        "deepseek-coder", # BPE
-        "falcon",         # BPE
-        "mpt",            # BPE
-        "starcoder",      # BPE
-        "gpt-2",          # BPE
-        "stablelm2",      # BPE
-        "refact",         # BPE
-        "qwen2",          # BPE
-        "olmo",           # BPE
-        "jina-v2-es",     # BPE
-        "jina-v2-de",     # BPE
-        "smaug-bpe",      # BPE
-        "poro-chat",      # BPE
-        "jina-v2-code",   # BPE
-        "viking",         # BPE
-        "jais",           # BPE
+        "llama-spm",  # SPM
+        "phi-3",  # SPM
+        "gemma",  # SPM
+        "gemma-2",  # SPM
+        "baichuan",  # SPM
+        "bert-bge",  # WPM
+        "jina-v2-en",  # WPM
+        "llama-bpe",  # BPE
+        "phi-2",  # BPE
+        "deepseek-llm",  # BPE
+        "deepseek-coder",  # BPE
+        "falcon",  # BPE
+        "mpt",  # BPE
+        "starcoder",  # BPE
+        "gpt-2",  # BPE
+        "stablelm2",  # BPE
+        "refact",  # BPE
+        "qwen2",  # BPE
+        "olmo",  # BPE
+        "jina-v2-es",  # BPE
+        "jina-v2-de",  # BPE
+        "smaug-bpe",  # BPE
+        "poro-chat",  # BPE
+        "jina-v2-code",  # BPE
+        "viking",  # BPE
+        "jais",  # BPE
     ]
 
     logger.info("=" * 50)

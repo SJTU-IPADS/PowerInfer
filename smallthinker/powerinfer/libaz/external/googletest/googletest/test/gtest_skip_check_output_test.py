@@ -38,7 +38,7 @@ import re
 from googletest.test import gtest_test_utils
 
 # Path to the gtest_skip_in_environment_setup_test binary
-EXE_PATH = gtest_test_utils.GetTestExecutablePath('gtest_skip_test')
+EXE_PATH = gtest_test_utils.GetTestExecutablePath("gtest_skip_test")
 
 OUTPUT = gtest_test_utils.Subprocess([EXE_PATH]).output
 
@@ -46,15 +46,15 @@ OUTPUT = gtest_test_utils.Subprocess([EXE_PATH]).output
 # Test.
 class SkipEntireEnvironmentTest(gtest_test_utils.TestCase):
 
-  def testSkipEntireEnvironmentTest(self):
-    self.assertIn('Skipped\nskipping single test\n', OUTPUT)
-    skip_fixture = 'Skipped\nskipping all tests for this fixture\n'
-    self.assertIsNotNone(
-        re.search(skip_fixture + '.*' + skip_fixture, OUTPUT, flags=re.DOTALL),
-        repr(OUTPUT),
-    )
-    self.assertNotIn('FAILED', OUTPUT)
+    def testSkipEntireEnvironmentTest(self):
+        self.assertIn("Skipped\nskipping single test\n", OUTPUT)
+        skip_fixture = "Skipped\nskipping all tests for this fixture\n"
+        self.assertIsNotNone(
+            re.search(skip_fixture + ".*" + skip_fixture, OUTPUT, flags=re.DOTALL),
+            repr(OUTPUT),
+        )
+        self.assertNotIn("FAILED", OUTPUT)
 
 
-if __name__ == '__main__':
-  gtest_test_utils.Main()
+if __name__ == "__main__":
+    gtest_test_utils.Main()

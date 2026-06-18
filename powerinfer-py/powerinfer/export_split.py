@@ -6,12 +6,14 @@ from gguf.gguf_writer import GGUFWriter
 import torch
 from pathlib import Path
 import os
-if 'NO_LOCAL_GGUF' not in os.environ:
-    sys.path.insert(1, str(Path(__file__).parent / 'gguf-py'))
+
+if "NO_LOCAL_GGUF" not in os.environ:
+    sys.path.insert(1, str(Path(__file__).parent / "gguf-py"))
 import gguf
 import struct
 import numpy as np
 import re
+
 
 def load_activation_weights(models_base: Path):
     # TODO: might need a specification file to indicate which models to load.
@@ -20,6 +22,7 @@ def load_activation_weights(models_base: Path):
     activation_files = [f for f in files if re.match(r"activation_\d+.pt", f)]
     activation_files.sort()
     return [torch.load(models_base / f) for f in activation_files]
+
 
 def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> None:
     _, indices = torch.topk(activation, k=int(select_count))
@@ -50,8 +53,13 @@ def append_gpu_idx(gguf: GGUFWriter, i_layer: int, activation, select_count) -> 
         raw_dtype=GGMLQuantizationType.I32,
     )
 
-def export_split(activations_path: str, output_path: str, solved_list: list[int], vram_capacity: int):
-    predictors = load_activation_weights(Path(activations_path)) # predictor => activation acount
+
+def export_split(
+    activations_path: str, output_path: str, solved_list: list[int], vram_capacity: int
+):
+    predictors = load_activation_weights(
+        Path(activations_path)
+    )  # predictor => activation acount
     gguf_out = GGUFWriter(output_path, "generic.gpu_index")
     for i, (activation, selected_count) in enumerate(zip(predictors, solved_list)):
         append_gpu_idx(gguf_out, i, activation, selected_count)
@@ -73,4 +81,3 @@ def export_split(activations_path: str, output_path: str, solved_list: list[int]
         fout.write(struct.pack("<I", 3))
 
     print(f"exported GPU index to {output_path}")
-

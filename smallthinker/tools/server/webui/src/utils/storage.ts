@@ -30,6 +30,28 @@ db.version(1).stores({
   messages: '&id, convId, [convId+id], timestamp',
 });
 
+const parseStorageJson = <T>(
+  key: string,
+  fallback: T,
+  opts?: { clearOnInvalid?: boolean }
+): T => {
+  const raw = localStorage.getItem(key);
+  if (!raw) return fallback;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    console.warn(
+      `[StorageUtils] Invalid JSON in localStorage key "${key}"`,
+      error
+    );
+    if (opts?.clearOnInvalid) {
+      localStorage.removeItem(key);
+    }
+    return fallback;
+  }
+};
+
 // convId is a string prefixed with 'conv-'
 const StorageUtils = {
   /**
@@ -193,11 +215,27 @@ const StorageUtils = {
 
   // manage config
   getConfig(): typeof CONFIG_DEFAULT {
-    const savedVal = JSON.parse(localStorage.getItem('config') || '{}');
+    const savedVal = parseStorageJson<unknown>(
+      'config',
+      {},
+      {
+        clearOnInvalid: true,
+      }
+    );
+    const isObjectConfig =
+      savedVal !== null &&
+      typeof savedVal === 'object' &&
+      !Array.isArray(savedVal);
+    if (!isObjectConfig) {
+      console.warn(
+        '[StorageUtils] Config value is not an object. Resetting localStorage key "config".'
+      );
+      localStorage.removeItem('config');
+    }
     // to prevent breaking changes in the future, we always provide default value for missing keys
     return {
       ...CONFIG_DEFAULT,
-      ...savedVal,
+      ...(isObjectConfig ? (savedVal as Partial<typeof CONFIG_DEFAULT>) : {}),
     };
   },
   setConfig(config: typeof CONFIG_DEFAULT) {
@@ -231,12 +269,51 @@ interface LSMessage {
   content: string;
   timings?: TimingReport;
 }
+
+const isLSMessage = (value: unknown): value is LSMessage => {
+  if (!value || typeof value !== 'object') return false;
+  const msg = value as Partial<LSMessage>;
+  return (
+    typeof msg.id === 'number' &&
+    (msg.role === 'user' ||
+      msg.role === 'assistant' ||
+      msg.role === 'system') &&
+    typeof msg.content === 'string'
+  );
+};
+
+const isLSConversation = (value: unknown): value is LSConversation => {
+  if (!value || typeof value !== 'object') return false;
+  const conv = value as Partial<LSConversation>;
+  if (
+    typeof conv.id !== 'string' ||
+    typeof conv.lastModified !== 'number' ||
+    !Array.isArray(conv.messages)
+  ) {
+    return false;
+  }
+  return conv.messages.every(isLSMessage);
+};
+
 async function migrationLStoIDB() {
   if (localStorage.getItem('migratedToIDB')) return;
   const res: LSConversation[] = [];
   for (const key in localStorage) {
     if (key.startsWith('conv-')) {
-      res.push(JSON.parse(localStorage.getItem(key) ?? '{}'));
+      const parsed = parseStorageJson<unknown>(key, null, {
+        clearOnInvalid: true,
+      });
+      if (parsed === null) continue;
+
+      if (!isLSConversation(parsed)) {
+        console.warn(
+          `[StorageUtils] Invalid conversation payload in key "${key}". Removing key.`
+        );
+        localStorage.removeItem(key);
+        continue;
+      }
+
+      res.push(parsed);
     }
   }
   if (res.length === 0) return;

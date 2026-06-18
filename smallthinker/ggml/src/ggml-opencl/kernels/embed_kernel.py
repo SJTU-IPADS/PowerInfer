@@ -2,6 +2,7 @@
 
 import sys
 import logging
+
 logger = logging.getLogger("opencl-embed-kernel")
 
 

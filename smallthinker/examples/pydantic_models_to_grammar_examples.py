@@ -15,8 +15,12 @@ from typing import Optional, Union
 
 import requests
 from pydantic import BaseModel, Field
-from pydantic_models_to_grammar import (add_run_method_to_dynamic_model, convert_dictionary_to_pydantic_model,
-                                        create_dynamic_model_from_function, generate_gbnf_grammar_and_documentation)
+from pydantic_models_to_grammar import (
+    add_run_method_to_dynamic_model,
+    convert_dictionary_to_pydantic_model,
+    create_dynamic_model_from_function,
+    generate_gbnf_grammar_and_documentation,
+)
 
 
 def create_completion(host, prompt, gbnf_grammar):
@@ -25,22 +29,31 @@ def create_completion(host, prompt, gbnf_grammar):
     See
     https://github.com/ggml-org/llama.cpp/tree/HEAD/tools/server#api-endpoints
     """
-    print(f"  Request:\n    Grammar:\n{textwrap.indent(gbnf_grammar, '      ')}\n    Prompt:\n{textwrap.indent(prompt.rstrip(), '      ')}")
+    print(
+        f"  Request:\n    Grammar:\n{textwrap.indent(gbnf_grammar, '      ')}\n    Prompt:\n{textwrap.indent(prompt.rstrip(), '      ')}"
+    )
     headers = {"Content-Type": "application/json"}
     data = {"prompt": prompt, "grammar": gbnf_grammar}
-    result = requests.post(f"http://{host}/completion", headers=headers, json=data).json()
+    result = requests.post(
+        f"http://{host}/completion", headers=headers, json=data
+    ).json()
     assert data.get("error") is None, data
     logging.info("Result: %s", result)
     content = result["content"]
     print(f"  Model: {result['model']}")
-    print(f"  Result:\n{textwrap.indent(json.dumps(json.loads(content), indent=2), '    ')}")
+    print(
+        f"  Result:\n{textwrap.indent(json.dumps(json.loads(content), indent=2), '    ')}"
+    )
     return content
 
 
 # A function for the agent to send a message to the user.
 class SendMessageToUser(BaseModel):
     """Send a message to the User."""
-    chain_of_thought: str = Field(..., description="Your chain of thought while sending the message.")
+
+    chain_of_thought: str = Field(
+        ..., description="Your chain of thought while sending the message."
+    )
     message: str = Field(..., description="Message you want to send to the user.")
 
     def run(self):
@@ -52,14 +65,21 @@ def example_rce(host):
     print("- example_rce")
     tools = [SendMessageToUser]
     gbnf_grammar, documentation = generate_gbnf_grammar_and_documentation(
-        pydantic_model_list=tools, outer_object_name="function",
-        outer_object_content="function_parameters", model_prefix="Function", fields_prefix="Parameters")
-    system_message = "You are an advanced AI, tasked to assist the user by calling functions in JSON format. The following are the available functions and their parameters and types:\n\n" + documentation
+        pydantic_model_list=tools,
+        outer_object_name="function",
+        outer_object_content="function_parameters",
+        model_prefix="Function",
+        fields_prefix="Parameters",
+    )
+    system_message = (
+        "You are an advanced AI, tasked to assist the user by calling functions in JSON format. The following are the available functions and their parameters and types:\n\n"
+        + documentation
+    )
     user_message = "What is 42 * 42?"
     prompt = f"<|im_start|>system\n{system_message}<|im_end|>\n<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant"
     text = create_completion(host, prompt, gbnf_grammar)
     json_data = json.loads(text)
-    tools_map = {tool.__name__:tool for tool in tools}
+    tools_map = {tool.__name__: tool for tool in tools}
     # This finds "SendMessageToUser":
     tool = tools_map.get(json_data["function"])
     if not tool:
@@ -82,6 +102,7 @@ class MathOperation(Enum):
 # system prompt.
 class Calculator(BaseModel):
     """Perform a math operation on two numbers."""
+
     number_one: Union[int, float] = Field(..., description="First number.")
     operation: MathOperation = Field(..., description="Math operation to perform.")
     number_two: Union[int, float] = Field(..., description="Second number.")
@@ -118,9 +139,16 @@ def example_calculator(host):
     print("- example_calculator")
     tools = [SendMessageToUser, Calculator]
     gbnf_grammar, documentation = generate_gbnf_grammar_and_documentation(
-        pydantic_model_list=tools, outer_object_name="function",
-        outer_object_content="function_parameters", model_prefix="Function", fields_prefix="Parameters")
-    system_message = "You are an advanced AI, tasked to assist the user by calling functions in JSON format. The following are the available functions and their parameters and types:\n\n" + documentation
+        pydantic_model_list=tools,
+        outer_object_name="function",
+        outer_object_content="function_parameters",
+        model_prefix="Function",
+        fields_prefix="Parameters",
+    )
+    system_message = (
+        "You are an advanced AI, tasked to assist the user by calling functions in JSON format. The following are the available functions and their parameters and types:\n\n"
+        + documentation
+    )
     user_message1 = "What is 42 * 42?"
     prompt = f"<|im_start|>system\n{system_message}<|im_end|>\n<|im_start|>user\n{user_message1}<|im_end|>\n<|im_start|>assistant"
     text = create_completion(host, prompt, gbnf_grammar)
@@ -130,12 +158,12 @@ def example_calculator(host):
         "function_parameters": {
             "number_one": 42,
             "operation": "multiply",
-            "number_two": 42
-        }
+            "number_two": 42,
+        },
     }
     if json_data != expected:
         print("  Result is not as expected!")
-    tools_map = {tool.__name__:tool for tool in tools}
+    tools_map = {tool.__name__: tool for tool in tools}
     # This finds "Calculator":
     tool = tools_map.get(json_data["function"])
     if not tool:
@@ -148,15 +176,19 @@ def example_calculator(host):
 
 class Category(Enum):
     """The category of the book."""
+
     Fiction = "Fiction"
     NonFiction = "Non-Fiction"
 
 
 class Book(BaseModel):
     """Represents an entry about a book."""
+
     title: str = Field(..., description="Title of the book.")
     author: str = Field(..., description="Author of the book.")
-    published_year: Optional[int] = Field(..., description="Publishing year of the book.")
+    published_year: Optional[int] = Field(
+        ..., description="Publishing year of the book."
+    )
     keywords: list[str] = Field(..., description="A list of keywords.")
     category: Category = Field(..., description="Category of the book.")
     summary: str = Field(..., description="Summary of the book.")
@@ -171,15 +203,22 @@ def example_struct(host):
     """
     print("- example_struct")
     tools = [Book]
-    gbnf_grammar, documentation = generate_gbnf_grammar_and_documentation(pydantic_model_list=tools)
-    system_message = "You are an advanced AI, tasked to create a dataset entry in JSON for a Book. The following is the expected output model:\n\n" + documentation
+    gbnf_grammar, documentation = generate_gbnf_grammar_and_documentation(
+        pydantic_model_list=tools
+    )
+    system_message = (
+        "You are an advanced AI, tasked to create a dataset entry in JSON for a Book. The following is the expected output model:\n\n"
+        + documentation
+    )
     text = """The Feynman Lectures on Physics is a physics textbook based on some lectures by Richard Feynman, a Nobel laureate who has sometimes been called "The Great Explainer". The lectures were presented before undergraduate students at the California Institute of Technology (Caltech), during 1961–1963. The book's co-authors are Feynman, Robert B. Leighton, and Matthew Sands."""
     prompt = f"<|im_start|>system\n{system_message}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant"
     text = create_completion(host, prompt, gbnf_grammar)
     json_data = json.loads(text)
     # In this case, there's no function nor function_parameters.
     # Here the result will vary based on the LLM used.
-    keys = sorted(["title", "author", "published_year", "keywords", "category", "summary"])
+    keys = sorted(
+        ["title", "author", "published_year", "keywords", "category", "summary"]
+    )
     if keys != sorted(json_data.keys()):
         print(f"Unexpected result: {sorted(json_data.keys())}")
         return 1
@@ -201,11 +240,17 @@ def get_current_datetime(output_format: Optional[str] = None):
 def get_current_weather(location, unit):
     """Get the current weather in a given location"""
     if "London" in location:
-        return json.dumps({"location": "London", "temperature": "42", "unit": unit.value})
+        return json.dumps(
+            {"location": "London", "temperature": "42", "unit": unit.value}
+        )
     elif "New York" in location:
-        return json.dumps({"location": "New York", "temperature": "24", "unit": unit.value})
+        return json.dumps(
+            {"location": "New York", "temperature": "24", "unit": unit.value}
+        )
     elif "North Pole" in location:
-        return json.dumps({"location": "North Pole", "temperature": "-42", "unit": unit.value})
+        return json.dumps(
+            {"location": "North Pole", "temperature": "-42", "unit": unit.value}
+        )
     return json.dumps({"location": location, "temperature": "unknown"})
 
 
@@ -234,58 +279,66 @@ def example_concurrent(host):
         },
     }
     # Convert OpenAI function definition into pydantic model.
-    current_weather_tool_model = convert_dictionary_to_pydantic_model(current_weather_tool)
+    current_weather_tool_model = convert_dictionary_to_pydantic_model(
+        current_weather_tool
+    )
     # Add the actual function to a pydantic model.
-    current_weather_tool_model = add_run_method_to_dynamic_model(current_weather_tool_model, get_current_weather)
+    current_weather_tool_model = add_run_method_to_dynamic_model(
+        current_weather_tool_model, get_current_weather
+    )
 
     # Convert normal Python function to a pydantic model.
     current_datetime_model = create_dynamic_model_from_function(get_current_datetime)
 
-    tools = [SendMessageToUser, Calculator, current_datetime_model, current_weather_tool_model]
+    tools = [
+        SendMessageToUser,
+        Calculator,
+        current_datetime_model,
+        current_weather_tool_model,
+    ]
     gbnf_grammar, documentation = generate_gbnf_grammar_and_documentation(
-        pydantic_model_list=tools, outer_object_name="function",
-        outer_object_content="params", model_prefix="Function", fields_prefix="Parameters", list_of_outputs=True)
-    system_message = "You are an advanced AI assistant. You are interacting with the user and with your environment by calling functions. You call functions by writing JSON objects, which represent specific function calls.\nBelow is a list of your available function calls:\n\n" + documentation
+        pydantic_model_list=tools,
+        outer_object_name="function",
+        outer_object_content="params",
+        model_prefix="Function",
+        fields_prefix="Parameters",
+        list_of_outputs=True,
+    )
+    system_message = (
+        "You are an advanced AI assistant. You are interacting with the user and with your environment by calling functions. You call functions by writing JSON objects, which represent specific function calls.\nBelow is a list of your available function calls:\n\n"
+        + documentation
+    )
     text = """Get the date and time, get the current weather in celsius in London and solve the following calculation: 42 * 42"""
     prompt = f"<|im_start|>system\n{system_message}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant"
     text = create_completion(host, prompt, gbnf_grammar)
     json_data = json.loads(text)
     expected = [
-      {
-        "function": "get_current_datetime",
-        "params": {
-          "output_format": "%Y-%m-%d %H:%M:%S"
-        }
-      },
-      {
-        "function": "get_current_weather",
-        "params": {
-          "location": "London",
-          "unit": "celsius"
-        }
-      },
-      {
-        "function": "Calculator",
-        "params": {
-          "number_one": 42,
-          "operation": "multiply",
-          "number_two": 42
-        }
-      }
+        {
+            "function": "get_current_datetime",
+            "params": {"output_format": "%Y-%m-%d %H:%M:%S"},
+        },
+        {
+            "function": "get_current_weather",
+            "params": {"location": "London", "unit": "celsius"},
+        },
+        {
+            "function": "Calculator",
+            "params": {"number_one": 42, "operation": "multiply", "number_two": 42},
+        },
     ]
     res = 0
     if json_data != expected:
         print("  Result is not as expected!")
         print("  This can happen on highly quantized models")
         res = 1
-    tools_map = {tool.__name__:tool for tool in tools}
+    tools_map = {tool.__name__: tool for tool in tools}
     for call in json_data:
-      tool = tools_map.get(call["function"])
-      if not tool:
-          print(f"Error: unknown tool {call['function']}")
-          return 1
-      result = tool(**call["params"]).run()
-      print(f"  Call {call['function']} returned {result}")
+        tool = tools_map.get(call["function"])
+        if not tool:
+            print(f"Error: unknown tool {call['function']}")
+            return 1
+        result = tool(**call["params"]).run()
+        print(f"  Call {call['function']} returned {result}")
     # Should output something like this:
     #   Call get_current_datetime returned 2024-07-15 09:50:38
     #   Call get_current_weather returned {"location": "London", "temperature": "42", "unit": "celsius"}

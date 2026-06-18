@@ -208,7 +208,7 @@ services:
   llamacpp-server:
     image: ghcr.io/ggml-org/llama.cpp:server
     ports:
-      - 8080:8080
+      - 18001:8080
     volumes:
       - ./models:/models
     environment:
@@ -254,6 +254,8 @@ For more details, please refer to [multimodal documentation](../../docs/multimod
 
 The project includes a web-based user interface that enables interaction with the model through the `/chat/completions` endpoint.
 
+For Chrome AI Hub integration in this repository, prefer Docker runtime and map host port `18001` to container port `8080`.
+
 The web UI is developed using:
 - `react` framework for frontend development
 - `tailwindcss` and `daisyui` for styling
@@ -261,15 +263,12 @@ The web UI is developed using:
 
 A pre-built version is available as a single HTML file under `/public` directory.
 
-To build or to run the dev server (with hot reload):
+To build the web UI assets:
 
 ```sh
 # make sure you have nodejs installed
 cd tools/server/webui
 npm i
-
-# to run the dev server
-npm run dev
 
 # to build the public/index.html.gz
 npm run build
@@ -279,38 +278,23 @@ headers (like build/tools/server/index.html.gz.hpp) that will be included
 by server.cpp. This is done by building `llama-server` as described in the
 [build](#build) section above.
 
-NOTE: if you are using the vite dev server, you can change the API base URL to llama.cpp. To do that, run this code snippet in browser's console:
+NOTE: for Chrome AI Hub integration, if you need to override API base URL in browser console:
 
 ```js
-localStorage.setItem('base', 'http://localhost:8080')
+localStorage.setItem('base', 'http://localhost:18001')
 ```
 
 ## Quick Start
 
-To get started right away, run the following command, making sure to use the correct path for the model you have:
-
-### Unix-based systems (Linux, macOS, etc.)
-
-```bash
-./llama-server -m models/7B/ggml-model.gguf -c 2048
-```
-
-### Windows
-
-```powershell
-llama-server.exe -m models\7B\ggml-model.gguf -c 2048
-```
-
-The above command will start a server that by default listens on `127.0.0.1:8080`.
-You can consume the endpoints with Postman or NodeJS with axios library. You can visit the web front end at the same url.
+For Chrome AI Hub usage in this repository, run the server in Docker only and use host endpoint `http://localhost:18001`.
 
 ### Docker
 
 ```bash
-docker run -p 8080:8080 -v /path/to/models:/models ghcr.io/ggml-org/llama.cpp:server -m models/7B/ggml-model.gguf -c 512 --host 0.0.0.0 --port 8080
+docker run -p 18001:8080 -v /path/to/models:/models ghcr.io/ggml-org/llama.cpp:server -m models/7B/ggml-model.gguf -c 512 --host 0.0.0.0 --port 8080
 
 # or, with CUDA:
-docker run -p 8080:8080 -v /path/to/models:/models --gpus all ghcr.io/ggml-org/llama.cpp:server-cuda -m models/7B/ggml-model.gguf -c 512 --host 0.0.0.0 --port 8080 --n-gpu-layers 99
+docker run -p 18001:8080 -v /path/to/models:/models --gpus all ghcr.io/ggml-org/llama.cpp:server-cuda -m models/7B/ggml-model.gguf -c 512 --host 0.0.0.0 --port 8080 --n-gpu-layers 99
 ```
 
 ## Testing with CURL
@@ -319,7 +303,7 @@ Using [curl](https://curl.se/). On Windows, `curl.exe` should be available in th
 
 ```sh
 curl --request POST \
-    --url http://localhost:8080/completion \
+  --url http://localhost:18001/completion \
     --header "Content-Type: application/json" \
     --data '{"prompt": "Building a website can be done in 10 simple steps:","n_predict": 128}'
 ```
@@ -345,7 +329,7 @@ Create an index.js file and put this inside:
 const prompt = "Building a website can be done in 10 simple steps:"
 
 async function test() {
-    let response = await fetch("http://127.0.0.1:8080/completion", {
+  let response = await fetch("http://localhost:18001/completion", {
         method: "POST",
         body: JSON.stringify({
             prompt,
@@ -1089,7 +1073,7 @@ Example usage with `openai` python library:
 import openai
 
 client = openai.OpenAI(
-    base_url="http://localhost:8080/v1", # "http://<Your api-server IP>:port"
+  base_url="http://localhost:18001/v1", # "http://<Your api-server IP>:port"
     api_key = "sk-no-key-required"
 )
 
@@ -1122,7 +1106,7 @@ You can use either Python `openai` library with appropriate checkpoints:
 import openai
 
 client = openai.OpenAI(
-    base_url="http://localhost:8080/v1", # "http://<Your api-server IP>:port"
+  base_url="http://localhost:18001/v1", # "http://<Your api-server IP>:port"
     api_key = "sk-no-key-required"
 )
 
@@ -1140,7 +1124,7 @@ print(completion.choices[0].message)
 ... or raw HTTP requests:
 
 ```shell
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:18001/v1/chat/completions \
 -H "Content-Type: application/json" \
 -H "Authorization: Bearer no-key" \
 -d '{
@@ -1177,7 +1161,7 @@ See [OpenAI Embeddings API documentation](https://platform.openai.com/docs/api-r
 - input as string
 
   ```shell
-  curl http://localhost:8080/v1/embeddings \
+  curl http://localhost:18001/v1/embeddings \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer no-key" \
   -d '{
@@ -1190,7 +1174,7 @@ See [OpenAI Embeddings API documentation](https://platform.openai.com/docs/api-r
 - `input` as string array
 
   ```shell
-  curl http://localhost:8080/v1/embeddings \
+  curl http://localhost:18001/v1/embeddings \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer no-key" \
   -d '{
@@ -1272,7 +1256,7 @@ A new chat-based UI has replaced the old completion-based since [this PR](https:
 For example:
 
 ```sh
-./llama-server -m my_model.gguf -c 8192 --path ./tools/server/public_legacy
+docker run -p 18001:8080 -v /path/to/models:/models ghcr.io/ggml-org/llama.cpp:server -m /models/my_model.gguf -c 8192 --host 0.0.0.0 --port 8080 --path ./tools/server/public_legacy
 ```
 
 ### Extending or building alternative Web Front End

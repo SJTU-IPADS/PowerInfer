@@ -42,128 +42,118 @@ TEST_WARNINGS_OUTPUT_FILE = "TEST_WARNINGS_OUTPUT_FILE"
 
 
 class GTestFailIfNoTestLinkedTest(gtest_test_utils.TestCase):
-  """Tests the --gtest_fail_if_no_test_linked flag."""
+    """Tests the --gtest_fail_if_no_test_linked flag."""
 
-  def Run(self, program_name, flag=None, env=None):
-    """Run the given program with the given flag.
+    def Run(self, program_name, flag=None, env=None):
+        """Run the given program with the given flag.
 
-    Args:
-      program_name: Name of the program to run.
-      flag: The command line flag to pass to the program, or None.
-      env: Dictionary with environment to pass to the subprocess.
+        Args:
+          program_name: Name of the program to run.
+          flag: The command line flag to pass to the program, or None.
+          env: Dictionary with environment to pass to the subprocess.
 
-    Returns:
-      True if the program exits with code 0, false otherwise.
-    """
+        Returns:
+          True if the program exits with code 0, false otherwise.
+        """
 
-    exe_path = gtest_test_utils.GetTestExecutablePath(program_name)
-    args = [exe_path]
-    if flag is not None:
-      args += [flag]
-    process = gtest_test_utils.Subprocess(args, capture_stderr=False, env=env)
-    return process.exited and process.exit_code == 0
+        exe_path = gtest_test_utils.GetTestExecutablePath(program_name)
+        args = [exe_path]
+        if flag is not None:
+            args += [flag]
+        process = gtest_test_utils.Subprocess(args, capture_stderr=False, env=env)
+        return process.exited and process.exit_code == 0
 
-  def testSucceedsIfNoTestLinkedAndFlagNotSpecified(self):
-    """Tests the behavior of no test linked and flag not specified."""
-    self.assertTrue(
-        self.Run("googletest-fail-if-no-test-linked-test-without-test_")
-    )
-
-  def testSucceedsIfNoTestLinkedAndFlagNotSpecifiedWithWarningFile(self):
-    """Tests that no test linked results in warning file output."""
-
-    warning_file = os.path.join(gtest_test_utils.GetTempDir(), "NO_TEST_LINKED")
-    self.assertTrue(
-        self.Run(
-            "googletest-fail-if-no-test-linked-test-without-test_",
-            env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+    def testSucceedsIfNoTestLinkedAndFlagNotSpecified(self):
+        """Tests the behavior of no test linked and flag not specified."""
+        self.assertTrue(
+            self.Run("googletest-fail-if-no-test-linked-test-without-test_")
         )
-    )
-    warning_file_contents = open(warning_file, "r").read()
-    self.assertEqual(
-        warning_file_contents,
-        "This test program does NOT link in any test case. Please make sure"
-        " this is intended.\n",
-    )
 
-  def testFailsIfNoTestLinkedAndFlagSpecified(self):
-    """Tests the behavior of no test linked and flag specified."""
+    def testSucceedsIfNoTestLinkedAndFlagNotSpecifiedWithWarningFile(self):
+        """Tests that no test linked results in warning file output."""
 
-    warning_file = os.path.join(
-        gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST"
-    )
-    self.assertFalse(
-        self.Run(
-            "googletest-fail-if-no-test-linked-test-without-test_",
-            f"--{FAIL_IF_NO_TEST_LINKED_FLAG}",
-            env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+        warning_file = os.path.join(gtest_test_utils.GetTempDir(), "NO_TEST_LINKED")
+        self.assertTrue(
+            self.Run(
+                "googletest-fail-if-no-test-linked-test-without-test_",
+                env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+            )
         )
-    )
-    with self.assertRaises(FileNotFoundError):
-      open(warning_file, "r")
-
-  def testSucceedsIfEnabledTestLinkedAndFlagNotSpecified(self):
-    """Tests the behavior of enabled test linked and flag not specified."""
-
-    warning_file = os.path.join(
-        gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST"
-    )
-    self.assertTrue(
-        self.Run(
-            "googletest-fail-if-no-test-linked-test-with-enabled-test_",
-            env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+        warning_file_contents = open(warning_file, "r").read()
+        self.assertEqual(
+            warning_file_contents,
+            "This test program does NOT link in any test case. Please make sure"
+            " this is intended.\n",
         )
-    )
-    with self.assertRaises(FileNotFoundError):
-      open(warning_file, "r")
 
-  def testSucceedsIfEnabledTestLinkedAndFlagSpecified(self):
-    """Tests the behavior of enabled test linked and flag specified."""
+    def testFailsIfNoTestLinkedAndFlagSpecified(self):
+        """Tests the behavior of no test linked and flag specified."""
 
-    warning_file = os.path.join(
-        gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST"
-    )
-    self.assertTrue(
-        self.Run(
-            "googletest-fail-if-no-test-linked-test-with-enabled-test_",
-            f"--{FAIL_IF_NO_TEST_LINKED_FLAG}",
-            env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+        warning_file = os.path.join(gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST")
+        self.assertFalse(
+            self.Run(
+                "googletest-fail-if-no-test-linked-test-without-test_",
+                f"--{FAIL_IF_NO_TEST_LINKED_FLAG}",
+                env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+            )
         )
-    )
-    with self.assertRaises(FileNotFoundError):
-      open(warning_file, "r")
+        with self.assertRaises(FileNotFoundError):
+            open(warning_file, "r")
 
-  def testSucceedsIfDisabledTestLinkedAndFlagNotSpecified(self):
-    """Tests the behavior of disabled test linked and flag not specified."""
+    def testSucceedsIfEnabledTestLinkedAndFlagNotSpecified(self):
+        """Tests the behavior of enabled test linked and flag not specified."""
 
-    warning_file = os.path.join(
-        gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST"
-    )
-    self.assertTrue(
-        self.Run(
-            "googletest-fail-if-no-test-linked-test-with-disabled-test_",
-            env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+        warning_file = os.path.join(gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST")
+        self.assertTrue(
+            self.Run(
+                "googletest-fail-if-no-test-linked-test-with-enabled-test_",
+                env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+            )
         )
-    )
-    with self.assertRaises(FileNotFoundError):
-      open(warning_file, "r")
+        with self.assertRaises(FileNotFoundError):
+            open(warning_file, "r")
 
-  def testSucceedsIfDisabledTestLinkedAndFlagSpecified(self):
-    """Tests the behavior of disabled test linked and flag specified."""
+    def testSucceedsIfEnabledTestLinkedAndFlagSpecified(self):
+        """Tests the behavior of enabled test linked and flag specified."""
 
-    warning_file = os.path.join(
-        gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST"
-    )
-    self.assertTrue(
-        self.Run(
-            "googletest-fail-if-no-test-linked-test-with-disabled-test_",
-            f"--{FAIL_IF_NO_TEST_LINKED_FLAG}",
-            env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+        warning_file = os.path.join(gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST")
+        self.assertTrue(
+            self.Run(
+                "googletest-fail-if-no-test-linked-test-with-enabled-test_",
+                f"--{FAIL_IF_NO_TEST_LINKED_FLAG}",
+                env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+            )
         )
-    )
-    with self.assertRaises(FileNotFoundError):
-      open(warning_file, "r")
+        with self.assertRaises(FileNotFoundError):
+            open(warning_file, "r")
+
+    def testSucceedsIfDisabledTestLinkedAndFlagNotSpecified(self):
+        """Tests the behavior of disabled test linked and flag not specified."""
+
+        warning_file = os.path.join(gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST")
+        self.assertTrue(
+            self.Run(
+                "googletest-fail-if-no-test-linked-test-with-disabled-test_",
+                env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+            )
+        )
+        with self.assertRaises(FileNotFoundError):
+            open(warning_file, "r")
+
+    def testSucceedsIfDisabledTestLinkedAndFlagSpecified(self):
+        """Tests the behavior of disabled test linked and flag specified."""
+
+        warning_file = os.path.join(gtest_test_utils.GetTempDir(), "SHOULD_NOT_EXIST")
+        self.assertTrue(
+            self.Run(
+                "googletest-fail-if-no-test-linked-test-with-disabled-test_",
+                f"--{FAIL_IF_NO_TEST_LINKED_FLAG}",
+                env={TEST_WARNINGS_OUTPUT_FILE: warning_file},
+            )
+        )
+        with self.assertRaises(FileNotFoundError):
+            open(warning_file, "r")
 
 
 if __name__ == "__main__":
-  gtest_test_utils.Main()
+    gtest_test_utils.Main()

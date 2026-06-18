@@ -42,8 +42,8 @@ import os
 import re
 from googletest.test import gtest_test_utils
 
-GTEST_LIST_TESTS_FLAG = '--gtest_list_tests'
-GTEST_OUTPUT_FLAG = '--gtest_output'
+GTEST_LIST_TESTS_FLAG = "--gtest_list_tests"
+GTEST_OUTPUT_FLAG = "--gtest_output"
 
 EXPECTED_XML = """<\?xml version="1.0" encoding="UTF-8"\?>
 <testsuites tests="16" name="AllTests">
@@ -224,66 +224,66 @@ EXPECTED_JSON = """{
 
 
 class GTestListTestsOutputUnitTest(gtest_test_utils.TestCase):
-  """Unit test for Google Test's list tests with output to file functionality."""
+    """Unit test for Google Test's list tests with output to file functionality."""
 
-  def testXml(self):
-    """Verifies XML output for listing tests in a Google Test binary.
+    def testXml(self):
+        """Verifies XML output for listing tests in a Google Test binary.
 
-    Runs a test program that generates an empty XML output, and
-    tests that the XML output is expected.
-    """
-    self._TestOutput('xml', EXPECTED_XML)
+        Runs a test program that generates an empty XML output, and
+        tests that the XML output is expected.
+        """
+        self._TestOutput("xml", EXPECTED_XML)
 
-  def testJSON(self):
-    """Verifies XML output for listing tests in a Google Test binary.
+    def testJSON(self):
+        """Verifies XML output for listing tests in a Google Test binary.
 
-    Runs a test program that generates an empty XML output, and
-    tests that the XML output is expected.
-    """
-    self._TestOutput('json', EXPECTED_JSON)
+        Runs a test program that generates an empty XML output, and
+        tests that the XML output is expected.
+        """
+        self._TestOutput("json", EXPECTED_JSON)
 
-  def _GetOutput(self, out_format):
-    file_path = os.path.join(
-        gtest_test_utils.GetTempDir(), 'test_out.' + out_format
-    )
-    gtest_prog_path = gtest_test_utils.GetTestExecutablePath(
-        'gtest_list_output_unittest_'
-    )
+    def _GetOutput(self, out_format):
+        file_path = os.path.join(
+            gtest_test_utils.GetTempDir(), "test_out." + out_format
+        )
+        gtest_prog_path = gtest_test_utils.GetTestExecutablePath(
+            "gtest_list_output_unittest_"
+        )
 
-    command = [
-        gtest_prog_path,
-        '%s=%s:%s' % (GTEST_OUTPUT_FLAG, out_format, file_path),
-        '--gtest_list_tests',
-    ]
-    environ_copy = os.environ.copy()
-    p = gtest_test_utils.Subprocess(
-        command, env=environ_copy, working_dir=gtest_test_utils.GetTempDir()
-    )
+        command = [
+            gtest_prog_path,
+            "%s=%s:%s" % (GTEST_OUTPUT_FLAG, out_format, file_path),
+            "--gtest_list_tests",
+        ]
+        environ_copy = os.environ.copy()
+        p = gtest_test_utils.Subprocess(
+            command, env=environ_copy, working_dir=gtest_test_utils.GetTempDir()
+        )
 
-    self.assertTrue(p.exited)
-    self.assertEqual(0, p.exit_code)
-    self.assertTrue(os.path.isfile(file_path))
-    with open(file_path) as f:
-      result = f.read()
-    return result
+        self.assertTrue(p.exited)
+        self.assertEqual(0, p.exit_code)
+        self.assertTrue(os.path.isfile(file_path))
+        with open(file_path) as f:
+            result = f.read()
+        return result
 
-  def _TestOutput(self, test_format, expected_output):
-    actual = self._GetOutput(test_format)
-    actual_lines = actual.splitlines()
-    expected_lines = expected_output.splitlines()
-    line_count = 0
-    for actual_line in actual_lines:
-      expected_line = expected_lines[line_count]
-      expected_line_re = re.compile(expected_line.strip())
-      self.assertTrue(
-          expected_line_re.match(actual_line.strip()),
-          'actual output of "%s",\n'
-          'which does not match expected regex of "%s"\n'
-          'on line %d' % (actual, expected_output, line_count),
-      )
-      line_count = line_count + 1
+    def _TestOutput(self, test_format, expected_output):
+        actual = self._GetOutput(test_format)
+        actual_lines = actual.splitlines()
+        expected_lines = expected_output.splitlines()
+        line_count = 0
+        for actual_line in actual_lines:
+            expected_line = expected_lines[line_count]
+            expected_line_re = re.compile(expected_line.strip())
+            self.assertTrue(
+                expected_line_re.match(actual_line.strip()),
+                'actual output of "%s",\n'
+                'which does not match expected regex of "%s"\n'
+                "on line %d" % (actual, expected_output, line_count),
+            )
+            line_count = line_count + 1
 
 
-if __name__ == '__main__':
-  os.environ['GTEST_STACK_TRACE_DEPTH'] = '1'
-  gtest_test_utils.Main()
+if __name__ == "__main__":
+    os.environ["GTEST_STACK_TRACE_DEPTH"] = "1"
+    gtest_test_utils.Main()

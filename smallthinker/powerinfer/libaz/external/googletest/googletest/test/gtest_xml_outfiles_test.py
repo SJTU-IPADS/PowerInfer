@@ -79,69 +79,69 @@ EXPECTED_XML_2 = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 class GTestXMLOutFilesTest(gtest_xml_test_utils.GTestXMLTestCase):
-  """Unit test for Google Test's XML output functionality."""
+    """Unit test for Google Test's XML output functionality."""
 
-  def setUp(self):
-    # We want the trailing '/' that the last "" provides in os.path.join, for
-    # telling Google Test to create an output directory instead of a single file
-    # for xml output.
-    self.output_dir_ = os.path.join(
-        gtest_test_utils.GetTempDir(), GTEST_OUTPUT_SUBDIR, ""
-    )
-    self.DeleteFilesAndDir()
+    def setUp(self):
+        # We want the trailing '/' that the last "" provides in os.path.join, for
+        # telling Google Test to create an output directory instead of a single file
+        # for xml output.
+        self.output_dir_ = os.path.join(
+            gtest_test_utils.GetTempDir(), GTEST_OUTPUT_SUBDIR, ""
+        )
+        self.DeleteFilesAndDir()
 
-  def tearDown(self):
-    self.DeleteFilesAndDir()
+    def tearDown(self):
+        self.DeleteFilesAndDir()
 
-  def DeleteFilesAndDir(self):
-    try:
-      os.remove(os.path.join(self.output_dir_, GTEST_OUTPUT_1_TEST + ".xml"))
-    except os.error:
-      pass
-    try:
-      os.remove(os.path.join(self.output_dir_, GTEST_OUTPUT_2_TEST + ".xml"))
-    except os.error:
-      pass
-    try:
-      os.rmdir(self.output_dir_)
-    except os.error:
-      pass
+    def DeleteFilesAndDir(self):
+        try:
+            os.remove(os.path.join(self.output_dir_, GTEST_OUTPUT_1_TEST + ".xml"))
+        except os.error:
+            pass
+        try:
+            os.remove(os.path.join(self.output_dir_, GTEST_OUTPUT_2_TEST + ".xml"))
+        except os.error:
+            pass
+        try:
+            os.rmdir(self.output_dir_)
+        except os.error:
+            pass
 
-  def testOutfile1(self):
-    self._TestOutFile(GTEST_OUTPUT_1_TEST, EXPECTED_XML_1)
+    def testOutfile1(self):
+        self._TestOutFile(GTEST_OUTPUT_1_TEST, EXPECTED_XML_1)
 
-  def testOutfile2(self):
-    self._TestOutFile(GTEST_OUTPUT_2_TEST, EXPECTED_XML_2)
+    def testOutfile2(self):
+        self._TestOutFile(GTEST_OUTPUT_2_TEST, EXPECTED_XML_2)
 
-  def _TestOutFile(self, test_name, expected_xml):
-    gtest_prog_path = gtest_test_utils.GetTestExecutablePath(test_name)
-    command = [gtest_prog_path, "--gtest_output=xml:%s" % self.output_dir_]
-    p = gtest_test_utils.Subprocess(
-        command, working_dir=gtest_test_utils.GetTempDir()
-    )
-    self.assertTrue(p.exited)
-    self.assertEqual(0, p.exit_code)
+    def _TestOutFile(self, test_name, expected_xml):
+        gtest_prog_path = gtest_test_utils.GetTestExecutablePath(test_name)
+        command = [gtest_prog_path, "--gtest_output=xml:%s" % self.output_dir_]
+        p = gtest_test_utils.Subprocess(
+            command, working_dir=gtest_test_utils.GetTempDir()
+        )
+        self.assertTrue(p.exited)
+        self.assertEqual(0, p.exit_code)
 
-    output_file_name1 = test_name + ".xml"
-    output_file1 = os.path.join(self.output_dir_, output_file_name1)
-    output_file_name2 = "lt-" + output_file_name1
-    output_file2 = os.path.join(self.output_dir_, output_file_name2)
-    self.assertTrue(
-        os.path.isfile(output_file1) or os.path.isfile(output_file2),
-        output_file1,
-    )
+        output_file_name1 = test_name + ".xml"
+        output_file1 = os.path.join(self.output_dir_, output_file_name1)
+        output_file_name2 = "lt-" + output_file_name1
+        output_file2 = os.path.join(self.output_dir_, output_file_name2)
+        self.assertTrue(
+            os.path.isfile(output_file1) or os.path.isfile(output_file2),
+            output_file1,
+        )
 
-    expected = minidom.parseString(expected_xml)
-    if os.path.isfile(output_file1):
-      actual = minidom.parse(output_file1)
-    else:
-      actual = minidom.parse(output_file2)
-    self.NormalizeXml(actual.documentElement)
-    self.AssertEquivalentNodes(expected.documentElement, actual.documentElement)
-    expected.unlink()
-    actual.unlink()
+        expected = minidom.parseString(expected_xml)
+        if os.path.isfile(output_file1):
+            actual = minidom.parse(output_file1)
+        else:
+            actual = minidom.parse(output_file2)
+        self.NormalizeXml(actual.documentElement)
+        self.AssertEquivalentNodes(expected.documentElement, actual.documentElement)
+        expected.unlink()
+        actual.unlink()
 
 
 if __name__ == "__main__":
-  os.environ["GTEST_STACK_TRACE_DEPTH"] = "0"
-  gtest_test_utils.Main()
+    os.environ["GTEST_STACK_TRACE_DEPTH"] = "0"
+    gtest_test_utils.Main()
