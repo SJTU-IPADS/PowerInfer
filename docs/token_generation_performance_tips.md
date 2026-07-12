@@ -71,7 +71,7 @@ Result:
 
 # CPU affinity and hybrid architecture
 
-PowerInfer achieves the best performance on CPUs of hybrid architecture (big.LITTLE) when it is running on all CPU performance cores (P cores). On such hardware, we recommend setting `-t --threads` with the available number of P cores. 
+PowerInfer achieves the best performance on CPUs of hybrid architecture (big.LITTLE) when it is running on all CPU performance cores (P cores). On such hardware, we recommend setting `-t --threads` with the available number of P cores.
 
 We found that Windows sometimes are not able to schedule threads on P cores and forfeits generation performance. If you find the token generation speed unstable, or the utilization of P cores is low, you can try to set CPU affinity manually with `Start-Process` in PowerShell like this example on 12th Gen Core i7 (8 P cores):
 
