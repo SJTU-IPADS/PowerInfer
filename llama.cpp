@@ -2113,18 +2113,32 @@ struct llama_model_loader {
         }
     }
 
-    size_t file_offset(const char * name) const {
+    size_t file_offset(const struct ggml_tensor * cur) const {
+        const char * name = ggml_get_name(cur);
         const int idx = gguf_find_tensor(ctx_gguf, name);
 
         if (idx < 0) {
             throw std::runtime_error(format("%s: tensor '%s' not found in the file", __func__, name));
         }
 
-        return gguf_get_data_offset(ctx_gguf) + gguf_get_tensor_offset(ctx_gguf, idx);
+        const size_t data_offset   = gguf_get_data_offset(ctx_gguf);
+        const size_t tensor_offset = gguf_get_tensor_offset(ctx_gguf, idx);
+
+        // Validate the file-controlled offsets before using them as mmap or read pointers.
+        if (tensor_offset > file.size || data_offset > file.size - tensor_offset) {
+            throw std::runtime_error(format("tensor '%s' data is not within the file bounds, model is corrupted or incomplete", name));
+        }
+
+        const size_t offs = data_offset + tensor_offset;
+        if (ggml_nbytes(cur) > file.size - offs) {
+            throw std::runtime_error(format("tensor '%s' data is not within the file bounds, model is corrupted or incomplete", name));
+        }
+
+        return offs;
     }
 
     void load_data_for(struct ggml_tensor * cur) const {
-        const size_t offs = file_offset(ggml_get_name(cur));
+        const size_t offs = file_offset(cur);
 
         if (use_mmap) {
             cur->data = (uint8_t *) mapping->addr + offs;
