@@ -44,6 +44,7 @@ llama_build_and_test_executable(test-grad0.cpp) # SLOW
 # llama_build_and_test_executable(test-opt.cpp) # SLOW
 
 llama_build_and_test_executable(test-rope.cpp)
+llama_build_and_test_executable(test-gpu-bucket.cpp)
 
 # dummy executable - not installed
 get_filename_component(TEST_TARGET test-c.c NAME_WE)

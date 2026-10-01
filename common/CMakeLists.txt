@@ -43,6 +43,7 @@ set(TARGET common)
 add_library(${TARGET} STATIC
     base64.hpp
     common.h
+    gpu_bucket.h
     common.cpp
     sampling.h
     sampling.cpp

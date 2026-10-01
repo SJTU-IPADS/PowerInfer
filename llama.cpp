@@ -7,6 +7,8 @@
 
 #include "ggml-alloc.h"
 
+#include "common/gpu_bucket.h"
+
 #ifdef GGML_USE_CUBLAS
 #  include "ggml-cuda.h"
 #elif defined(GGML_USE_CLBLAST)
@@ -2827,16 +2829,19 @@ struct llama_gpu_split_loader {
         LLAMA_LOG_INFO("%s: applying gpu_idx adapter from '%s' - please wait ...\n", __func__, fname.c_str());
         const int64_t t_start_mlp_us = ggml_time_us();
 
+        std::vector<ggml_tensor *> gpu_indices(n_layers);
+        std::vector<ggml_tensor *> gpu_buckets(n_layers);
+        std::vector<int64_t> gpu_neurons(n_layers);
+
         for (int il = 0; il < n_layers; il++) {
-            llama_layer &model_layer = model->layers[il];
             ggml_tensor * gpu_idx = idx_loader->get_tensor_meta(il*2);
             ggml_tensor * gpu_bucket = idx_loader->get_tensor_meta(il*2+1);
             if (gpu_idx == nullptr || gpu_bucket == nullptr) {
                 LLAMA_LOG_ERROR("%s: error: failed to load gpu index or bucket\n", __func__);
                 return 1;
             }
-            model_layer.gpu_idx = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
-            model_layer.gpu_bucket = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_CPU);
+            gpu_indices[il] = idx_loader->create_tensor_for(ctx_meta, gpu_idx, GGML_BACKEND_CPU);
+            gpu_buckets[il] = idx_loader->create_tensor_for(ctx_meta, gpu_bucket, GGML_BACKEND_CPU);
         }
         llama_progress_callback cb = [](float progress, void *ctx) {
             LLAMA_LOG_INFO(".");
@@ -2845,11 +2850,61 @@ struct llama_gpu_split_loader {
 
         for (int il = 0; il < n_layers; il++) {
             llama_layer &model_layer = model->layers[il];
-            ggml_tensor * gpu_idx = model_layer.gpu_idx;
-            ggml_tensor * gpu_bucket = model_layer.gpu_bucket;
-            int64_t gpu_neurons = sum_gpu_index(gpu_idx);
-            model_layer.gpu_offload_ratio = (double)gpu_neurons / gpu_idx->ne[0];
-            if (gpu_neurons == 0 || gpu_neurons == gpu_idx->ne[0]) {
+            ggml_tensor * gpu_idx = gpu_indices[il];
+            ggml_tensor * gpu_bucket = gpu_buckets[il];
+
+            if (gpu_idx->type != GGML_TYPE_I32 || gpu_bucket->type != GGML_TYPE_I32 ||
+                gpu_idx->data == nullptr ||
+                ggml_nelements(gpu_idx) != gpu_idx->ne[0] ||
+                ggml_nelements(gpu_bucket) != gpu_bucket->ne[0] ||
+                model_layer.ffn_up == nullptr ||
+                gpu_idx->ne[0] != model_layer.ffn_up->ne[1]) {
+                LLAMA_LOG_ERROR("%s: error: invalid GPU split tensor shape or type for layer %d\n", __func__, il);
+                return 1;
+            }
+
+            const int32_t * gpu_idx_data = reinterpret_cast<const int32_t *>(gpu_idx->data);
+            for (int64_t i = 0; i < gpu_idx->ne[0]; ++i) {
+                if (gpu_idx_data[i] != 0 && gpu_idx_data[i] != 1) {
+                    LLAMA_LOG_ERROR("%s: error: invalid GPU index value for layer %d\n", __func__, il);
+                    return 1;
+                }
+            }
+
+            const size_t bucket_count = static_cast<size_t>(gpu_bucket->ne[0]);
+            if (bucket_count > 0 && !gpu_bucket_indices_are_valid(
+                    reinterpret_cast<const int32_t *>(gpu_bucket->data), bucket_count, gpu_idx->ne[0])) {
+                LLAMA_LOG_ERROR("%s: error: invalid GPU bucket row index for layer %d\n", __func__, il);
+                return 1;
+            }
+
+            if (bucket_count > 0) {
+                const int32_t * bucket_data = reinterpret_cast<const int32_t *>(gpu_bucket->data);
+                if ((model_layer.ffn_gate != nullptr && !gpu_bucket_indices_are_valid(
+                         bucket_data, bucket_count, model_layer.ffn_gate->ne[1])) ||
+                    !gpu_bucket_indices_are_valid(bucket_data, bucket_count, model_layer.ffn_up->ne[1]) ||
+                    model_layer.ffn_down_t == nullptr ||
+                    !gpu_bucket_indices_are_valid(bucket_data, bucket_count, model_layer.ffn_down_t->ne[1])) {
+                    LLAMA_LOG_ERROR("%s: error: GPU bucket does not fit FFN tensors for layer %d\n", __func__, il);
+                    return 1;
+                }
+            }
+
+            gpu_neurons[il] = sum_gpu_index(gpu_idx);
+            if (gpu_neurons[il] != gpu_bucket->ne[0]) {
+                LLAMA_LOG_ERROR("%s: error: GPU index and bucket sizes differ for layer %d\n", __func__, il);
+                return 1;
+            }
+        }
+
+        for (int il = 0; il < n_layers; il++) {
+            llama_layer &model_layer = model->layers[il];
+            ggml_tensor * gpu_idx = gpu_indices[il];
+            ggml_tensor * gpu_bucket = gpu_buckets[il];
+            model_layer.gpu_idx = gpu_idx;
+            model_layer.gpu_bucket = gpu_bucket;
+            model_layer.gpu_offload_ratio = (double)gpu_neurons[il] / gpu_idx->ne[0];
+            if (gpu_neurons[il] == 0 || gpu_neurons[il] == gpu_idx->ne[0]) {
                 // no hybrid inference for this layer, unset gpu_bucket
                 model_layer.gpu_bucket = NULL;
                 // TODO: maybe can also unset gpu_idx
@@ -2904,9 +2959,18 @@ struct llama_augmentation_model_loader {
             return src;
         }
 
+        if (src == nullptr || src->data == nullptr || gpu_bucket->type != GGML_TYPE_I32 ||
+            gpu_bucket->ne[0] <= 0 || gpu_bucket->ne[0] > src->ne[1] ||
+            ggml_nelements(gpu_bucket) != gpu_bucket->ne[0] ||
+            !gpu_bucket_indices_are_valid(
+                reinterpret_cast<const int32_t *>(gpu_bucket->data),
+                static_cast<size_t>(gpu_bucket->ne[0]), src->ne[1])) {
+            LLAMA_LOG_ERROR("%s: error: invalid GPU bucket tensor\n", __func__);
+            return NULL;
+        }
+
         int64_t row_len = src->ne[0];
         int64_t gpu_rows = gpu_bucket->ne[0];
-        GGML_ASSERT(0 < gpu_rows && gpu_rows <= src->ne[1]);
 
         ggml_set_no_alloc(aux_ctx, true);
         ggml_tensor * gpu_dst = ggml_new_tensor_2d(aux_ctx, src->type, row_len, gpu_rows);
@@ -2954,13 +3018,22 @@ struct llama_augmentation_model_loader {
 
         if (layer.ffn_gate) {
             layer.ffn_gate_gpu = create_striped_mat_to_gpu(layer.ffn_gate, gpu_bucket);
+            if (layer.ffn_gate_gpu == NULL) {
+                return 0;
+            }
             offloaded_bytes += ggml_nbytes(layer.ffn_gate_gpu);
         }
         
         layer.ffn_up_gpu = create_striped_mat_to_gpu(layer.ffn_up, gpu_bucket);
+        if (layer.ffn_up_gpu == NULL) {
+            return 0;
+        }
         offloaded_bytes += ggml_nbytes(layer.ffn_up_gpu);
         
         layer.ffn_down_gpu = create_striped_mat_to_gpu(layer.ffn_down_t, gpu_bucket);
+        if (layer.ffn_down_gpu == NULL) {
+            return 0;
+        }
         offloaded_bytes += ggml_nbytes(layer.ffn_down_gpu);
 
         return offloaded_bytes;
